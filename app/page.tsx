@@ -1,77 +1,200 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
+import {
+  ArrowRight,
+  Clock,
+  Hospital,
+  MapPin,
+  Navigation,
+  PhoneCall,
+  Plane,
+  Quote,
+  ShieldCheck,
+  Star,
+  Users,
+} from "lucide-react";
+
+const services = [
+  {
+    title: "Aéroport",
+    description: "Transferts vers Lyon Saint-Exupéry et gares régionales.",
+    Icon: Plane,
+  },
+  {
+    title: "Longue distance",
+    description: "Courses toutes distances en France et en Europe.",
+    Icon: Navigation,
+  },
+  {
+    title: "Van & ski",
+    description: "7 places confort pour séjours montagne et évènements.",
+    Icon: Users,
+  },
+  {
+    title: "VSL / CPAM",
+    description: "Transport assis professionnalisé conventionné CPAM.",
+    Icon: Hospital,
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx files or not to implement.
-          </h1>
-          <Card className="w-[350px]">
-            <CardHeader>
-              <CardTitle className="text-slate-900">Test Shadcn UI</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <Button>Réserver</Button>
-              <Button variant="outline">Annuler</Button>
-            </CardContent>
-          </Card>
-          <p>La grande classe</p>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning he name
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+    <div className="mx-auto flex max-w-6xl flex-col gap-16 px-4 py-12 sm:px-6 lg:px-8">
+      <section id="reserver" className="space-y-6">
+        <div className="relative overflow-hidden rounded-[24px] border border-black/5 shadow-[0_35px_70px_rgba(1,7,18,0.35)] dark:border-white/10">
+          <div className="absolute inset-0">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="/images/mercedes-gare.png"
+              alt="Taxi premium stationné devant la gare de Lyon-Saint-Exupéry"
+              fill
+              priority
+              className="object-cover object-[center_70%]"
+              sizes="(max-width: 1024px) 100vw, 1200px"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <div className="absolute inset-0 bg-gradient-to-r from-sidebar/90 via-sidebar/70 to-transparent" />
+          </div>
+
+          <div className="relative z-10 flex flex-col gap-6 px-6 py-12 text-sidebar-foreground sm:px-10 lg:px-14">
+            <span className="badge-pill bg-white/10 text-white/90">Service premium 24/7</span>
+            <div className="space-y-4">
+              <h1 className="font-display text-4xl leading-tight text-white sm:text-5xl">
+                À votre service pour tous vos trajets
+              </h1>
+              <p className="hidden max-w-2xl text-lg text-white/80 sm:block">
+                Transferts aéroport, longues distances, VSL/CPAM, navettes entreprises. Des
+                chauffeurs ponctuels, un suivi en temps réel et un confort haut de gamme.
+              </p>
+            </div>
+
+            <div className="flex w-full flex-col gap-3 sm:flex-row">
+              <button className="btn btn-primary w-full justify-center shadow-[0_30px_55px_rgba(246,196,49,0.45)] sm:flex-1 md:flex-none md:w-56">
+                Réserver maintenant
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <a
+                href="tel:+33495785400"
+                className="btn w-full justify-center border border-primary/90 bg-transparent text-white hover:border-primary hover:bg-primary/15 sm:flex-1 md:flex-none md:w-56"
+              >
+                Appeler
+              </a>
+            </div>
+          </div>
         </div>
-      </main>
+
+        <div className="rounded-[24px] border border-border/70 bg-card px-5 py-5 text-sm text-muted-foreground sm:hidden">
+          <p className="font-semibold text-foreground">Pourquoi nous choisir ?</p>
+          <div className="mt-3 grid gap-2">
+            <div>• Chauffeurs disponibles 24/7</div>
+            <div>• Transferts aéroports, longues distances, VSL/CPAM</div>
+            <div>• Suivi en temps réel et paiement sécurisé</div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-[2fr_1fr]">
+          <div className="grid gap-6 rounded-[32px] border border-border/80 bg-card p-8 shadow-[0_35px_55px_rgba(5,15,35,0.08)]">
+            <div className="flex flex-col gap-2">
+              <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                Nos services
+              </p>
+              <h2 className="font-display text-3xl text-foreground">
+                Tous vos trajets, sur-mesure
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Déplacements professionnels, transferts famille, navettes scolaires ou transport
+                médicalisé : nous adaptons la flotte à vos besoins.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {services.map(({ title, description, Icon }) => (
+                <div key={title} className="icon-tile items-start text-left">
+                  <span className="rounded-2xl bg-muted px-4 py-3 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+                    <p className="text-sm text-muted-foreground">{description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <div className="rounded-[28px] border border-border/70 bg-card px-6 py-8 text-center shadow-[0_35px_55px_rgba(5,15,35,0.12)]">
+              <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">
+                Trajet type
+              </p>
+              <h3 className="mt-4 font-display text-2xl text-foreground">Tignieu → Aéroport</h3>
+              <p className="text-sm text-muted-foreground">Lyon Saint-Exupéry ou Lyon Part-Dieu</p>
+              <p className="mt-6 text-sm text-muted-foreground">à partir de</p>
+              <p className="text-5xl font-semibold text-primary">35 €</p>
+              <p className="text-xs text-muted-foreground">
+                Tarif indicatif journée, 1 à 4 passagers
+              </p>
+            </div>
+
+            <div className="rounded-[28px] border border-border/70 bg-sidebar px-6 py-8 text-sidebar-foreground shadow-[0_35px_55px_rgba(2,8,32,0.35)]">
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Contacter</p>
+              <h3 className="mt-4 font-display text-2xl text-white">Un chauffeur disponible</h3>
+              <ul className="mt-6 space-y-3 text-sm text-white/90">
+                <li className="flex items-center gap-3">
+                  <PhoneCall className="h-4 w-4 text-primary" />
+                  04 95 78 54 00
+                </li>
+                <li className="flex items-center gap-3">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  9, rue de la République — 38230
+                </li>
+                <li className="flex items-center gap-3">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Chauffeurs agréés & paiement sécurisé
+                </li>
+              </ul>
+              <a
+                href="mailto:contact@taxitignieu.fr"
+                className="mt-6 inline-flex items-center text-sm font-semibold text-primary"
+              >
+                contact@taxitignieu.fr
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="avis"
+        className="grid gap-6 rounded-[32px] border border-border/70 bg-card p-8 shadow-[0_35px_55px_rgba(5,15,35,0.12)] lg:grid-cols-[1.3fr_0.7fr]"
+      >
+        <div className="space-y-4">
+          <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+            Avis clients
+          </p>
+          <h2 className="font-display text-3xl text-foreground">Ils nous font confiance</h2>
+          <div className="rounded-2xl border border-border/70 bg-muted/30 p-6 shadow-inner">
+            <Quote className="h-6 w-6 text-primary" />
+            <p className="mt-3 text-lg text-foreground">
+              “Service impeccable, chauffeur ponctuel et cordial. Je recommande vivement !”
+            </p>
+            <p className="mt-4 text-sm font-semibold text-muted-foreground">Sophie M.</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="stat-card">
+            <Star className="h-5 w-5 text-primary" />
+            <h3 className="text-2xl font-semibold text-foreground">4.9 / 5</h3>
+            <p className="text-sm text-muted-foreground">Moyenne sur 320+ clients vérifiés</p>
+          </div>
+          <div className="stat-card">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <h3 className="text-2xl font-semibold text-foreground">99 %</h3>
+            <p className="text-sm text-muted-foreground">Trajets à l&apos;heure en 2024</p>
+          </div>
+          <div className="stat-card">
+            <Clock className="h-5 w-5 text-primary" />
+            <h3 className="text-2xl font-semibold text-foreground">15 min</h3>
+            <p className="text-sm text-muted-foreground">Temps moyen de prise en charge</p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
