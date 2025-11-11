@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
 
 export default function Home() {
@@ -14,8 +16,19 @@ export default function Home() {
         />
         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
           <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+            To get started, edit the page.tsx files or 
+            not.
           </h1>
+            <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle className="text-slate-900">Test Shadcn UI</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          <Button>Réserver</Button>
+          <Button variant="outline">Annuler</Button>
+        </CardContent>
+      </Card>
+          <p>La grande classe</p>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             Looking for a starting point or more instructions? Head over to{" "}
             <a
@@ -24,7 +37,9 @@ export default function Home() {
             >
               Templates
             </a>{" "}
-            or the{" "}
+            
+
+
             <a
               href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
               className="font-medium text-zinc-950 dark:text-zinc-50"
