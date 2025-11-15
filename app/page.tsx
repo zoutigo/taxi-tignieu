@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   Clock,
@@ -66,10 +67,13 @@ export default function Home() {
             </div>
 
             <div className="flex w-full flex-col gap-3 sm:flex-row">
-              <button className="btn btn-primary w-full justify-center shadow-[0_30px_55px_rgba(246,196,49,0.45)] sm:flex-1 md:flex-none md:w-56">
+              <Link
+                href="/reserver"
+                className="btn btn-primary w-full justify-center shadow-[0_30px_55px_rgba(246,196,49,0.45)] sm:flex-1 md:flex-none md:w-56"
+              >
                 Réserver maintenant
                 <ArrowRight className="h-4 w-4" />
-              </button>
+              </Link>
               <a
                 href="tel:+33495785400"
                 className="btn w-full justify-center border border-primary/90 bg-transparent text-white hover:border-primary hover:bg-primary/15 sm:flex-1 md:flex-none md:w-56"

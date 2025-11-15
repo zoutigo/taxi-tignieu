@@ -6,8 +6,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { useState } from "react";
 
 const navLinks = [
-  { label: "Réserver", href: "#reserver" },
-  { label: "Tarifs", href: "#tarifs" },
+  { label: "Tarifs", href: "/tarifs" },
   { label: "Services", href: "#services" },
   { label: "Avis", href: "#avis" },
   { label: "Entreprises", href: "#entreprises" },
@@ -51,7 +50,9 @@ export function SiteHeader() {
               <PhoneCall className="h-4 w-4" />
               Appeler
             </a>
-            <button className="btn btn-primary hidden text-sm lg:inline-flex">Réserver</button>
+            <Link href="/reserver" className="btn btn-primary hidden text-sm lg:inline-flex">
+              Réserver
+            </Link>
             <button
               type="button"
               onClick={toggleMenu}
@@ -113,9 +114,9 @@ export function SiteHeader() {
                   <PhoneCall className="h-4 w-4" />
                   Appeler
                 </a>
-                <button className="btn btn-primary w-full" onClick={closeMenu}>
+                <Link href="/reserver" className="btn btn-primary w-full" onClick={closeMenu}>
                   Réserver
-                </button>
+                </Link>
               </div>
             </div>
           </div>

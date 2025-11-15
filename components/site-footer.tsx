@@ -3,8 +3,8 @@ import { Car, Mail, MapPin, PhoneCall } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
 const quickLinks = [
-  { label: "Réserver un trajet", href: "#reserver" },
-  { label: "Nos tarifs", href: "#tarifs" },
+  { label: "Réserver un trajet", href: "/reserver" },
+  { label: "Nos tarifs", href: "/tarifs" },
   { label: "Services entreprises", href: "#entreprises" },
   { label: "Avis clients", href: "#avis" },
 ];

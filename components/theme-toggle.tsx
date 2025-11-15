@@ -2,16 +2,22 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const activeTheme = (theme === "system" ? resolvedTheme : theme) ?? undefined;
+  const [mounted, setMounted] = useState(false);
 
-  if (!activeTheme) {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
     return (
       <div className="h-10 w-20 rounded-full border border-border bg-muted/60" aria-hidden="true" />
     );
   }
+
+  const activeTheme = (theme === "system" ? resolvedTheme : theme) ?? "light";
 
   const isDark = activeTheme === "dark";
 
