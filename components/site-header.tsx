@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Car, PhoneCall, Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useState } from "react";
+import { useSession, signIn } from "next-auth/react";
 
 const navLinks = [
   { label: "Tarifs", href: "/tarifs" },
@@ -16,9 +17,14 @@ const navLinks = [
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
 
   const toggleMenu = () => setMenuOpen((prev) => !prev);
   const closeMenu = () => setMenuOpen(false);
+  const handleLogin = () => {
+    void signIn("google", { redirectTo: "/espace-client" });
+  };
 
   return (
     <>
@@ -43,6 +49,22 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <Link
+                href="/espace-client"
+                className="btn btn-outline hidden text-sm lg:inline-flex"
+              >
+                Espace client
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="btn btn-outline hidden text-sm lg:inline-flex"
+              >
+                Login
+              </button>
+            )}
             <a
               href="tel:+33495785400"
               className="hidden items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-sm font-semibold text-sidebar-foreground transition hover:border-primary/80 hover:text-primary lg:flex"
@@ -106,6 +128,26 @@ export function SiteHeader() {
 
               <div className="space-y-4">
                 <ThemeToggle />
+                {isAuthenticated ? (
+                  <Link
+                    href="/espace-client"
+                    className="btn btn-outline w-full"
+                    onClick={closeMenu}
+                  >
+                    Espace client
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-outline w-full"
+                    onClick={() => {
+                      closeMenu();
+                      handleLogin();
+                    }}
+                  >
+                    Login
+                  </button>
+                )}
                 <a
                   href="tel:+33495785400"
                   className="flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:border-primary/70 hover:text-primary"
