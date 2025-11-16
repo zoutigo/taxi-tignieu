@@ -15,11 +15,6 @@ export default async function ClientDashboardPage() {
     redirect("/");
   }
 
-  if (!session.user.phone) {
-    const params = new URLSearchParams({ from: "/espace-client" });
-    redirect(`/profil/completer-telephone?${params.toString()}`);
-  }
-
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
@@ -31,6 +26,11 @@ export default async function ClientDashboardPage() {
 
   if (!user) {
     redirect("/");
+  }
+
+  if (!user.phone) {
+    const params = new URLSearchParams({ from: "/espace-client" });
+    redirect(`/profil/completer-telephone?${params.toString()}`);
   }
 
   return (

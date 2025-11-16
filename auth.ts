@@ -43,6 +43,14 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;
       }
+      try {
+        const target = new URL(url);
+        if (target.origin === baseUrl) {
+          return url;
+        }
+      } catch {
+        // ignore parsing errors and fallback below
+      }
       return baseUrl;
     },
   },
