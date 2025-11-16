@@ -18,10 +18,27 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   ],
   adapter: PrismaAdapter(prisma),
   session: {
-    strategy: "database",
+    strategy: "jwt",
   },
   trustHost: true,
   callbacks: {
+    async jwt({ token, user, trigger, session }) {
+      if (user) {
+        token.id = user.id;
+        token.phone = user.phone ?? null;
+      }
+      if (trigger === "update" && session?.phone !== undefined) {
+        token.phone = session.phone;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = (token.id as string) ?? token.sub ?? session.user.id;
+        session.user.phone = (token.phone as string | null) ?? null;
+      }
+      return session;
+    },
     async redirect({ url, baseUrl }) {
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Car, PhoneCall, Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 const navLinks = [
   { label: "Tarifs", href: "/tarifs" },
@@ -24,6 +24,9 @@ export function SiteHeader() {
   const closeMenu = () => setMenuOpen(false);
   const handleLogin = () => {
     void signIn("google", { redirectTo: "/espace-client" });
+  };
+  const handleLogout = () => {
+    void signOut({ redirectTo: "/" });
   };
 
   return (
@@ -50,12 +53,21 @@ export function SiteHeader() {
 
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <Link
-                href="/espace-client"
-                className="btn btn-outline hidden text-sm lg:inline-flex"
-              >
-                Espace client
-              </Link>
+              <>
+                <Link
+                  href="/espace-client"
+                  className="btn btn-outline hidden text-sm lg:inline-flex"
+                >
+                  Espace client
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="btn btn-secondary hidden text-sm lg:inline-flex"
+                >
+                  Se déconnecter
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -136,6 +148,18 @@ export function SiteHeader() {
                   >
                     Espace client
                   </Link>
+                ) : null}
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary w-full"
+                    onClick={() => {
+                      closeMenu();
+                      handleLogout();
+                    }}
+                  >
+                    Se déconnecter
+                  </button>
                 ) : (
                   <button
                     type="button"
