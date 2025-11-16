@@ -15,6 +15,38 @@ const navLinks = [
   { label: "Contact", href: "#contact" },
 ];
 
+const defaultLoginProviderId = process.env.NEXT_PUBLIC_AUTH_PROVIDER_ID ?? "google";
+const e2eLoginEmail = process.env.NEXT_PUBLIC_E2E_TEST_USER_EMAIL;
+const e2eLoginName = process.env.NEXT_PUBLIC_E2E_TEST_USER_NAME;
+
+declare global {
+  interface Window {
+    __E2E_AUTH_PROVIDER__?: string;
+    __E2E_LOGIN_EMAIL__?: string;
+    __E2E_LOGIN_NAME__?: string;
+  }
+}
+
+const getRuntimeLoginConfig = () => {
+  if (typeof window !== "undefined") {
+    const providerOverride = window.__E2E_AUTH_PROVIDER__;
+    const emailOverride = window.__E2E_LOGIN_EMAIL__;
+    const nameOverride = window.__E2E_LOGIN_NAME__;
+
+    return {
+      provider: providerOverride ?? defaultLoginProviderId,
+      email: emailOverride ?? e2eLoginEmail,
+      name: nameOverride ?? e2eLoginName,
+    };
+  }
+
+  return {
+    provider: defaultLoginProviderId,
+    email: e2eLoginEmail,
+    name: e2eLoginName,
+  };
+};
+
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { status } = useSession();
@@ -23,7 +55,19 @@ export function SiteHeader() {
   const toggleMenu = () => setMenuOpen((prev) => !prev);
   const closeMenu = () => setMenuOpen(false);
   const handleLogin = () => {
-    void signIn("google", { redirectTo: "/espace-client" });
+    const { provider, email, name } = getRuntimeLoginConfig();
+    const loginOptions: Record<string, string> = { callbackUrl: "/espace-client" };
+
+    if (provider !== "google") {
+      if (email) {
+        loginOptions.email = email;
+      }
+      if (name) {
+        loginOptions.name = name;
+      }
+    }
+
+    void signIn(provider, loginOptions);
   };
   const handleLogout = () => {
     void signOut({ redirectTo: "/" });

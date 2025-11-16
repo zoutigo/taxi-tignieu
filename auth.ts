@@ -1,5 +1,8 @@
 import NextAuth from "next-auth";
+import type { User } from "next-auth";
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
+import type { Provider } from "@auth/core/providers";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
@@ -9,13 +12,48 @@ if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET) {
   );
 }
 
+const providers: Provider[] = [
+  Google({
+    clientId: process.env.AUTH_GOOGLE_ID,
+    clientSecret: process.env.AUTH_GOOGLE_SECRET,
+  }),
+];
+
+const e2eUserId = process.env.AUTH_E2E_TEST_USER_ID;
+const e2eUserEmail = process.env.AUTH_E2E_TEST_USER_EMAIL ?? "e2e@example.com";
+const e2eUserName = process.env.AUTH_E2E_TEST_USER_NAME ?? "Utilisateur E2E";
+
+if (e2eUserId) {
+  providers.push(
+    Credentials({
+      id: "mock-google",
+      name: "Mock Google",
+      credentials: {
+        email: { label: "Email", type: "text" },
+        name: { label: "Nom", type: "text" },
+      },
+      async authorize(credentials) {
+        if (!e2eUserId) {
+          return null;
+        }
+        const email = (credentials?.email as string | undefined) ?? e2eUserEmail;
+        const name = (credentials?.name as string | undefined) ?? e2eUserName;
+
+        const user: User = {
+          id: e2eUserId,
+          email,
+          name,
+          phone: null,
+        };
+
+        return user;
+      },
+    })
+  );
+}
+
 export const { auth, handlers, signIn, signOut } = NextAuth({
-  providers: [
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-    }),
-  ],
+  providers,
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",

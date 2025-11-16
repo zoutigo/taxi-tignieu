@@ -1,0 +1,189 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Taxi Tignieu À votre service 24/7" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e11]:
+            - generic [ref=e12]: Taxi Tignieu
+            - generic [ref=e13]: À votre service 24/7
+        - navigation [ref=e14]:
+          - link "Tarifs" [ref=e15] [cursor=pointer]:
+            - /url: /tarifs
+          - link "Services" [ref=e16] [cursor=pointer]:
+            - /url: "#services"
+          - link "Avis" [ref=e17] [cursor=pointer]:
+            - /url: "#avis"
+          - link "Entreprises" [ref=e18] [cursor=pointer]:
+            - /url: "#entreprises"
+          - link "À propos" [ref=e19] [cursor=pointer]:
+            - /url: "#a-propos"
+          - link "Contact" [ref=e20] [cursor=pointer]:
+            - /url: "#contact"
+        - generic [ref=e21]:
+          - link "Espace client" [ref=e22] [cursor=pointer]:
+            - /url: /espace-client
+          - button "Se déconnecter" [ref=e23]
+          - link "Appeler" [ref=e24] [cursor=pointer]:
+            - /url: tel:+33495785400
+            - img [ref=e25]
+            - text: Appeler
+          - link "Réserver" [ref=e29] [cursor=pointer]:
+            - /url: /reserver
+    - main [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img "Taxi premium stationné devant la gare de Lyon-Saint-Exupéry" [ref=e35]
+            - generic [ref=e37]:
+              - generic [ref=e38]: Service premium 24/7
+              - generic [ref=e39]:
+                - heading "À votre service pour tous vos trajets" [level=1] [ref=e40]
+                - paragraph [ref=e41]: Transferts aéroport, longues distances, VSL/CPAM, navettes entreprises. Des chauffeurs ponctuels, un suivi en temps réel et un confort haut de gamme.
+              - generic [ref=e42]:
+                - link "Réserver maintenant" [ref=e43] [cursor=pointer]:
+                  - /url: /reserver
+                  - text: Réserver maintenant
+                  - img [ref=e44]
+                - link "Appeler" [ref=e46] [cursor=pointer]:
+                  - /url: tel:+33495785400
+          - generic [ref=e47]:
+            - generic [ref=e48]:
+              - generic [ref=e49]:
+                - paragraph [ref=e50]: Nos services
+                - heading "Tous vos trajets, sur-mesure" [level=2] [ref=e51]
+                - paragraph [ref=e52]: "Déplacements professionnels, transferts famille, navettes scolaires ou transport médicalisé : nous adaptons la flotte à vos besoins."
+              - generic [ref=e53]:
+                - generic [ref=e54]:
+                  - img [ref=e56]
+                  - generic [ref=e58]:
+                    - heading "Aéroport" [level=3] [ref=e59]
+                    - paragraph [ref=e60]: Transferts vers Lyon Saint-Exupéry et gares régionales.
+                - generic [ref=e61]:
+                  - img [ref=e63]
+                  - generic [ref=e65]:
+                    - heading "Longue distance" [level=3] [ref=e66]
+                    - paragraph [ref=e67]: Courses toutes distances en France et en Europe.
+                - generic [ref=e68]:
+                  - img [ref=e70]
+                  - generic [ref=e75]:
+                    - heading "Van & ski" [level=3] [ref=e76]
+                    - paragraph [ref=e77]: 7 places confort pour séjours montagne et évènements.
+                - generic [ref=e78]:
+                  - img [ref=e80]
+                  - generic [ref=e84]:
+                    - heading "VSL / CPAM" [level=3] [ref=e85]
+                    - paragraph [ref=e86]: Transport assis professionnalisé conventionné CPAM.
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - paragraph [ref=e89]: Trajet type
+                - heading "Tignieu → Aéroport" [level=3] [ref=e90]
+                - paragraph [ref=e91]: Lyon Saint-Exupéry ou Lyon Part-Dieu
+                - paragraph [ref=e92]: à partir de
+                - paragraph [ref=e93]: 35 €
+                - paragraph [ref=e94]: Tarif indicatif journée, 1 à 4 passagers
+              - generic [ref=e95]:
+                - paragraph [ref=e96]: Contacter
+                - heading "Un chauffeur disponible" [level=3] [ref=e97]
+                - list [ref=e98]:
+                  - listitem [ref=e99]:
+                    - img [ref=e100]
+                    - text: 04 95 78 54 00
+                  - listitem [ref=e104]:
+                    - img [ref=e105]
+                    - text: 9, rue de la République — 38230
+                  - listitem [ref=e108]:
+                    - img [ref=e109]
+                    - text: Chauffeurs agréés & paiement sécurisé
+                - link "contact@taxitignieu.fr" [ref=e112] [cursor=pointer]:
+                  - /url: mailto:contact@taxitignieu.fr
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - paragraph [ref=e115]: Avis clients
+            - heading "Ils nous font confiance" [level=2] [ref=e116]
+            - generic [ref=e117]:
+              - img [ref=e118]
+              - paragraph [ref=e121]: “Service impeccable, chauffeur ponctuel et cordial. Je recommande vivement !”
+              - paragraph [ref=e122]: Sophie M.
+          - generic [ref=e123]:
+            - generic [ref=e124]:
+              - img [ref=e125]
+              - heading "4.9 / 5" [level=3] [ref=e127]
+              - paragraph [ref=e128]: Moyenne sur 320+ clients vérifiés
+            - generic [ref=e129]:
+              - img [ref=e130]
+              - heading "99 %" [level=3] [ref=e133]
+              - paragraph [ref=e134]: Trajets à l'heure en 2024
+            - generic [ref=e135]:
+              - img [ref=e136]
+              - heading "15 min" [level=3] [ref=e139]
+              - paragraph [ref=e140]: Temps moyen de prise en charge
+    - contentinfo [ref=e141]:
+      - generic [ref=e142]:
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - img [ref=e146]
+            - generic [ref=e150]:
+              - generic [ref=e151]: Taxi Tignieu
+              - generic [ref=e152]: Mobilité premium région lyonnaise
+          - paragraph [ref=e153]: Trajets aéroports, longues distances, VSL/CPAM et mises à disposition. Chauffeurs ponctuels et réservation simple 7j/7.
+        - generic [ref=e154]:
+          - paragraph [ref=e155]: Contact
+          - list [ref=e156]:
+            - listitem [ref=e157]:
+              - img [ref=e158]
+              - link "04 95 78 54 00" [ref=e162] [cursor=pointer]:
+                - /url: tel:+33495785400
+            - listitem [ref=e163]:
+              - img [ref=e164]
+              - link "contact@taxitignieu.fr" [ref=e167] [cursor=pointer]:
+                - /url: mailto:contact@taxitignieu.fr
+            - listitem [ref=e168]:
+              - img [ref=e169]
+              - generic [ref=e172]: 9, rue de la République, 38230 Tignieu-Jameyzieu
+        - generic [ref=e173]:
+          - paragraph [ref=e174]: Navigation
+          - list [ref=e175]:
+            - listitem [ref=e176]:
+              - link "Réserver un trajet" [ref=e177] [cursor=pointer]:
+                - /url: /reserver
+            - listitem [ref=e178]:
+              - link "Nos tarifs" [ref=e179] [cursor=pointer]:
+                - /url: /tarifs
+            - listitem [ref=e180]:
+              - link "Services entreprises" [ref=e181] [cursor=pointer]:
+                - /url: "#entreprises"
+            - listitem [ref=e182]:
+              - link "Avis clients" [ref=e183] [cursor=pointer]:
+                - /url: "#avis"
+        - generic [ref=e184]:
+          - generic [ref=e185]:
+            - paragraph [ref=e186]: Informations
+            - list [ref=e187]:
+              - listitem [ref=e188]:
+                - link "Mentions légales" [ref=e189] [cursor=pointer]:
+                  - /url: /mentions-legales
+              - listitem [ref=e190]:
+                - link "Politique de confidentialité" [ref=e191] [cursor=pointer]:
+                  - /url: /confidentialite
+              - listitem [ref=e192]:
+                - link "CGV" [ref=e193] [cursor=pointer]:
+                  - /url: /cgv
+          - generic [ref=e194]:
+            - paragraph [ref=e195]: Apparence
+            - button "Basculer le thème clair/sombre" [ref=e196]:
+              - img [ref=e198]
+              - generic [ref=e204]: Jour
+              - generic [ref=e205]: Nuit
+            - paragraph [ref=e206]: Choisissez le mode clair ou nuit.
+      - generic [ref=e208]:
+        - paragraph [ref=e209]: © 2025 Taxi Tignieu · Tous droits réservés
+        - paragraph [ref=e210]: Chauffeurs agréés · Disponibilité 24/7 · Paiement sécurisé
+  - button "Open Next.js Dev Tools" [ref=e216] [cursor=pointer]:
+    - img [ref=e217]
+  - alert [ref=e220]
+```

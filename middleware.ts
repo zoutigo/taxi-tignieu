@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 import { auth } from "@/auth";
 
-export default auth(async (req: NextRequest) => {
+export default auth(async (req) => {
   const { pathname, searchParams } = req.nextUrl;
   const isProtectedArea = pathname.startsWith("/espace-client");
   const isPhoneCompletion = pathname.startsWith("/profil/completer-telephone");
