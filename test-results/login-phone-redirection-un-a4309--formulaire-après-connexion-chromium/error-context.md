@@ -183,7 +183,5 @@
       - generic [ref=e208]:
         - paragraph [ref=e209]: © 2025 Taxi Tignieu · Tous droits réservés
         - paragraph [ref=e210]: Chauffeurs agréés · Disponibilité 24/7 · Paiement sécurisé
-  - button "Open Next.js Dev Tools" [ref=e216] [cursor=pointer]:
-    - img [ref=e217]
-  - alert [ref=e220]
+  - alert [ref=e211]
 ```
