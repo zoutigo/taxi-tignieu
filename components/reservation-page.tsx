@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { bookingEstimateSchema } from "@/schemas/booking";
 import type { BookingEstimateInput } from "@/schemas/booking";
-import { useBookingStore, setBookingEstimate } from "@/hooks/useBookingStore";
+import { useBookingStore, setBookingEstimate, clearBookingEstimate } from "@/hooks/useBookingStore";
+import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -42,6 +44,45 @@ export function ReservationPage() {
     [storedEstimate]
   );
 
+  const router = useRouter();
+  const { status: sessionStatus } = useSession();
+  const [error, setError] = useState<string | null>(null);
+  const [hasPosted, setHasPosted] = useState(false);
+
+  const isPostingRef = useRef(false);
+
+  const createBooking = useCallback(
+    async (payload: BookingEstimateInput) => {
+      if (isPostingRef.current) {
+        return;
+      }
+      isPostingRef.current = true;
+      setError(null);
+      try {
+        const res = await fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, estimatedPrice: storedPrice ?? null }),
+        });
+
+        if (!res.ok) {
+          const message =
+            (await res.json().catch(() => ({}))).error ?? "Impossible de créer la réservation.";
+          throw new Error(message);
+        }
+
+        setHasPosted(true);
+        clearBookingEstimate();
+        router.push("/espace-client?booking=success");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erreur inconnue.");
+      } finally {
+        isPostingRef.current = false;
+      }
+    },
+    [router, storedPrice]
+  );
+
   const form = useForm<BookingEstimateInput>({
     resolver: zodResolver(bookingEstimateSchema),
     mode: "onChange",
@@ -52,12 +93,23 @@ export function ReservationPage() {
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
-  const [status, setStatus] = useState<"idle" | "success">("idle");
-
-  const onSubmit = form.handleSubmit((data: BookingEstimateInput) => {
+  const onSubmit = form.handleSubmit(async (data: BookingEstimateInput) => {
     setBookingEstimate(data, storedPrice ?? 0);
-    setStatus("success");
+
+    if (sessionStatus === "authenticated") {
+      await createBooking(data);
+      return;
+    }
+
+    // Invite to login; booking will be posted on return thanks to persisted store
+    await signIn("google", { callbackUrl: "/reserver" });
   });
+
+  useEffect(() => {
+    if (sessionStatus === "authenticated" && storedEstimate && !hasPosted) {
+      void createBooking(storedEstimate);
+    }
+  }, [sessionStatus, storedEstimate, hasPosted, createBooking]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-12 sm:px-6 lg:px-8">
@@ -270,14 +322,19 @@ export function ReservationPage() {
               )}
             />
 
-            <Button type="submit" className="btn btn-primary w-full">
-              Confirmer ma demande
+            <Button
+              type="submit"
+              className="btn btn-primary w-full"
+              disabled={form.formState.isSubmitting || sessionStatus === "loading"}
+            >
+              {form.formState.isSubmitting ? "Enregistrement..." : "Confirmer ma demande"}
             </Button>
-            {status == "success" && (
+            {form.formState.isSubmitSuccessful && !error ? (
               <p className="text-center text-sm text-primary">
-                Merci ! Nous vous recontactons rapidement pour finaliser la réservation.
+                Merci ! Votre demande est enregistrée. Elle apparaît dans votre espace client.
               </p>
-            )}
+            ) : null}
+            {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
           </form>
         </Form>
 

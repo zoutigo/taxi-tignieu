@@ -29,6 +29,11 @@ const authResult = NextAuth({
       if (user) {
         token.id = user.id;
         token.phone = user.phone ?? null;
+        const adminList =
+          process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
+        if (user.email && adminList.includes(user.email.toLowerCase())) {
+          token.isAdmin = true;
+        }
       }
       if (trigger === "update" && session?.phone !== undefined) {
         token.phone = session.phone;
@@ -68,6 +73,7 @@ const authResult = NextAuth({
       session.user.email = user.email ?? session.user.email;
       session.user.name = user.name ?? session.user.name;
       session.user.phone = user.phone ?? null;
+      session.user.isAdmin = Boolean((token as unknown as { isAdmin?: boolean }).isAdmin);
 
       return session;
     },

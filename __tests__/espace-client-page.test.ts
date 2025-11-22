@@ -37,7 +37,7 @@ describe("ClientDashboardPage workflow", () => {
   it("redirige vers l'accueil sans session", async () => {
     mockedAuth.mockResolvedValue(null);
 
-    await expect(ClientDashboardPage()).rejects.toThrow("REDIRECT:/");
+    await expect(ClientDashboardPage({ searchParams: {} })).rejects.toThrow("REDIRECT:/");
     expect(mockedRedirect).toHaveBeenCalledWith("/");
   });
 
@@ -45,7 +45,7 @@ describe("ClientDashboardPage workflow", () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" }, expires: "" } as Session);
     mockedFindUnique.mockResolvedValue(null);
 
-    await expect(ClientDashboardPage()).rejects.toThrow("REDIRECT:/");
+    await expect(ClientDashboardPage({ searchParams: {} })).rejects.toThrow("REDIRECT:/");
   });
 
   it("redirige vers la complétion téléphone si le numéro est absent", async () => {
@@ -61,7 +61,7 @@ describe("ClientDashboardPage workflow", () => {
       createdAt: new Date(),
     } satisfies User);
 
-    await expect(ClientDashboardPage()).rejects.toThrow(
+    await expect(ClientDashboardPage({ searchParams: {} })).rejects.toThrow(
       "REDIRECT:/profil/completer-telephone?from=%2Fespace-client"
     );
   });
@@ -77,9 +77,27 @@ describe("ClientDashboardPage workflow", () => {
       passwordHash: null,
       emailVerified: null,
       createdAt: new Date(),
-    } satisfies User);
+      bookings: [
+        {
+          id: 1,
+          userId: "u1",
+          pickup: "A",
+          dropoff: "B",
+          dateTime: new Date(),
+          pax: 1,
+          luggage: 0,
+          babySeat: false,
+          notes: null,
+          priceCents: null,
+          status: "PENDING",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          customerId: null,
+        },
+      ],
+    } as unknown as User);
 
-    const page = await ClientDashboardPage();
+    const page = await ClientDashboardPage({ searchParams: {} });
 
     expect(page).toBeTruthy();
     expect(mockedRedirect).not.toHaveBeenCalled();
