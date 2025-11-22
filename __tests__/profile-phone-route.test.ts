@@ -1,6 +1,8 @@
 import { POST } from "@/app/api/profile/phone/route";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import type { Session } from "next-auth";
+import type { User } from "@prisma/client";
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -14,8 +16,8 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
-const mockedAuth = auth as jest.MockedFunction<typeof auth>;
-const mockedUpdate = prisma.user.update as jest.MockedFunction<typeof prisma.user.update>;
+const mockedAuth = auth as unknown as jest.MockedFunction<() => Promise<Session | null>>;
+const mockedUpdate = prisma.user.update as unknown as jest.MockedFunction<() => Promise<User>>;
 
 const makeRequest = (body: unknown) =>
   new Request("http://localhost/api/profile/phone", {
@@ -40,7 +42,7 @@ describe("POST /api/profile/phone", () => {
   });
 
   it("renvoie 400 si le format est invalide", async () => {
-    mockedAuth.mockResolvedValue({ user: { id: "user-1" } } as any);
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" }, expires: "" } as Session);
 
     const res = await POST(makeRequest({ phone: "abc" }));
 
@@ -51,8 +53,17 @@ describe("POST /api/profile/phone", () => {
   });
 
   it("met à jour le numéro avec succès", async () => {
-    mockedAuth.mockResolvedValue({ user: { id: "user-1" } } as any);
-    mockedUpdate.mockResolvedValue({ id: "user-1" } as any);
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" }, expires: "" } as Session);
+    mockedUpdate.mockResolvedValue({
+      id: "user-1",
+      name: "Tester",
+      email: "test@example.com",
+      image: null,
+      phone: "+33 4 95 78 54 00",
+      passwordHash: null,
+      emailVerified: null,
+      createdAt: new Date(),
+    } satisfies User);
 
     const res = await POST(makeRequest({ phone: "+33 4 95 78 54 00" }));
 

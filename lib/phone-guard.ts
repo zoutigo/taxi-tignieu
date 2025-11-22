@@ -6,6 +6,7 @@ export type AuthenticatedRequest = NextRequest & {
 };
 
 export function phoneCompletionGuard(req: AuthenticatedRequest) {
+  // This guard is no longer used in middleware (replaced by server-side checks).
   const { pathname, searchParams } = req.nextUrl;
   const isProtectedArea = pathname.startsWith("/espace-client");
   const isPhoneCompletion = pathname.startsWith("/profil/completer-telephone");
@@ -17,7 +18,10 @@ export function phoneCompletionGuard(req: AuthenticatedRequest) {
     return NextResponse.next();
   }
 
-  const hasPhone = Boolean(req.auth.user?.phone);
+  // Treat undefined as "unknown" so we don't force a redirect when the JWT is stale
+  // (e.g., phone updated in DB but not yet on the token). Only explicit null/empty should trigger it.
+  const phone = req.auth.user?.phone;
+  const hasPhone = phone !== null && phone !== "";
 
   if (!hasPhone && isProtectedArea && !isPhoneCompletion) {
     const target = new URL("/profil/completer-telephone", req.nextUrl.origin);

@@ -1,3 +1,3 @@
-import { handlers } from "@/auth";
-
-export const { GET, POST } = handlers;
+export { GET, POST } from "@/auth";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";

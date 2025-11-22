@@ -5,6 +5,7 @@ import { Car, PhoneCall, Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const navLinks = [
   { label: "Tarifs", href: "/tarifs" },
@@ -17,6 +18,7 @@ const navLinks = [
 
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
   const { status } = useSession();
   const isAuthenticated = status === "authenticated";
 
@@ -26,7 +28,7 @@ export function SiteHeader() {
     void signIn("google", { callbackUrl: "/espace-client" });
   };
   const handleLogout = () => {
-    void signOut({ redirectTo: "/" });
+    void signOut({ callbackUrl: "/" });
   };
 
   return (
@@ -54,12 +56,13 @@ export function SiteHeader() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <Link
-                  href="/espace-client"
+                <button
+                  type="button"
+                  onClick={() => router.push("/espace-client")}
                   className="btn btn-outline hidden text-sm lg:inline-flex"
                 >
                   Espace client
-                </Link>
+                </button>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -141,13 +144,16 @@ export function SiteHeader() {
               <div className="space-y-4">
                 <ThemeToggle />
                 {isAuthenticated ? (
-                  <Link
-                    href="/espace-client"
+                  <button
+                    type="button"
                     className="btn btn-outline w-full"
-                    onClick={closeMenu}
+                    onClick={() => {
+                      closeMenu();
+                      router.push("/espace-client");
+                    }}
                   >
                     Espace client
-                  </Link>
+                  </button>
                 ) : null}
                 {isAuthenticated ? (
                   <button

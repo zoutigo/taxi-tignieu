@@ -9,11 +9,14 @@ if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET) {
   );
 }
 
-export const { auth, handlers, signIn, signOut } = NextAuth({
+const authResult = NextAuth({
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      authorization: "https://accounts.google.com/o/oauth2/v2/auth",
+      token: "https://oauth2.googleapis.com/token",
+      userinfo: "https://openidconnect.googleapis.com/v1/userinfo",
     }),
   ],
   adapter: PrismaAdapter(prisma),
@@ -33,10 +36,39 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = (token.id as string) ?? token.sub ?? session.user.id;
-        session.user.phone = (token.phone as string | null) ?? null;
+      const userId = (token.id as string) ?? token.sub ?? session.user?.id;
+      if (!session.user || !userId) {
+        return session;
       }
+
+      // Avoid Prisma on edge runtime (e.g., middleware) to keep auth compatible there.
+      if (process.env.NEXT_RUNTIME === "edge") {
+        session.user.id = userId;
+        session.user.email = session.user.email ?? (token.email as string | null);
+        session.user.name = session.user.name ?? (token.name as string | null);
+        session.user.phone = (token.phone as string | null) ?? null;
+        return session;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+        },
+      });
+
+      if (!user) {
+        return session;
+      }
+
+      session.user.id = user.id;
+      session.user.email = user.email ?? session.user.email;
+      session.user.name = user.name ?? session.user.name;
+      session.user.phone = user.phone ?? null;
+
       return session;
     },
     async redirect({ url, baseUrl }) {
@@ -55,3 +87,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     },
   },
 });
+
+export const { auth, handlers, signIn, signOut } = authResult;
+export const { GET, POST } = handlers;

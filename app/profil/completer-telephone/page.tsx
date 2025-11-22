@@ -7,13 +7,15 @@ export const metadata: Metadata = {
   title: "Compléter votre profil | Taxi Tignieu",
 };
 
-interface PhoneCompletionPageProps {
-  searchParams?: {
+type PhoneCompletionPageProps = {
+  searchParams: Promise<{
     from?: string;
-  };
-}
+  }>;
+};
 
 export default async function PhoneCompletionPage({ searchParams }: PhoneCompletionPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const from = resolvedSearchParams?.from;
   const session = await auth();
 
   if (!session?.user) {
@@ -21,10 +23,10 @@ export default async function PhoneCompletionPage({ searchParams }: PhoneComplet
   }
 
   if (session.user.phone) {
-    redirect(searchParams?.from ?? "/espace-client");
+    redirect(from ?? "/espace-client");
   }
 
-  const redirectTo = searchParams?.from ?? "/espace-client";
+  const redirectTo = from ?? "/espace-client";
 
   return (
     <section className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col justify-center px-4 py-16 sm:px-6 lg:px-8">
