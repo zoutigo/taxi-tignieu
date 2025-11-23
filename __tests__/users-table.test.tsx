@@ -57,6 +57,20 @@ const users: UserRow[] = [
 ];
 
 describe("UsersTable UI", () => {
+  const originalError = console.error;
+  beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation((msg: unknown, ...rest: unknown[]) => {
+      if (typeof msg === "string" && msg.includes("react-test-renderer is deprecated")) {
+        return;
+      }
+      originalError(msg, ...rest);
+    });
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   beforeAll(() => {
     (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
   });

@@ -49,6 +49,20 @@ const textFromChildren = (value: unknown): string => {
 };
 
 describe("BookingsAdminTable UI", () => {
+  const originalError = console.error;
+  beforeAll(() => {
+    jest.spyOn(console, "error").mockImplementation((msg: unknown, ...rest: unknown[]) => {
+      if (typeof msg === "string" && msg.includes("react-test-renderer is deprecated")) {
+        return;
+      }
+      originalError(msg, ...rest);
+    });
+  });
+
+  afterAll(() => {
+    (console.error as jest.Mock).mockRestore();
+  });
+
   beforeEach(() => {
     const fetchMock = jest.fn(() =>
       Promise.resolve({ ok: true, json: async () => ({ booking: baseBooking }) })
