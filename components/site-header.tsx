@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 const navLinks = [
   { label: "Tarifs", href: "/tarifs" },
   { label: "Services", href: "#services" },
-  { label: "Avis", href: "#avis" },
+  { label: "Avis", href: "/avis" },
   { label: "Entreprises", href: "#entreprises" },
   { label: "À propos", href: "#a-propos" },
   { label: "Contact", href: "#contact" },
@@ -19,8 +19,12 @@ const navLinks = [
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const router = useRouter();
-  const { status } = useSession();
+  const { status, data } = useSession();
   const isAuthenticated = status === "authenticated";
+  const isAdminLike = Boolean(
+    (data?.user as { isAdmin?: boolean; isManager?: boolean } | undefined)?.isAdmin ||
+      (data?.user as { isAdmin?: boolean; isManager?: boolean } | undefined)?.isManager
+  );
 
   const toggleMenu = () => setMenuOpen((prev) => !prev);
   const closeMenu = () => setMenuOpen(false);
@@ -45,56 +49,22 @@ export function SiteHeader() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-6 lg:flex">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="nav-link">
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => router.push("/espace-client")}
-                  className="btn btn-outline hidden text-sm lg:inline-flex"
-                >
-                  Espace client
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="btn btn-secondary hidden text-sm lg:inline-flex"
-                >
-                  Se déconnecter
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={handleLogin}
-                className="btn btn-outline hidden text-sm lg:inline-flex"
-              >
-                Login
-              </button>
-            )}
             <a
               href="tel:+33495785400"
-              className="hidden items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-sm font-semibold text-sidebar-foreground transition hover:border-primary/80 hover:text-primary lg:flex"
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2 text-sm font-semibold text-sidebar-foreground transition hover:border-primary/80 hover:text-primary"
             >
               <PhoneCall className="h-4 w-4" />
               Appeler
             </a>
-            <Link href="/reserver" className="btn btn-primary hidden text-sm lg:inline-flex">
+            <Link href="/reserver" className="btn btn-primary text-sm inline-flex">
               Réserver
             </Link>
             <button
               type="button"
               onClick={toggleMenu}
               aria-label="Ouvrir le menu"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 text-white transition hover:border-primary/80 hover:text-primary lg:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 text-white transition hover:border-primary/80 hover:text-primary"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -103,7 +73,7 @@ export function SiteHeader() {
       </header>
 
       {menuOpen && (
-        <div className="lg:hidden">
+        <div>
           <div
             className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
             role="dialog"
@@ -139,6 +109,15 @@ export function SiteHeader() {
                     {link.label}
                   </Link>
                 ))}
+                {isAdminLike ? (
+                  <Link
+                    href="/dashboard"
+                    className="rounded-2xl border border-transparent px-2 py-2 transition hover:border-white/15 hover:text-white"
+                    onClick={closeMenu}
+                  >
+                    Dashboard
+                  </Link>
+                ) : null}
               </nav>
 
               <div className="space-y-4">
@@ -153,6 +132,18 @@ export function SiteHeader() {
                     }}
                   >
                     Espace client
+                  </button>
+                ) : null}
+                {isAdminLike ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline w-full"
+                    onClick={() => {
+                      closeMenu();
+                      router.push("/dashboard");
+                    }}
+                  >
+                    Dashboard
                   </button>
                 ) : null}
                 {isAuthenticated ? (

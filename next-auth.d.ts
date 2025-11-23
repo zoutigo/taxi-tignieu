@@ -6,11 +6,15 @@ declare module "next-auth" {
       id: string;
       phone?: string | null;
       isAdmin?: boolean;
+      isManager?: boolean;
+      isDriver?: boolean;
     };
   }
 
   interface User {
     phone?: string | null;
     isAdmin?: boolean;
+    isManager?: boolean;
+    isDriver?: boolean;
   }
 }

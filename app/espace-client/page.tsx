@@ -35,6 +35,9 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
       name: true,
       email: true,
       phone: true,
+      isAdmin: true,
+      isManager: true,
+      isDriver: true,
       bookings: {
         orderBy: { createdAt: "desc" },
         take: 10,

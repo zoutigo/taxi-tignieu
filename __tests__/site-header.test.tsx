@@ -39,11 +39,47 @@ describe("SiteHeader actions", () => {
     (console.error as jest.Mock).mockRestore();
   });
 
+  function openMenu(tree: renderer.ReactTestRenderer) {
+    const menuBtn = tree.root.find(
+      (node) => node.type === "button" && node.props["aria-label"] === "Ouvrir le menu"
+    );
+    act(() => {
+      (menuBtn.props.onClick as () => void)();
+    });
+  }
+
+  it("le lien Avis pointe vers /avis", () => {
+    let tree: renderer.ReactTestRenderer | null = null;
+    act(() => {
+      tree = renderer.create(<SiteHeader />);
+    });
+    openMenu(tree!);
+    const avisLink = tree!.root.find((node) => node.type === "a" && node.props.children === "Avis");
+    expect(avisLink.props.href).toBe("/avis");
+  });
+
+  it("affiche le Dashboard pour admin/manager", () => {
+    (useSession as jest.Mock).mockReturnValue({
+      status: "authenticated",
+      data: { user: { isAdmin: true } },
+    });
+    let tree: renderer.ReactTestRenderer | null = null;
+    act(() => {
+      tree = renderer.create(<SiteHeader />);
+    });
+    openMenu(tree!);
+    const dashLink = tree!.root.find(
+      (node) => node.type === "a" && node.props.children === "Dashboard"
+    );
+    expect(dashLink.props.href).toBe("/dashboard");
+  });
+
   it("redirige vers l'espace client quand on clique sur le bouton dédié", () => {
     let tree: renderer.ReactTestRenderer;
     act(() => {
       tree = renderer.create(<SiteHeader />);
     });
+    openMenu(tree!);
     const btn = tree!.root.find(
       (node: renderer.ReactTestInstance) =>
         node.type === "button" && node.props.children === "Espace client"
@@ -60,6 +96,7 @@ describe("SiteHeader actions", () => {
     act(() => {
       tree = renderer.create(<SiteHeader />);
     });
+    openMenu(tree!);
     const btn = tree!.root.find(
       (node: renderer.ReactTestInstance) =>
         node.type === "button" && node.props.children === "Se déconnecter"

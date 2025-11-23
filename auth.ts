@@ -31,8 +31,20 @@ const authResult = NextAuth({
         token.phone = user.phone ?? null;
         const adminList =
           process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
-        if (user.email && adminList.includes(user.email.toLowerCase())) {
-          token.isAdmin = true;
+        const managerList =
+          process.env.MANAGER_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
+        const driverList =
+          process.env.DRIVER_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
+
+        if (user.email) {
+          const lower = user.email.toLowerCase();
+          token.isAdmin = Boolean(user.isAdmin || adminList.includes(lower));
+          token.isManager = Boolean(user.isManager || managerList.includes(lower));
+          token.isDriver = Boolean(user.isDriver || driverList.includes(lower));
+        } else {
+          token.isAdmin = Boolean(user.isAdmin);
+          token.isManager = Boolean(user.isManager);
+          token.isDriver = Boolean(user.isDriver);
         }
       }
       if (trigger === "update" && session?.phone !== undefined) {
@@ -62,6 +74,9 @@ const authResult = NextAuth({
           email: true,
           name: true,
           phone: true,
+          isAdmin: true,
+          isManager: true,
+          isDriver: true,
         },
       });
 
@@ -73,7 +88,15 @@ const authResult = NextAuth({
       session.user.email = user.email ?? session.user.email;
       session.user.name = user.name ?? session.user.name;
       session.user.phone = user.phone ?? null;
-      session.user.isAdmin = Boolean((token as unknown as { isAdmin?: boolean }).isAdmin);
+      session.user.isAdmin = Boolean(
+        (token as unknown as { isAdmin?: boolean }).isAdmin ?? user.isAdmin
+      );
+      session.user.isManager = Boolean(
+        (token as unknown as { isManager?: boolean }).isManager ?? user.isManager
+      );
+      session.user.isDriver = Boolean(
+        (token as unknown as { isDriver?: boolean }).isDriver ?? user.isDriver
+      );
 
       return session;
     },

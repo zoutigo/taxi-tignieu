@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `isAdmin` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `isDriver` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `isManager` BOOLEAN NOT NULL DEFAULT false;

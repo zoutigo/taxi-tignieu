@@ -63,6 +63,9 @@ describe("POST /api/profile/phone", () => {
       passwordHash: null,
       emailVerified: null,
       createdAt: new Date(),
+      isAdmin: false,
+      isManager: false,
+      isDriver: false,
     } satisfies User);
 
     const res = await POST(makeRequest({ phone: "+33 4 95 78 54 00" }));

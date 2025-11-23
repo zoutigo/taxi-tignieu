@@ -58,6 +58,9 @@ describe("ClientDashboardPage workflow", () => {
       image: null,
       passwordHash: null,
       emailVerified: null,
+      isAdmin: false,
+      isManager: false,
+      isDriver: false,
       createdAt: new Date(),
     } satisfies User);
 
@@ -76,6 +79,9 @@ describe("ClientDashboardPage workflow", () => {
       image: null,
       passwordHash: null,
       emailVerified: null,
+      isAdmin: false,
+      isManager: false,
+      isDriver: false,
       createdAt: new Date(),
       bookings: [
         {
