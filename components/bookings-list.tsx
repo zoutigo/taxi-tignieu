@@ -5,6 +5,7 @@ import type { Booking } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type BookingWithPrice = Omit<Booking, "dateTime"> & { dateTime: Date | string };
 
@@ -82,6 +83,7 @@ export function BookingsList({ initialBookings }: Props) {
   const [form, setForm] = useState<EditForm | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<BookingWithPrice | null>(null);
 
   const handleEdit = useCallback((booking: BookingWithPrice) => {
     setEditingId(booking.id);
@@ -132,9 +134,6 @@ export function BookingsList({ initialBookings }: Props) {
   );
 
   const handleDelete = useCallback(async (booking: BookingWithPrice) => {
-    if (typeof window !== "undefined" && !window.confirm("Supprimer cette réservation ?")) {
-      return;
-    }
     setLoadingId(booking.id);
     setError(null);
     try {
@@ -268,7 +267,7 @@ export function BookingsList({ initialBookings }: Props) {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleDelete(booking)}
+                  onClick={() => setPendingDelete(booking)}
                   disabled={loadingId === booking.id}
                 >
                   Supprimer
@@ -280,6 +279,21 @@ export function BookingsList({ initialBookings }: Props) {
       })}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Supprimer cette réservation ?"
+        message="Cette action est irréversible."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          if (pendingDelete) {
+            await handleDelete(pendingDelete);
+          }
+          setPendingDelete(null);
+        }}
+      />
     </div>
   );
 }

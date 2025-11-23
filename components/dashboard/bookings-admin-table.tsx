@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
 
 type Driver = Pick<User, "id" | "name" | "email" | "phone">;
 
@@ -60,7 +61,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [transferTarget, setTransferTarget] = useState<Record<number, string>>({});
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">("ALL");
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
 
   const adminLike = Boolean(currentUser?.isAdmin || currentUser?.isManager);
   const driverLike = Boolean(currentUser?.isDriver);
@@ -78,11 +79,14 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     () => bookings.filter((b) => (statusFilter === "ALL" ? true : b.status === statusFilter)),
     [bookings, statusFilter]
   );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageBookings = useMemo(
-    () => filtered.slice((page - 1) * pageSize, page * pageSize),
-    [filtered, page, pageSize]
-  );
+  const {
+    items: pageBookings,
+    totalPages,
+    currentPage,
+  } = useMemo(() => paginateArray(filtered, page, pageSize), [filtered, page, pageSize]);
+  useEffect(() => {
+    setPage(currentPage);
+  }, [currentPage]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -217,6 +221,23 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
             </Button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span>Éléments par page</span>
+        <Input
+          type="number"
+          min={1}
+          className="h-9 w-20"
+          value={pageSize}
+          onChange={(e) => {
+            const val = Math.max(1, Number(e.target.value) || 1);
+            setPageSize(val);
+            const next = loadPaginationSettings();
+            savePaginationSettings({ ...next, bookings: val });
+            setPage(1);
+          }}
+        />
       </div>
 
       {pageBookings.map((b) => {

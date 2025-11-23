@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Car, Mail, MapPin, PhoneCall } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { getSiteContact } from "@/lib/site-config";
 
 const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
@@ -15,7 +16,10 @@ const infoLinks = [
   { label: "CGV", href: "/cgv" },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const contact = await getSiteContact();
+  const address = contact.address;
+  const addressLine = `${address.streetNumber ? `${address.streetNumber} ` : ""}${address.street}, ${address.postalCode} ${address.city}`;
   return (
     <footer id="contact" className="mt-12 bg-sidebar text-sidebar-foreground">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-4 lg:px-8">
@@ -40,19 +44,19 @@ export function SiteFooter() {
           <ul className="space-y-3 text-sm text-white/80">
             <li className="flex items-center gap-2">
               <PhoneCall className="h-4 w-4" />
-              <a href="tel:+33495785400" className="hover:text-white">
-                04 95 78 54 00
+              <a href={`tel:${contact.phone}`} className="hover:text-white">
+                {contact.phone}
               </a>
             </li>
             <li className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
-              <a href="mailto:contact@taxitignieu.fr" className="hover:text-white">
-                contact@taxitignieu.fr
+              <a href={`mailto:${contact.email}`} className="hover:text-white">
+                {contact.email}
               </a>
             </li>
             <li className="flex items-start gap-2">
               <MapPin className="mt-1 h-4 w-4" />
-              <span>9, rue de la République, 38230 Tignieu-Jameyzieu</span>
+              <span>{addressLine}</span>
             </li>
           </ul>
         </div>

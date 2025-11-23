@@ -1,3 +1,4 @@
+/** @jest-environment jsdom */
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { BookingsList } from "@/components/bookings-list";
@@ -52,6 +53,13 @@ describe("BookingsList actions", () => {
     );
     await act(async () => {
       (deleteBtn.props.onClick as () => void)();
+    });
+    const confirms = tree!.root.findAll(
+      (node) => node.type === "button" && node.props.children === "Supprimer"
+    );
+    const confirm = confirms[confirms.length - 1];
+    await act(async () => {
+      (confirm.props.onClick as () => void)();
     });
 
     expect(mockFetch).toHaveBeenCalledWith(

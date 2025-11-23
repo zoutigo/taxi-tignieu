@@ -4,6 +4,7 @@ const cards = [
   { title: "Utilisateurs", href: "/dashboard/users", desc: "Rôles, infos, réservations" },
   { title: "Réservations", href: "/dashboard/bookings", desc: "Statuts, détails, nettoyage" },
   { title: "Avis", href: "/dashboard/avis", desc: "Validation, édition, suppression" },
+  { title: "Paramètres", href: "/dashboard/parametres", desc: "Pagination, contact, footer" },
 ];
 
 export default function DashboardPage() {
