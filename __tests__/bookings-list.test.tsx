@@ -16,6 +16,7 @@ const booking = {
   priceCents: null,
   status: "PENDING" as const,
   userId: "u1",
+  driverId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
   customerId: null,

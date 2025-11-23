@@ -56,6 +56,7 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
           createdAt: true,
           updatedAt: true,
           customerId: true,
+          driverId: true,
         },
       },
     },

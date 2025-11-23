@@ -21,6 +21,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   bookings      Booking[]
+  driverBookings Booking[] @relation("DriverBookings")
   reviews       Review[]
   createdAt     DateTime  @default(now())
 }
@@ -73,6 +74,8 @@ model Booking {
   priceCents Int?
   userId     String?
   user       User?         @relation(fields: [userId], references: [id])
+  driverId   String?
+  driver     User?         @relation("DriverBookings", fields: [driverId], references: [id])
   status     BookingStatus @default(PENDING)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt

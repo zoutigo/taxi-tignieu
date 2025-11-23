@@ -6,16 +6,23 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
     },
   },
 }));
 
 const mockedAuth = auth as unknown as jest.Mock;
 const mockedFindMany = prisma.booking.findMany as unknown as jest.Mock;
+const mockedFindUnique = prisma.booking.findUnique as unknown as jest.Mock;
 const mockedUpdate = prisma.booking.update as unknown as jest.Mock;
 const mockedDelete = prisma.booking.delete as unknown as jest.Mock;
+// keep reference for future use cases; currently not used
+// const mockedFindUser = prisma.user.findUnique as unknown as jest.Mock;
 
 describe("api/admin/bookings", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -38,6 +45,7 @@ describe("api/admin/bookings", () => {
 
   it("update une réservation", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: true } });
+    mockedFindUnique.mockResolvedValue({ driverId: null });
     mockedUpdate.mockResolvedValue({ id: 1 });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
