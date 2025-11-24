@@ -25,10 +25,15 @@ const authResult = NextAuth({
   },
   trustHost: true,
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session, account, profile }) {
       if (user) {
         token.id = user.id;
         token.phone = user.phone ?? null;
+        token.picture =
+          (account as { picture?: string } | null)?.picture ??
+          (profile as { picture?: string } | null)?.picture ??
+          (user as { image?: string } | null)?.image ??
+          null;
         const adminList =
           process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
         const managerList =
@@ -74,6 +79,7 @@ const authResult = NextAuth({
           email: true,
           name: true,
           phone: true,
+          image: true,
           isAdmin: true,
           isManager: true,
           isDriver: true,
@@ -88,6 +94,14 @@ const authResult = NextAuth({
       session.user.email = user.email ?? session.user.email;
       session.user.name = user.name ?? session.user.name;
       session.user.phone = user.phone ?? null;
+      const tokenPicture = (token as unknown as { picture?: string | null }).picture ?? null;
+      const imageToUse = user.image ?? tokenPicture ?? session.user.image ?? null;
+      session.user.image = imageToUse;
+      if (!user.image && tokenPicture) {
+        void prisma.user
+          .update({ where: { id: user.id }, data: { image: tokenPicture } })
+          .catch(() => {});
+      }
       session.user.isAdmin = Boolean(
         (token as unknown as { isAdmin?: boolean }).isAdmin ?? user.isAdmin
       );

@@ -76,7 +76,7 @@ describe("ClientDashboardPage workflow", () => {
       email: "test@example.com",
       name: "Test",
       phone: "+33123456789",
-      image: null,
+      image: "https://api.dicebear.com/7.x/thumbs/svg?seed=test",
       passwordHash: null,
       emailVerified: null,
       isAdmin: false,
@@ -107,5 +107,27 @@ describe("ClientDashboardPage workflow", () => {
 
     expect(page).toBeTruthy();
     expect(mockedRedirect).not.toHaveBeenCalled();
+  });
+
+  it("redirige vers le choix d'avatar si image absente", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" }, expires: "" } as Session);
+    mockedFindUnique.mockResolvedValue({
+      id: "u1",
+      email: "test@example.com",
+      name: "Test",
+      phone: "+33123456789",
+      image: null,
+      passwordHash: null,
+      emailVerified: null,
+      isAdmin: false,
+      isManager: false,
+      isDriver: false,
+      createdAt: new Date(),
+      bookings: [],
+    } as unknown as User);
+
+    await expect(ClientDashboardPage({ searchParams: {} })).rejects.toThrow(
+      "REDIRECT:/profil/choisir-avatar?from=%2Fespace-client"
+    );
   });
 });

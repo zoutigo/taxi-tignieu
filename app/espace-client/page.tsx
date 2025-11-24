@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -35,6 +36,7 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
       name: true,
       email: true,
       phone: true,
+      image: true,
       isAdmin: true,
       isManager: true,
       isDriver: true,
@@ -71,6 +73,11 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
     redirect(`/profil/completer-telephone?${params.toString()}`);
   }
 
+  if (!user.image) {
+    const params = new URLSearchParams({ from: "/espace-client" });
+    redirect(`/profil/choisir-avatar?${params.toString()}`);
+  }
+
   return (
     <section className="mx-auto w-full max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
       {bookingSuccess ? (
@@ -102,10 +109,23 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
             Informations personnelles
           </p>
           <div className="mt-6 space-y-4 text-sm text-muted-foreground">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Nom</p>
-              <p className="text-base text-foreground">{user.name ?? "—"}</p>
-            </div>
+            {user.image ? (
+              <div className="flex items-center gap-3">
+                <Image
+                  src={user.image}
+                  alt={user.name ?? "Avatar"}
+                  width={56}
+                  height={56}
+                  className="h-14 w-14 rounded-full border border-border/60 object-cover"
+                />
+                <p className="text-sm font-semibold text-foreground">{user.name ?? "—"}</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Nom</p>
+                <p className="text-base text-foreground">{user.name ?? "—"}</p>
+              </div>
+            )}
             <div>
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Email</p>
               <p className="text-base text-foreground">{user.email ?? "—"}</p>

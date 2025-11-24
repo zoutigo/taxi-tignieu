@@ -107,4 +107,17 @@ describe("SiteHeader actions", () => {
     onClick?.();
     expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
+
+  it("le menu latéral est scrollable", () => {
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(<SiteHeader />);
+    });
+    openMenu(tree!);
+    const panel = tree!.root.find(
+      (node) =>
+        typeof node.props.className === "string" && node.props.className.includes("overflow-y-auto")
+    );
+    expect(panel).toBeTruthy();
+  });
 });

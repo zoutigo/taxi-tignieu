@@ -81,7 +81,7 @@ export function SiteHeader() {
             onClick={closeMenu}
           >
             <div
-              className="ml-auto flex h-full w-80 max-w-full flex-col gap-6 border-l border-white/10 bg-sidebar px-6 py-6 text-sidebar-foreground shadow-[0_25px_60px_rgba(1,6,18,0.8)]"
+              className="ml-auto flex h-full w-80 max-w-full flex-col gap-6 overflow-y-auto border-l border-white/10 bg-sidebar px-6 py-6 text-sidebar-foreground shadow-[0_25px_60px_rgba(1,6,18,0.8)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between">
