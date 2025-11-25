@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Avis | Taxi Tignieu",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AvisPage() {
   const session = await auth();
   const existingReview =
@@ -24,6 +26,8 @@ export default async function AvisPage() {
   const total = reviews.length;
   const average = total ? reviews.reduce((acc, r) => acc + r.rating, 0) / total : 0;
   const starFill = Math.max(0, Math.min(5, average));
+  const showForm = Boolean(session?.user && !existingReview);
+  const formId = "leave-review";
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
@@ -49,12 +53,25 @@ export default async function AvisPage() {
         </div>
       </header>
 
-      <p className="text-sm text-muted-foreground">Connectez vous pour laisser un avis.</p>
+      {!session?.user ? (
+        <p className="text-sm text-muted-foreground">Connectez vous pour laisser un avis.</p>
+      ) : showForm ? (
+        <a
+          href={`#${formId}`}
+          className="text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:hidden"
+        >
+          Laissez votre avis
+        </a>
+      ) : null}
 
-      <section className="space-y-6">
+      <section className={`grid gap-6 items-start ${showForm ? "lg:grid-cols-[2fr_1fr]" : ""}`}>
         <ReviewsPublicList reviews={JSON.parse(JSON.stringify(reviews))} />
-        {session?.user && !existingReview ? (
-          <div className="rounded-3xl border border-border/80 bg-card p-6 shadow-[0_25px_60px_rgba(5,12,35,0.12)]">
+        {showForm ? (
+          <div
+            id={formId}
+            tabIndex={-1}
+            className="rounded-3xl border border-border/80 bg-card p-6 shadow-[0_25px_60px_rgba(5,12,35,0.12)]"
+          >
             <h3 className="text-base font-semibold text-foreground">Laisser un avis</h3>
             <ReviewsForm />
           </div>

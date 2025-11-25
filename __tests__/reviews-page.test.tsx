@@ -62,7 +62,7 @@ describe("AvisPage", () => {
     jest.clearAllMocks();
   });
 
-  it("affiche la moyenne, le total et les étoiles remplies", async () => {
+  it("affiche la moyenne, le total, les étoiles, le CTA et le formulaire pour un utilisateur sans avis", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" }, expires: "" } as Session);
     mockedFindFirst.mockResolvedValue(null);
     mockedFindMany.mockResolvedValue([makeReview({ rating: 5 }), makeReview({ id: 2, rating: 4 })]);
@@ -74,6 +74,9 @@ describe("AvisPage", () => {
     expect(normalized).toContain("4.5 / 5");
     expect(html).toMatch(/Total\s*:<\/span>\s*2/);
     expect(html).toMatch(/style="width:\s*90%/);
+    expect(normalized).toContain("Laissez votre avis");
+    expect(normalized).toContain("Laisser un avis");
+    expect(normalized).not.toContain("Connectez vous pour laisser un avis");
   });
 
   it("n’affiche pas le formulaire si l’utilisateur n’est pas connecté", async () => {
@@ -84,6 +87,7 @@ describe("AvisPage", () => {
     const html = renderToStaticMarkup(await AvisPage());
 
     expect(html).not.toContain("Laisser un avis");
+    expect(html).toContain("Connectez vous pour laisser un avis");
   });
 
   it("n’affiche pas le formulaire si un avis existe déjà", async () => {
