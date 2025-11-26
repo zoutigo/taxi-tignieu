@@ -15,8 +15,11 @@ import { Input } from "@/components/ui/input";
 import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
 import { CheckCircle2, Clock3, Pencil, XCircle, Sparkles } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-type ReviewRow = Review & { user?: { name: string | null; email: string | null } | null };
+type ReviewRow = Review & {
+  user?: { name: string | null; email: string | null; image?: string | null } | null;
+};
 
 type Props = {
   initialReviews: ReviewRow[];
@@ -201,9 +204,15 @@ export function ReviewsAdminTable({ initialReviews }: Props) {
         <div key={r.id} className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
           <div className="flex flex-col gap-2 text-sm text-foreground">
             <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="font-semibold">{r.user?.name ?? "Client"}</p>
-                <p className="text-muted-foreground text-xs">{formatDate(r.createdAt)}</p>
+              <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={r.user?.image ?? undefined} alt={r.user?.name ?? "Client"} />
+                  <AvatarFallback>{(r.user?.name ?? "C").slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="font-semibold">{r.user?.name ?? "Client"}</p>
+                  <p className="text-muted-foreground text-xs">{formatDate(r.createdAt)}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-muted px-2 py-1 text-xs font-semibold text-foreground">
