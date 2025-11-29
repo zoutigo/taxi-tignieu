@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TariffCode } from "@/lib/tarifs";
+import { computePriceEuros } from "@/lib/tarifs";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
@@ -137,7 +138,26 @@ export default function TarifsPage() {
       if (!res.ok || data.error) {
         setError(data.error ?? "Impossible de calculer le tarif.");
       } else {
-        setQuote(data);
+        const distance = Number(data.distanceKm);
+        const priceFromApi = Number(data.price);
+        const distanceOk = Number.isFinite(distance) && distance > 0;
+        const finalPrice =
+          distanceOk && priceFromApi > 0
+            ? priceFromApi
+            : distanceOk
+              ? computePriceEuros(distance, tariff, {
+                  baggageCount: baggage,
+                  fifthPassenger,
+                  waitMinutes,
+                })
+              : 0;
+
+        setQuote({
+          distanceKm: distanceOk ? Math.round(distance * 100) / 100 : 0,
+          durationMinutes: data.durationMinutes,
+          price: finalPrice,
+          error: undefined,
+        });
       }
     } catch (e) {
       setError("Erreur réseau : " + String(e));
@@ -330,7 +350,16 @@ export default function TarifsPage() {
                   toLng,
                   price: String(quote.price),
                   distanceKm: String(quote.distanceKm),
+                  durationMinutes: String(quote.durationMinutes),
+                  tariff,
+                  baggage: String(baggage),
+                  fifthPassenger: String(fifthPassenger),
+                  waitMinutes: String(waitMinutes),
                 });
+                if (fromCity) params.set("fromCity", fromCity);
+                if (fromPostcode) params.set("fromPostcode", fromPostcode);
+                if (toCity) params.set("toCity", toCity);
+                if (toPostcode) params.set("toPostcode", toPostcode);
                 router.push(`/reserver?${params.toString()}`);
               }}
             >
