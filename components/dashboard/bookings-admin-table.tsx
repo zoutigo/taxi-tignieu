@@ -22,6 +22,8 @@ type BookingRow = Booking & {
   customer?: { fullName: string; phone: string; email: string | null } | null;
   driver?: Driver | null;
   driverId?: string | null;
+  pickup?: string;
+  dropoff?: string;
 };
 
 type CurrentUser = {
@@ -117,8 +119,6 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     try {
       const updated = await patchBooking({
         id: b.id,
-        pickup: b.pickup,
-        dropoff: b.dropoff,
         notes: b.notes ?? "",
         status: b.status,
         priceCents: b.priceCents ?? undefined,

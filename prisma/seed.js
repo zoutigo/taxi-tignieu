@@ -79,6 +79,33 @@ function randomFutureDate(daysAhead = 30) {
   return new Date(now + offset);
 }
 
+function parseAddress(label) {
+  const cpMatch = label.match(/(\d{5})/);
+  const postalCode = cpMatch?.[1] ?? null;
+  const parts = label
+    .split(/[,|-]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const street = parts[0] ?? label;
+  const city = parts.find((p) => p && p !== postalCode && /[a-zA-Z]{3,}/.test(p)) ?? null;
+  return { label, street, postalCode, city, country: "France" };
+}
+
+async function createAddress(label) {
+  const parsed = parseAddress(label);
+  return prisma.address.create({
+    data: {
+      name: parsed.label,
+      street: parsed.street,
+      postalCode: parsed.postalCode,
+      city: parsed.city,
+      country: parsed.country,
+      latitude: null,
+      longitude: null,
+    },
+  });
+}
+
 async function ensureDrivers() {
   return Promise.all(
     DRIVER_EMAILS.map((email, idx) =>
@@ -125,17 +152,21 @@ async function seedBookings(drivers, customers) {
   const existingCount = await prisma.booking.count();
   const target = 100;
   const toCreate = Math.max(0, target - existingCount);
-  console.log(`Bookings existants: ${existingCount}. À créer: ${toCreate}.`);
+  // info log volontairement retiré pour éviter le bruit en CI
 
   for (let i = 0; i < toCreate; i += 1) {
     const customer = randChoice(customers);
     const driver = Math.random() < 0.6 ? randChoice(drivers) : null;
     const status = driver ? "CONFIRMED" : randChoice(statuses);
     const dt = randomFutureDate(60);
+    const pickupLabel = randChoice(pickups);
+    const dropoffLabel = randChoice(dropoffs);
+    const pickupAddr = await createAddress(pickupLabel);
+    const dropoffAddr = await createAddress(dropoffLabel);
     await prisma.booking.create({
       data: {
-        pickup: randChoice(pickups),
-        dropoff: randChoice(dropoffs),
+        pickupId: pickupAddr.id,
+        dropoffId: dropoffAddr.id,
         dateTime: dt,
         pax: Math.floor(Math.random() * 3) + 1,
         luggage: Math.floor(Math.random() * 4),
@@ -154,7 +185,7 @@ async function seedReviews(customers, bookings) {
   const existingCount = await prisma.review.count();
   const target = 70;
   const toCreate = Math.max(0, target - existingCount);
-  console.log(`Avis existants: ${existingCount}. À créer: ${toCreate}.`);
+  // info log volontairement retiré pour éviter le bruit en CI
   const approvedStatuses = ["APPROVED", "PENDING"];
 
   for (let i = 0; i < toCreate; i += 1) {
@@ -173,13 +204,13 @@ async function seedReviews(customers, bookings) {
 }
 
 async function main() {
-  console.log("Démarrage du seed…");
+  // démarrage seed
   const drivers = await ensureDrivers();
   const customers = await ensureCustomers();
   await seedBookings(drivers, customers);
   const allBookings = await prisma.booking.findMany({ select: { id: true } });
   await seedReviews(customers, allBookings);
-  console.log("Seed terminé.");
+  // fin seed
 }
 
 main()

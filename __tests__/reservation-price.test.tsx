@@ -3,6 +3,7 @@ import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { ReservationPage } from "@/components/reservation-page";
 import { useRouter, useSearchParams } from "next/navigation";
+import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
@@ -43,11 +44,22 @@ describe("ReservationPage price display", () => {
 
   it("affiche un prix non nul quand distance > 0 (fallback local)", async () => {
     mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/tarifs/config")) {
+        return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
+      }
       if (url.startsWith("/api/tarifs/search")) {
         return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
       }
       if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({ ok: true, json: async () => ({ lat: 45.75, lng: 4.85 }) });
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            lat: 45.75,
+            lng: 4.85,
+            country: "France",
+            label: "114B route de Crémieu, France",
+          }),
+        });
       }
       if (url.startsWith("/api/tarifs/quote")) {
         return Promise.resolve({
@@ -114,6 +126,12 @@ describe("ReservationPage price display", () => {
     const match = text.match(/Estimation:\s*([0-9.,]+)/);
     expect(match).toBeTruthy();
     const value = match ? parseFloat(match[1].replace(",", ".")) : 0;
-    expect(value).toBeGreaterThan(0);
+    const expected = computePriceEuros(
+      51,
+      "A",
+      { baggageCount: 0, fifthPassenger: false, waitMinutes: 0 },
+      defaultTariffConfig
+    );
+    expect(value).toBeCloseTo(expected, 1);
   });
 });

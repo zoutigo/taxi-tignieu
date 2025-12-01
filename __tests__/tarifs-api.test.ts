@@ -1,6 +1,12 @@
 import { GET as searchGet } from "@/app/api/tarifs/search/route";
 import { GET as geocodeGet } from "@/app/api/tarifs/geocode/route";
 import { POST as quotePost } from "@/app/api/tarifs/quote/route";
+import { defaultTariffConfig } from "@/lib/tarifs";
+import { getTariffConfig } from "@/lib/tariff-config";
+
+jest.mock("@/lib/tariff-config", () => ({
+  getTariffConfig: jest.fn(),
+}));
 
 describe("tarifs APIs", () => {
   const originalFetch = global.fetch;
@@ -72,6 +78,7 @@ describe("tarifs APIs", () => {
       }
       return Promise.resolve({ ok: true, json: async () => ({}) }) as unknown as Response;
     });
+    (getTariffConfig as jest.Mock).mockResolvedValue(defaultTariffConfig);
 
     const res = await quotePost(
       makeRequest("http://localhost/api/tarifs/quote", "POST", {

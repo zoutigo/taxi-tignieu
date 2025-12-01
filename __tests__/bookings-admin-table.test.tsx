@@ -2,11 +2,14 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { BookingsAdminTable } from "@/components/dashboard/bookings-admin-table";
+import type { BookingStatus } from "@prisma/client";
 
 type BookingRow = Parameters<typeof BookingsAdminTable>[0]["initialBookings"][number];
 
 const baseBooking: BookingRow = {
   id: 1,
+  pickupId: 1,
+  dropoffId: 2,
   pickup: "Départ A",
   dropoff: "Arrivée B",
   dateTime: new Date("2025-01-01T10:00:00Z"),
@@ -15,7 +18,7 @@ const baseBooking: BookingRow = {
   babySeat: false,
   notes: "",
   priceCents: 1500,
-  status: "PENDING",
+  status: "PENDING" as BookingStatus,
   userId: "u1",
   driverId: null,
   createdAt: new Date(),

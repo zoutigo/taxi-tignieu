@@ -8,6 +8,9 @@ jest.mock("@/auth", () => ({
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    address: {
+      create: jest.fn(),
+    },
     booking: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -19,6 +22,10 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 const mockedAuth = auth as unknown as jest.Mock<Promise<unknown>, unknown[]>;
+const mockedAddressCreate = prisma.address.create as unknown as jest.Mock<
+  Promise<unknown>,
+  unknown[]
+>;
 const mockedCreate = prisma.booking.create as unknown as jest.Mock<Promise<unknown>, unknown[]>;
 const mockedFindMany = prisma.booking.findMany as unknown as jest.Mock<Promise<unknown>, unknown[]>;
 const mockedFindUnique = prisma.booking.findUnique as unknown as jest.Mock<
@@ -50,12 +57,13 @@ describe("POST /api/bookings", () => {
 
   it("crée une réservation avec user connecté", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
+    mockedAddressCreate.mockResolvedValue({ id: 10 });
+    mockedAddressCreate.mockResolvedValueOnce({ id: 10 });
+    mockedAddressCreate.mockResolvedValueOnce({ id: 11 });
     mockedCreate.mockResolvedValue({
       id: 1,
       createdAt: new Date(),
       userId: "u1",
-      pickup: "114 B route",
-      dropoff: "Aéroport",
       dateTime: new Date(),
       pax: 2,
       luggage: 1,
@@ -65,11 +73,13 @@ describe("POST /api/bookings", () => {
       status: "PENDING",
       updatedAt: new Date(),
       customerId: null,
+      pickupId: 10,
+      dropoffId: 11,
     });
 
     const payload = {
-      pickup: "114 B route",
-      dropoff: "Aéroport",
+      pickup: { label: "114 B route", lat: 45, lng: 5 },
+      dropoff: { label: "Aéroport", lat: 46, lng: 5.1 },
       date: "2025-11-24",
       time: "12:50",
       passengers: 2,
@@ -84,8 +94,8 @@ describe("POST /api/bookings", () => {
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          pickup: payload.pickup,
-          dropoff: payload.dropoff,
+          pickupId: 10,
+          dropoffId: 11,
           pax: payload.passengers,
           luggage: payload.luggage,
           notes: payload.notes,
@@ -98,12 +108,12 @@ describe("POST /api/bookings", () => {
 
   it("calcule dateTime et priceCents, même sans notes", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
+    mockedAddressCreate.mockResolvedValueOnce({ id: 10 });
+    mockedAddressCreate.mockResolvedValueOnce({ id: 11 });
     mockedCreate.mockResolvedValue({
       id: 2,
       createdAt: new Date(),
       userId: "u1",
-      pickup: "X",
-      dropoff: "Y",
       dateTime: new Date("2025-01-01T10:30:00Z"),
       pax: 1,
       luggage: 0,
@@ -117,8 +127,8 @@ describe("POST /api/bookings", () => {
 
     const res = await POST(
       makeRequest({
-        pickup: "123 Rue Test",
-        dropoff: "Destination",
+        pickup: { label: "123 Rue Test", lat: 45, lng: 5 },
+        dropoff: { label: "Destination", lat: 46, lng: 5.1 },
         date: "2025-01-01",
         time: "10:30",
         passengers: 1,
@@ -130,10 +140,12 @@ describe("POST /api/bookings", () => {
 
     expect(res.status).toBe(201);
     const called = mockedCreate.mock.calls[0]?.[0] as {
-      data?: { dateTime?: unknown; priceCents?: unknown };
+      data?: { dateTime?: unknown; priceCents?: unknown; pickupId?: number; dropoffId?: number };
     };
     expect(called?.data?.dateTime).toBeInstanceOf(Date);
     expect(called?.data?.priceCents).toBeNull();
+    expect(called?.data?.pickupId).toBe(10);
+    expect(called?.data?.dropoffId).toBe(11);
   });
 });
 
@@ -145,8 +157,10 @@ describe("GET /api/bookings", () => {
         id: 1,
         createdAt: new Date(),
         userId: "u1",
-        pickup: "X",
-        dropoff: "Y",
+        pickupId: 1,
+        dropoffId: 2,
+        pickup: { id: 1 },
+        dropoff: { id: 2 },
         dateTime: new Date(),
         pax: 1,
         luggage: 0,
@@ -165,6 +179,7 @@ describe("GET /api/bookings", () => {
     expect(mockedFindMany).toHaveBeenCalledWith({
       where: { userId: "u1" },
       orderBy: { createdAt: "desc" },
+      include: { pickup: true, dropoff: true },
     });
   });
 });
@@ -176,8 +191,8 @@ describe("PATCH /api/bookings", () => {
       id: 1,
       createdAt: new Date(),
       userId: "other",
-      pickup: "X",
-      dropoff: "Y",
+      pickupId: 1,
+      dropoffId: 2,
       dateTime: new Date(),
       pax: 1,
       luggage: 0,
@@ -191,7 +206,7 @@ describe("PATCH /api/bookings", () => {
 
     const res = await (
       await import("@/app/api/bookings/route")
-    ).PATCH(makeRequest({ id: 1, pickup: "New" }));
+    ).PATCH(makeRequest({ id: 1, pickup: { label: "New", lat: 1, lng: 1 } }));
 
     expect(res.status).toBe(403);
     expect(mockedUpdate).not.toHaveBeenCalled();
@@ -205,8 +220,8 @@ describe("PATCH /api/bookings", () => {
       id: 1,
       createdAt: new Date(),
       userId: "u1",
-      pickup: "X",
-      dropoff: "Y",
+      pickupId: 1,
+      dropoffId: 2,
       dateTime: new Date(),
       pax: 1,
       luggage: 0,
@@ -239,18 +254,26 @@ describe("PATCH /api/bookings", () => {
     ).PATCH(
       makeRequest({
         id: 1,
-        pickup: "New",
-        dropoff: "Dest",
+        pickup: { label: "New", lat: 1, lng: 1 },
+        dropoff: { label: "Dest", lat: 2, lng: 2 },
         date: "2025-01-01",
         time: "10:00",
         passengers: 2,
         luggage: 1,
         notes: "Note",
+        estimatedPrice: 55.5,
       })
     );
 
     expect(res.status).toBe(200);
-    expect(mockedUpdate).toHaveBeenCalled();
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          pickupId: expect.any(Number),
+          priceCents: 5550,
+        }),
+      })
+    );
   });
 });
 
@@ -264,8 +287,8 @@ describe("DELETE /api/bookings", () => {
       id: 1,
       createdAt: new Date(),
       userId: "other",
-      pickup: "X",
-      dropoff: "Y",
+      pickupId: 1,
+      dropoffId: 2,
       dateTime: new Date(),
       pax: 1,
       luggage: 0,

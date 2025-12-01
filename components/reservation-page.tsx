@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,7 +7,7 @@ import { bookingEstimateSchema } from "@/schemas/booking";
 import type { BookingEstimateInput } from "@/schemas/booking";
 import { useBookingStore, setBookingEstimate, clearBookingEstimate } from "@/hooks/useBookingStore";
 import { useSession, signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -28,78 +27,122 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { computePriceEuros, type TariffCode, baseChargeEuros } from "@/lib/tarifs";
+import {
+  computePriceEuros,
+  type TariffCode,
+  defaultTariffConfig,
+  type TariffConfigValues,
+} from "@/lib/tarifs";
+import {
+  fetchAddressData,
+  haversineKm,
+  inferTariffFromDateTime,
+  parseAddressParts,
+  type AddressData,
+} from "@/lib/booking-utils";
 
 export function ReservationPage() {
   const storedEstimate = useBookingStore((state) => state.estimate);
   const storedPrice = useBookingStore((state) => state.estimatedPrice);
-  const defaultValues = useMemo<BookingEstimateInput>(
-    () => ({
-      pickup: storedEstimate?.pickup ?? "",
-      dropoff: storedEstimate?.dropoff ?? "",
-      date: storedEstimate?.date ?? "",
-      time: storedEstimate?.time ?? "",
-      passengers: storedEstimate?.passengers ?? 1,
-      luggage: storedEstimate?.luggage ?? 0,
-      notes: storedEstimate?.notes ?? "",
-    }),
-    [storedEstimate]
-  );
+  const defaultValues = useMemo<BookingEstimateInput>(() => {
+    const emptyAddress: AddressData = {
+      label: "",
+      lat: NaN,
+      lng: NaN,
+      street: "",
+      streetNumber: "",
+      postcode: "",
+      city: "",
+      country: "",
+    };
+    return {
+      pickup: { ...emptyAddress },
+      dropoff: { ...emptyAddress },
+      date: "",
+      time: "",
+      passengers: 1,
+      luggage: 0,
+      notes: "",
+    };
+  }, []);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { status: sessionStatus } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [hasPosted, setHasPosted] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const isPostingRef = useRef(false);
-  const [fromCity, setFromCity] = useState("");
-  const [fromPostcode, setFromPostcode] = useState("");
-  const [toCity, setToCity] = useState("");
-  const [toPostcode, setToPostcode] = useState("");
-  const [fromSuggestions, setFromSuggestions] = useState<
-    { label: string; city?: string; postcode?: string; lat: number; lng: number }[]
-  >([]);
-  const [toSuggestions, setToSuggestions] = useState<
-    { label: string; city?: string; postcode?: string; lat: number; lng: number }[]
-  >([]);
+  const [fromSuggestions, setFromSuggestions] = useState<AddressData[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<AddressData[]>([]);
   const [quotePrice, setQuotePrice] = useState<number | null>(null);
   const [quoteDistance, setQuoteDistance] = useState<string>("");
   const [quoteDuration, setQuoteDuration] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [readyToPost, setReadyToPost] = useState(false);
+  const [tariffConfig, setTariffConfig] = useState<TariffConfigValues>(defaultTariffConfig);
 
-  const geocode = async (address: string) => {
-    const res = await fetch(`/api/tarifs/geocode?q=${encodeURIComponent(address)}`);
-    if (!res.ok) throw new Error("Adresse introuvable");
-    return (await res.json()) as { lat: number; lng: number };
+  const searchSuggestions = async (text: string, kind: "pickup" | "dropoff") => {
+    if (text.length < 3) {
+      if (kind === "pickup") setFromSuggestions([]);
+      else setToSuggestions([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/tarifs/search?q=${encodeURIComponent(text)}`);
+      const data = (await res.json()) as { results?: AddressData[] };
+      const normalized =
+        data.results?.map((s) => {
+          const parsed = parseAddressParts(s.label);
+          const withCountry =
+            s.country && !s.label.toLowerCase().includes(s.country.toLowerCase())
+              ? `${s.label}, ${s.country}`
+              : s.label;
+          return {
+            ...s,
+            label: withCountry,
+            city: s.city ?? parsed.city,
+            postcode: s.postcode ?? parsed.cp,
+            street: parsed.street,
+            streetNumber: parsed.streetNumber,
+          };
+        }) ?? [];
+      if (kind === "pickup") setFromSuggestions(normalized);
+      else setToSuggestions(normalized);
+    } catch {
+      if (kind === "pickup") setFromSuggestions([]);
+      else setToSuggestions([]);
+    }
   };
 
-  const haversineKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
-    const R = 6371;
-    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-    const dLon = ((b.lng - a.lng) * Math.PI) / 180;
-    const lat1 = (a.lat * Math.PI) / 180;
-    const lat2 = (b.lat * Math.PI) / 180;
-    const sinDLat = Math.sin(dLat / 2);
-    const sinDLon = Math.sin(dLon / 2);
-    const c =
-      2 *
-      Math.asin(Math.sqrt(sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon));
-    return R * c;
+  const applyAddress = (kind: "pickup" | "dropoff", addr: AddressData) => {
+    form.setValue(kind, addr, { shouldValidate: true, shouldDirty: true });
+    if (kind === "pickup") setFromSuggestions([]);
+    else setToSuggestions([]);
   };
 
-  const inferTariff = (dateStr: string, timeStr: string) => {
-    if (!dateStr || !timeStr) return "A";
-    const dt = new Date(`${dateStr}T${timeStr}`);
-    const hour = dt.getHours();
-    const isNight = hour < 7 || hour >= 19;
-    const isWeekend = [0, 6].includes(dt.getDay());
-    return isNight || isWeekend ? "B" : "A";
+  const ensureAddress = async (kind: "pickup" | "dropoff"): Promise<AddressData> => {
+    const current = form.getValues(kind) as AddressData;
+    if (Number.isFinite(current.lat) && Number.isFinite(current.lng)) {
+      return current;
+    }
+    const fetched = await fetchAddressData(current.label);
+    const merged: AddressData = {
+      ...current,
+      ...fetched,
+    };
+    applyAddress(kind, merged);
+    return merged;
+  };
+
+  const handleAddressInput = (kind: "pickup" | "dropoff", value: string) => {
+    const current = form.getValues(kind) as AddressData;
+    const next: AddressData = { ...current, label: value, lat: NaN, lng: NaN };
+    form.setValue(kind, next, { shouldValidate: false, shouldDirty: true });
+    void searchSuggestions(value, kind);
   };
 
   const createBooking = useCallback(
-    async (payload: BookingEstimateInput) => {
+    async (payload: BookingEstimateInput, estimatedPrice: number | null) => {
       if (isPostingRef.current) {
         return;
       }
@@ -109,7 +152,7 @@ export function ReservationPage() {
         const res = await fetch("/api/bookings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, estimatedPrice: storedPrice ?? null }),
+          body: JSON.stringify({ ...payload, estimatedPrice }),
         });
 
         if (!res.ok) {
@@ -120,14 +163,14 @@ export function ReservationPage() {
 
         setHasPosted(true);
         clearBookingEstimate();
-        router.push("/espace-client?booking=success");
+        router.push("/espace-client/bookings?booking=success");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur inconnue.");
       } finally {
         isPostingRef.current = false;
       }
     },
-    [router, storedPrice]
+    [router]
   );
 
   const form = useForm<BookingEstimateInput>({
@@ -135,124 +178,89 @@ export function ReservationPage() {
     mode: "onChange",
     defaultValues,
   });
+  const pickupAddress = form.watch("pickup") as AddressData;
+  const dropoffAddress = form.watch("dropoff") as AddressData;
 
   useEffect(() => {
     form.reset(defaultValues);
+    clearBookingEstimate();
+    setFromSuggestions([]);
+    setToSuggestions([]);
+    setQuotePrice(null);
+    setQuoteDistance("");
+    setQuoteDuration("");
   }, [defaultValues, form]);
 
-  useEffect(() => {
-    const sp = searchParams;
-    if (!sp) return;
-    const pickup = sp.get("from") ?? defaultValues.pickup;
-    const dropoff = sp.get("to") ?? defaultValues.dropoff;
-    const price = Number(sp.get("price"));
-    const distanceKm = sp.get("distanceKm");
-    const durationMinutes = sp.get("durationMinutes");
-    const tariff = sp.get("tariff");
-    const baggage = sp.get("baggage");
-    const fifthPassenger = sp.get("fifthPassenger");
-    const waitMinutes = sp.get("waitMinutes");
-    const fromCityVal = sp.get("fromCity") ?? "";
-    const fromPostVal = sp.get("fromPostcode") ?? "";
-    const toCityVal = sp.get("toCity") ?? "";
-    const toPostVal = sp.get("toPostcode") ?? "";
-
-    const extrasSummary = [
-      tariff ? `Tarif: ${tariff}` : null,
-      distanceKm ? `Distance estimée: ${distanceKm} km` : null,
-      durationMinutes ? `Durée estimée: ${durationMinutes} min` : null,
-      baggage ? `Bagages: ${baggage}` : null,
-      fifthPassenger === "true" ? "5ᵉ passager" : null,
-      waitMinutes ? `Attente: ${waitMinutes} min` : null,
-      fromCityVal || fromPostVal ? `Départ: ${fromPostVal} ${fromCityVal}` : null,
-      toCityVal || toPostVal ? `Arrivée: ${toPostVal} ${toCityVal}` : null,
-    ]
-      .filter(Boolean)
-      .join(" • ");
-
-    const nextValues: BookingEstimateInput = {
-      pickup,
-      dropoff,
-      date: defaultValues.date,
-      time: defaultValues.time,
-      passengers: defaultValues.passengers,
-      luggage: defaultValues.luggage,
-      notes: extrasSummary ? `${extrasSummary}` : defaultValues.notes,
-    };
-
-    setFromCity(fromCityVal);
-    setFromPostcode(fromPostVal);
-    setToCity(toCityVal);
-    setToPostcode(toPostVal);
-    if (distanceKm) setQuoteDistance(distanceKm);
-    if (durationMinutes) setQuoteDuration(durationMinutes);
-
-    form.reset(nextValues);
-    if (!Number.isNaN(price) && price > 0) {
-      setBookingEstimate(nextValues, price);
-      setQuotePrice(price);
-    } else {
-      setBookingEstimate(nextValues, storedPrice ?? 0);
-    }
-  }, [defaultValues, form, searchParams, storedPrice]);
+  // Plus de synchronisation depuis /tarifs : seuls les champs saisis ici pilotent l'affichage.
 
   useEffect(() => {
     const firstInput = formRef.current?.querySelector("input");
     firstInput?.focus({ preventScroll: false });
   }, []);
 
-  const searchPhoton = async (text: string, kind: "from" | "to") => {
-    if (text.length < 3) {
-      if (kind === "from") setFromSuggestions([]);
-      else setToSuggestions([]);
-      return;
-    }
-    try {
-      const res = await fetch(`/api/tarifs/search?q=${encodeURIComponent(text)}`);
-      const data = (await res.json()) as {
-        results?: { label: string; city?: string; postcode?: string; lat: number; lng: number }[];
-      };
-      if (kind === "from") setFromSuggestions(data.results ?? []);
-      else setToSuggestions(data.results ?? []);
-    } catch {
-      if (kind === "from") setFromSuggestions([]);
-      else setToSuggestions([]);
-    }
-  };
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await fetch("/api/tarifs/config", { cache: "no-store" });
+        if (!res.ok) return;
+        const cfg = (await res.json()) as TariffConfigValues;
+        setTariffConfig(cfg);
+      } catch {
+        // keep defaults
+      }
+    };
+    void loadConfig();
+  }, []);
 
-  const pickSuggestion = (
-    s: { label: string; city?: string; postcode?: string; lat: number; lng: number },
-    kind: "from" | "to"
-  ) => {
-    if (kind === "from") {
-      form.setValue("pickup", s.label);
-      setFromCity(s.city ?? "");
-      setFromPostcode(s.postcode ?? "");
-      setFromSuggestions([]);
-    } else {
-      form.setValue("dropoff", s.label);
-      setToCity(s.city ?? "");
-      setToPostcode(s.postcode ?? "");
-      setToSuggestions([]);
-    }
+  const pickSuggestion = (s: AddressData, kind: "pickup" | "dropoff") => {
+    const parsed = parseAddressParts(s.label);
+    const withCountry =
+      s.country && !s.label.toLowerCase().includes(s.country.toLowerCase())
+        ? `${s.label}, ${s.country}`
+        : s.label;
+    const addr: AddressData = {
+      ...s,
+      label: withCountry,
+      city: s.city ?? parsed.city,
+      postcode: s.postcode ?? parsed.cp,
+      street: s.street ?? parsed.street,
+      streetNumber: s.streetNumber ?? parsed.streetNumber,
+    };
+    applyAddress(kind, addr);
   };
 
   const calculateQuote = async () => {
+    const pickupValue = form.getValues("pickup");
+    const dropValue = form.getValues("dropoff");
+    if (!pickupValue?.label || !dropValue?.label) {
+      setError("Renseignez les adresses avant de calculer.");
+      return;
+    }
     setQuoteLoading(true);
     setError(null);
     try {
       const values = form.getValues();
-      const gFrom = await geocode(values.pickup);
-      const gTo = await geocode(values.dropoff);
-      const tariff = inferTariff(values.date, values.time);
+      const gFrom = await ensureAddress("pickup");
+      const gTo = await ensureAddress("dropoff");
+
+      if (
+        !Number.isFinite(gFrom.lat) ||
+        !Number.isFinite(gFrom.lng) ||
+        !Number.isFinite(gTo.lat) ||
+        !Number.isFinite(gTo.lng)
+      ) {
+        throw new Error("Impossible de calculer : coordonnées manquantes.");
+      }
+
+      const tariff = inferTariffFromDateTime(values.date, values.time);
 
       // Appel identique à la page /tarifs
       const res = await fetch("/api/tarifs/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: gFrom,
-          to: gTo,
+          from: { lat: gFrom.lat, lng: gFrom.lng },
+          to: { lat: gTo.lat, lng: gTo.lng },
           tariff: tariff as TariffCode,
           baggageCount: values.luggage,
           fifthPassenger: values.passengers > 4,
@@ -276,16 +284,34 @@ export function ReservationPage() {
           ? Math.round(apiDuration)
           : Math.round((distance / 40) * 60);
 
-      const finalPrice = computePriceEuros(distance, tariff as TariffCode, {
-        baggageCount: values.luggage,
-        fifthPassenger: values.passengers > 4,
-        waitMinutes: 0,
-      });
+      const apiPrice = Number(data.price);
+      const finalPrice =
+        Number.isFinite(apiPrice) && apiPrice > 0
+          ? apiPrice
+          : computePriceEuros(
+              distance,
+              tariff as TariffCode,
+              {
+                baggageCount: values.luggage,
+                fifthPassenger: values.passengers > 4,
+                waitMinutes: 0,
+              },
+              tariffConfig
+            );
+
+      // Ne pas modifier l'affichage du formulaire ici : seules les sélections utilisateur mettent à jour les champs.
 
       setQuotePrice(finalPrice);
       setQuoteDistance(distance.toFixed(2));
       setQuoteDuration(durationMinutes > 0 ? String(durationMinutes) : "");
-      setBookingEstimate({ ...values }, finalPrice);
+      setBookingEstimate(
+        {
+          ...values,
+          pickup: gFrom,
+          dropoff: gTo,
+        },
+        finalPrice
+      );
     } catch (e) {
       setError("Erreur lors du calcul du tarif : " + String(e));
     } finally {
@@ -295,11 +321,14 @@ export function ReservationPage() {
 
   const onSubmit = form.handleSubmit(async (data: BookingEstimateInput) => {
     const priceToUse = quotePrice ?? storedPrice ?? 0;
-    setBookingEstimate(data, priceToUse);
+    const pickup = await ensureAddress("pickup");
+    const dropoff = await ensureAddress("dropoff");
+    const payload: BookingEstimateInput = { ...data, pickup, dropoff };
+    setBookingEstimate(payload, priceToUse);
     setReadyToPost(true);
 
     if (sessionStatus === "authenticated") {
-      await createBooking(data);
+      await createBooking(payload, priceToUse);
       setReadyToPost(false);
       return;
     }
@@ -310,10 +339,10 @@ export function ReservationPage() {
 
   useEffect(() => {
     if (sessionStatus === "authenticated" && storedEstimate && !hasPosted && readyToPost) {
-      void createBooking(storedEstimate);
+      void createBooking(storedEstimate, storedPrice ?? null);
       setReadyToPost(false);
     }
-  }, [sessionStatus, storedEstimate, hasPosted, readyToPost, createBooking]);
+  }, [sessionStatus, storedEstimate, storedPrice, hasPosted, readyToPost, createBooking]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-12 sm:px-6 lg:px-8">
@@ -343,10 +372,7 @@ export function ReservationPage() {
             </div>
           </div>
           <div className="mt-6 text-sm text-white/75">
-            Pas encore d&apos;estimation ?{" "}
-            <Link href="/tarifs" className="font-semibold text-primary">
-              Voir les tarifs
-            </Link>
+            Pas encore d&apos;estimation ? Saisissez vos adresses ci-dessous et lancez le calcul.
           </div>
         </div>
 
@@ -384,17 +410,17 @@ export function ReservationPage() {
                 </p>
                 <FormField
                   control={form.control}
-                  name="pickup"
+                  name="pickup.label"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
                         <Input
                           placeholder="Ex: 114B route de Crémieu, Tignieu"
                           className="border-border/60 bg-white text-base text-foreground placeholder:text-muted-foreground"
-                          {...field}
+                          value={pickupAddress?.label ?? ""}
                           onChange={(e) => {
-                            field.onChange(e);
-                            void searchPhoton(e.target.value, "from");
+                            field.onChange(e.target.value);
+                            handleAddressInput("pickup", e.target.value);
                           }}
                         />
                       </FormControl>
@@ -405,19 +431,19 @@ export function ReservationPage() {
                 {fromSuggestions.length > 0 && (
                   <div className="relative">
                     <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg">
-                      {fromSuggestions.map((s) => (
+                      {fromSuggestions.map((s, idx) => (
                         <button
-                          key={`${s.lat}-${s.lng}-${s.label}`}
+                          key={`${s.lat}-${s.lng}-${s.label}-${idx}`}
                           type="button"
                           className={cn(
                             "flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm text-foreground",
                             "hover:bg-muted/60"
                           )}
-                          onClick={() => pickSuggestion(s, "from")}
+                          onClick={() => pickSuggestion(s, "pickup")}
                         >
                           <span className="truncate">{s.label}</span>
                           <span className="truncate text-xs text-muted-foreground">
-                            {[s.city, s.postcode].filter(Boolean).join(" • ")}
+                            {[s.city, s.postcode, s.country].filter(Boolean).join(" • ")}
                           </span>
                         </button>
                       ))}
@@ -426,16 +452,36 @@ export function ReservationPage() {
                 )}
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                   <div>
+                    <label className="text-xs text-muted-foreground">Rue / n°</label>
+                    <Input
+                      readOnly
+                      value={pickupAddress?.street || pickupAddress?.streetNumber || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
+                  </div>
+                  <div>
                     <label className="text-xs text-muted-foreground">Code postal</label>
                     <Input
                       readOnly
-                      value={fromPostcode || "Auto"}
+                      value={pickupAddress?.postcode || "Auto"}
                       className="bg-muted/50 text-sm"
                     />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Ville</label>
-                    <Input readOnly value={fromCity || "Auto"} className="bg-muted/50 text-sm" />
+                    <Input
+                      readOnly
+                      value={pickupAddress?.city || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Pays</label>
+                    <Input
+                      readOnly
+                      value={pickupAddress?.country || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -446,17 +492,17 @@ export function ReservationPage() {
                 </p>
                 <FormField
                   control={form.control}
-                  name="dropoff"
+                  name="dropoff.label"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
                         <Input
                           placeholder="Ex: Aéroport de Lyon"
                           className="border-border/60 bg-white text-base text-foreground placeholder:text-muted-foreground"
-                          {...field}
+                          value={dropoffAddress?.label ?? ""}
                           onChange={(e) => {
-                            field.onChange(e);
-                            void searchPhoton(e.target.value, "to");
+                            field.onChange(e.target.value);
+                            handleAddressInput("dropoff", e.target.value);
                           }}
                         />
                       </FormControl>
@@ -467,15 +513,15 @@ export function ReservationPage() {
                 {toSuggestions.length > 0 && (
                   <div className="relative">
                     <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg">
-                      {toSuggestions.map((s) => (
+                      {toSuggestions.map((s, idx) => (
                         <button
-                          key={`${s.lat}-${s.lng}-${s.label}`}
+                          key={`${s.lat}-${s.lng}-${s.label}-${idx}`}
                           type="button"
                           className={cn(
                             "flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm text-foreground",
                             "hover:bg-muted/60"
                           )}
-                          onClick={() => pickSuggestion(s, "to")}
+                          onClick={() => pickSuggestion(s, "dropoff")}
                         >
                           <span className="truncate">{s.label}</span>
                           <span className="truncate text-xs text-muted-foreground">
@@ -488,12 +534,36 @@ export function ReservationPage() {
                 )}
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                   <div>
+                    <label className="text-xs text-muted-foreground">Rue / n°</label>
+                    <Input
+                      readOnly
+                      value={dropoffAddress?.street || dropoffAddress?.streetNumber || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
+                  </div>
+                  <div>
                     <label className="text-xs text-muted-foreground">Code postal</label>
-                    <Input readOnly value={toPostcode || "Auto"} className="bg-muted/50 text-sm" />
+                    <Input
+                      readOnly
+                      value={dropoffAddress?.postcode || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Ville</label>
-                    <Input readOnly value={toCity || "Auto"} className="bg-muted/50 text-sm" />
+                    <Input
+                      readOnly
+                      value={dropoffAddress?.city || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Pays</label>
+                    <Input
+                      readOnly
+                      value={dropoffAddress?.country || "Auto"}
+                      className="bg-muted/50 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -617,7 +687,13 @@ export function ReservationPage() {
                 type="button"
                 variant="outline"
                 onClick={calculateQuote}
-                disabled={quoteLoading}
+                disabled={
+                  quoteLoading ||
+                  !pickupAddress?.label ||
+                  !dropoffAddress?.label ||
+                  !pickupAddress ||
+                  !dropoffAddress
+                }
               >
                 {quoteLoading ? "Calcul..." : "Calculer le tarif"}
               </Button>
@@ -670,6 +746,17 @@ export function ReservationPage() {
             </ul>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-border/60 bg-card p-5 text-sm text-foreground shadow-sm">
+        <h2 className="text-lg font-semibold">Résumé tarifaire (extrait panneau 2020)</h2>
+        <ul className="mt-3 space-y-2 text-muted-foreground">
+          <li>Prise en charge : 2,80 €</li>
+          <li>Tarif A : 0,98 €/km (jour semaine 7h-19h) • Tarif B : 1,23 €/km (nuit/dim/fériés)</li>
+          <li>Tarif C : 1,96 €/km (gare jour) • Tarif D : 2,46 €/km (gare nuit)</li>
+          <li>Attente : 29,40 €/h (marche lente ou arrêt demandé)</li>
+          <li>Suppléments : 5ᵉ passager 2,50 € • Bagage 2 €</li>
+        </ul>
       </section>
     </div>
   );

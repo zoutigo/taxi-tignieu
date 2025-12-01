@@ -33,14 +33,14 @@ export const getSiteContact = cache(
       });
       if (!cfg || !cfg.address) return fallbackContact;
       return {
-        phone: cfg.phone,
-        email: cfg.email,
+        phone: cfg.phone ?? "",
+        email: cfg.email ?? "",
         address: {
-          street: cfg.address.street,
-          streetNumber: cfg.address.streetNumber,
-          postalCode: cfg.address.postalCode,
-          city: cfg.address.city,
-          country: cfg.address.country,
+          street: cfg.address.street ?? "",
+          streetNumber: cfg.address.streetNumber ?? "",
+          postalCode: cfg.address.postalCode ?? "",
+          city: cfg.address.city ?? "",
+          country: cfg.address.country ?? "",
         },
       };
     } catch {

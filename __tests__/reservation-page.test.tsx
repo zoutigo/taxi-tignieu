@@ -3,6 +3,7 @@ import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { ReservationPage } from "@/components/reservation-page";
 import { useRouter, useSearchParams } from "next/navigation";
+import { defaultTariffConfig } from "@/lib/tarifs";
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
@@ -48,8 +49,19 @@ describe("ReservationPage - calcul tarif", () => {
 
   it("calcule un prix non nul quand la distance > 0", async () => {
     mockFetch.mockImplementation((url: string) => {
+      if (url.startsWith("/api/tarifs/config")) {
+        return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
+      }
       if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({ ok: true, json: async () => ({ lat: 45.75, lng: 4.85 }) });
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            lat: 45.75,
+            lng: 4.85,
+            country: "France",
+            label: "114B route de Crémieu, France",
+          }),
+        });
       }
       if (url.startsWith("/api/tarifs/quote")) {
         return Promise.resolve({

@@ -1,22 +1,40 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { Booking } from "@prisma/client";
+import type { Booking, Address } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-type BookingWithPrice = Omit<Booking, "dateTime"> & { dateTime: Date | string };
+type BookingWithPrice = Omit<Booking, "dateTime"> & {
+  dateTime: Date | string;
+  pickup: Address | string | null;
+  dropoff: Address | string | null;
+};
 
 type EditForm = {
-  pickup: string;
-  dropoff: string;
+  pickup: string | Address;
+  dropoff: string | Address;
   date: string;
   time: string;
   passengers: number;
   luggage: number;
   notes: string;
+};
+
+const formatAddress = (value: string | Address | null) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value.name) return value.name;
+  const parts = [
+    value.streetNumber,
+    value.street,
+    value.postalCode,
+    value.city,
+    value.country,
+  ].filter(Boolean);
+  return parts.join(" ");
 };
 
 function toForm(booking: BookingWithPrice): EditForm {
@@ -25,8 +43,8 @@ function toForm(booking: BookingWithPrice): EditForm {
   const [date, timeRaw] = iso.split("T");
   const time = timeRaw.slice(0, 5);
   return {
-    pickup: booking.pickup,
-    dropoff: booking.dropoff,
+    pickup: booking.pickup ?? "",
+    dropoff: booking.dropoff ?? "",
     date,
     time,
     passengers: booking.pax,
@@ -106,8 +124,28 @@ export function BookingsList({ initialBookings }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: booking.id,
-            pickup: form.pickup,
-            dropoff: form.dropoff,
+            pickup:
+              typeof form.pickup === "string"
+                ? { label: form.pickup, lat: NaN, lng: NaN }
+                : {
+                    label: formatAddress(form.pickup),
+                    lat: form.pickup.latitude ?? NaN,
+                    lng: form.pickup.longitude ?? NaN,
+                    city: form.pickup.city ?? undefined,
+                    postcode: form.pickup.postalCode ?? undefined,
+                    country: form.pickup.country ?? undefined,
+                  },
+            dropoff:
+              typeof form.dropoff === "string"
+                ? { label: form.dropoff, lat: NaN, lng: NaN }
+                : {
+                    label: formatAddress(form.dropoff),
+                    lat: form.dropoff.latitude ?? NaN,
+                    lng: form.dropoff.longitude ?? NaN,
+                    city: form.dropoff.city ?? undefined,
+                    postcode: form.dropoff.postalCode ?? undefined,
+                    country: form.dropoff.country ?? undefined,
+                  },
             date: form.date,
             time: form.time,
             passengers: form.passengers,
@@ -168,7 +206,7 @@ export function BookingsList({ initialBookings }: Props) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  {booking.pickup} → {booking.dropoff}
+                  {formatAddress(booking.pickup)} → {formatAddress(booking.dropoff)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDate(
@@ -192,12 +230,12 @@ export function BookingsList({ initialBookings }: Props) {
             {isEditing ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <Input
-                  value={formValues?.pickup ?? ""}
+                  value={formatAddress(formValues?.pickup ?? "")}
                   onChange={(e) => handleChange("pickup", e.target.value)}
                   placeholder="Prise en charge"
                 />
                 <Input
-                  value={formValues?.dropoff ?? ""}
+                  value={formatAddress(formValues?.dropoff ?? "")}
                   onChange={(e) => handleChange("dropoff", e.target.value)}
                   placeholder="Destination"
                 />

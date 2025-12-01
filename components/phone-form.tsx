@@ -45,7 +45,11 @@ export function PhoneForm({ defaultPhone, redirectTo = "/espace-client" }: Phone
         throw new Error(payload?.error ?? "Impossible d'enregistrer le numéro pour le moment.");
       }
 
-      await update({ phone: values.phone });
+      try {
+        await update({ phone: values.phone });
+      } catch {
+        // Si la session ne retourne pas de JSON, on ignore et on force un refresh plus bas
+      }
       setSuccess(true);
       router.push(redirectTo);
       router.refresh();

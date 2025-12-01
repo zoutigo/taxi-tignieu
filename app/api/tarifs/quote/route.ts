@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { computePriceEuros, type TariffCode } from "@/lib/tarifs";
+import { getTariffConfig } from "@/lib/tariff-config";
 
 type Coord = { lat: number; lng: number };
 
@@ -101,11 +102,17 @@ export async function POST(request: Request) {
 
     const distanceKm = summary.distance / 1000;
     const durationMinutes = summary.duration / 60;
-    const price = computePriceEuros(distanceKm, body.tariff, {
-      baggageCount: body.baggageCount,
-      fifthPassenger: body.fifthPassenger,
-      waitMinutes: body.waitMinutes,
-    });
+    const config = await getTariffConfig();
+    const price = computePriceEuros(
+      distanceKm,
+      body.tariff,
+      {
+        baggageCount: body.baggageCount,
+        fifthPassenger: body.fifthPassenger,
+        waitMinutes: body.waitMinutes,
+      },
+      config
+    );
 
     return NextResponse.json({
       distanceKm: Math.round(distanceKm * 100) / 100,

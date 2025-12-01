@@ -63,25 +63,27 @@ model VerificationToken {
 }
 
 model Booking {
-  id         Int           @id @default(autoincrement())
-  pickup     String
-  dropoff    String
-  dateTime   DateTime
-  pax        Int           @default(1)
-  luggage    Int           @default(0)
-  babySeat   Boolean       @default(false)
-  notes      String?
-  priceCents Int?
-  userId     String?
-  user       User?         @relation(fields: [userId], references: [id])
-  driverId   String?
-  driver     User?         @relation("DriverBookings", fields: [driverId], references: [id])
-  status     BookingStatus @default(PENDING)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  customer   Customer?     @relation(fields: [customerId], references: [id])
-  customerId Int?
-  reviews    Review[]
+  id           Int           @id @default(autoincrement())
+  dateTime     DateTime
+  pax          Int           @default(1)
+  luggage      Int           @default(0)
+  babySeat     Boolean       @default(false)
+  notes        String?
+  priceCents   Int?
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id])
+  driverId     String?
+  driver       User?         @relation("DriverBookings", fields: [driverId], references: [id])
+  status       BookingStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  customerId   Int?
+  reviews      Review[]
+  pickupId     Int
+  dropoffId    Int
+  pickup       Address       @relation("PickupAddress", fields: [pickupId], references: [id])
+  dropoff      Address       @relation("DropoffAddress", fields: [dropoffId], references: [id])
 }
 
 enum BookingStatus {
@@ -120,17 +122,20 @@ model Review {
 }
 
 model Address {
-  id          Int      @id @default(autoincrement())
-  street      String
-  streetNumber String?
-  postalCode  String
-  city        String
-  country     String
-  latitude    Float?
-  longitude   Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  config      SiteConfig?
+  id              Int        @id @default(autoincrement())
+  name            String?
+  street          String?
+  streetNumber    String?
+  postalCode      String?
+  city            String?
+  country         String?
+  latitude        Float?
+  longitude       Float?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  config          SiteConfig?
+  pickupBookings  Booking[]  @relation("PickupAddress")
+  dropoffBookings Booking[] @relation("DropoffAddress")
 }
 
 model SiteConfig {
@@ -141,4 +146,18 @@ model SiteConfig {
   address    Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model TariffConfig {
+  id                   Int      @id @default(autoincrement())
+  baseChargeCents      Int      @default(280)
+  kmCentsA             Int      @default(98)
+  kmCentsB             Int      @default(123)
+  kmCentsC             Int      @default(196)
+  kmCentsD             Int      @default(246)
+  waitPerHourCents     Int      @default(2940)
+  baggageFeeCents      Int      @default(200)
+  fifthPassengerCents  Int      @default(250)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

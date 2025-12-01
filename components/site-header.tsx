@@ -8,7 +8,6 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 const navLinks = [
-  { label: "Tarifs", href: "/tarifs" },
   { label: "Services", href: "#services" },
   { label: "Avis", href: "/avis" },
   { label: "Entreprises", href: "#entreprises" },

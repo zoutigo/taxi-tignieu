@@ -4,7 +4,6 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { BookingsList } from "@/components/bookings-list";
 
 export const metadata: Metadata = {
   title: "Espace client | Taxi Tignieu",
@@ -140,24 +139,21 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
         </div>
       </div>
 
-      <div className="mt-10 space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="badge-pill bg-muted text-xs uppercase tracking-[0.35em] text-muted-foreground">
-            Réservations
-          </p>
-          <Link href="/reserver" className="text-sm font-semibold text-primary">
-            Nouvelle demande
-          </Link>
-        </div>
-
-        {user.bookings.length === 0 ? (
-          <div className="rounded-2xl border border-border/70 bg-muted/30 px-5 py-6 text-sm text-muted-foreground">
-            Aucune réservation pour le moment. Lancez une demande pour la retrouver ici une fois
-            validée.
+      <div className="mt-10 space-y-3">
+        <p className="badge-pill bg-muted text-xs uppercase tracking-[0.35em] text-muted-foreground">
+          Réservations
+        </p>
+        <div className="rounded-2xl border border-border/70 bg-muted/30 px-5 py-6 text-sm text-muted-foreground">
+          Retrouvez et modifiez vos réservations dans l’espace dédié.
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link href="/espace-client/bookings" className="btn btn-primary">
+              Voir mes réservations
+            </Link>
+            <Link href="/reserver" className="btn" aria-label="Nouvelle réservation">
+              Nouvelle demande
+            </Link>
           </div>
-        ) : (
-          <BookingsList initialBookings={user.bookings} />
-        )}
+        </div>
       </div>
     </section>
   );
