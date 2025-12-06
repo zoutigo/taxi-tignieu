@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  image         String?
-  phone         String?
-  isAdmin       Boolean   @default(false)
-  isManager     Boolean   @default(false)
-  isDriver      Boolean   @default(false)
-  passwordHash  String?
-  emailVerified DateTime?
-  accounts      Account[]
-  sessions      Session[]
-  bookings      Booking[]
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  image          String?
+  phone          String?
+  isAdmin        Boolean   @default(false)
+  isManager      Boolean   @default(false)
+  isDriver       Boolean   @default(false)
+  passwordHash   String?
+  emailVerified  DateTime?
+  accounts       Account[]
+  sessions       Session[]
+  bookings       Booking[]
   driverBookings Booking[] @relation("DriverBookings")
-  reviews       Review[]
-  createdAt     DateTime  @default(now())
+  reviews        Review[]
+  createdAt      DateTime  @default(now())
 }
 
 model Account {
@@ -63,27 +63,28 @@ model VerificationToken {
 }
 
 model Booking {
-  id           Int           @id @default(autoincrement())
-  dateTime     DateTime
-  pax          Int           @default(1)
-  luggage      Int           @default(0)
-  babySeat     Boolean       @default(false)
-  notes        String?
-  priceCents   Int?
-  userId       String?
-  user         User?         @relation(fields: [userId], references: [id])
-  driverId     String?
-  driver       User?         @relation("DriverBookings", fields: [driverId], references: [id])
-  status       BookingStatus @default(PENDING)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  customer     Customer?     @relation(fields: [customerId], references: [id])
-  customerId   Int?
-  reviews      Review[]
-  pickupId     Int
-  dropoffId    Int
-  pickup       Address       @relation("PickupAddress", fields: [pickupId], references: [id])
-  dropoff      Address       @relation("DropoffAddress", fields: [dropoffId], references: [id])
+  id         Int           @id @default(autoincrement())
+  dateTime   DateTime
+  pax        Int           @default(1)
+  luggage    Int           @default(0)
+  babySeat   Boolean       @default(false)
+  notes      String?
+  priceCents Int?
+  userId     String?
+  user       User?         @relation(fields: [userId], references: [id])
+  driverId   String?
+  driver     User?         @relation("DriverBookings", fields: [driverId], references: [id])
+  status     BookingStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  customer   Customer?     @relation(fields: [customerId], references: [id])
+  customerId Int?
+  reviews    Review[]
+  pickupId   Int
+  dropoffId  Int
+  pickup     Address       @relation("PickupAddress", fields: [pickupId], references: [id])
+  dropoff    Address       @relation("DropoffAddress", fields: [dropoffId], references: [id])
+  invoice    Invoice?
 }
 
 enum BookingStatus {
@@ -122,7 +123,7 @@ model Review {
 }
 
 model Address {
-  id              Int        @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   name            String?
   street          String?
   streetNumber    String?
@@ -131,33 +132,44 @@ model Address {
   country         String?
   latitude        Float?
   longitude       Float?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
   config          SiteConfig?
-  pickupBookings  Booking[]  @relation("PickupAddress")
-  dropoffBookings Booking[] @relation("DropoffAddress")
+  pickupBookings  Booking[]   @relation("PickupAddress")
+  dropoffBookings Booking[]   @relation("DropoffAddress")
 }
 
 model SiteConfig {
-  id         Int      @id @default(autoincrement())
-  phone      String
-  email      String
-  addressId  Int      @unique
-  address    Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  phone     String
+  email     String
+  addressId Int      @unique
+  address   Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model TariffConfig {
-  id                   Int      @id @default(autoincrement())
-  baseChargeCents      Int      @default(280)
-  kmCentsA             Int      @default(98)
-  kmCentsB             Int      @default(123)
-  kmCentsC             Int      @default(196)
-  kmCentsD             Int      @default(246)
-  waitPerHourCents     Int      @default(2940)
-  baggageFeeCents      Int      @default(200)
-  fifthPassengerCents  Int      @default(250)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  baseChargeCents     Int      @default(280)
+  kmCentsA            Int      @default(98)
+  kmCentsB            Int      @default(123)
+  kmCentsC            Int      @default(196)
+  kmCentsD            Int      @default(246)
+  waitPerHourCents    Int      @default(2940)
+  baggageFeeCents     Int      @default(200)
+  fifthPassengerCents Int      @default(250)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Invoice {
+  id          Int      @id @default(autoincrement())
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId   Int      @unique
+  amountCents Int
+  pdfPath     String
+  issuedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

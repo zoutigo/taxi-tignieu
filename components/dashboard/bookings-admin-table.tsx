@@ -5,6 +5,7 @@ import type { Booking, BookingStatus, User } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Mail, PhoneCall, Pencil } from "lucide-react";
 import {
   Select,
@@ -64,6 +65,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">("ALL");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<number | null>(null);
 
   const adminLike = Boolean(currentUser?.isAdmin || currentUser?.isManager);
   const driverLike = Boolean(currentUser?.isDriver);
@@ -260,7 +262,35 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                 <p className="text-sm font-semibold uppercase tracking-[0.25em] text-muted-foreground">
                   {formatDateTime(dateValue)}
                 </p>
-                <p className="text-base font-semibold text-foreground">{priceLabel}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-semibold text-foreground">{priceLabel}</p>
+                  {b.status === "COMPLETED" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        setSavingId(b.id);
+                        setMessage(null);
+                        setError(null);
+                        const res = await fetch("/api/admin/bills", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ bookingId: b.id }),
+                        });
+                        if (res.ok) {
+                          setMessage("Facture générée.");
+                        } else {
+                          const payload = await res.json().catch(() => ({}));
+                          setError(payload?.error ?? "Impossible de générer la facture.");
+                        }
+                        setSavingId(null);
+                      }}
+                      disabled={savingId === b.id}
+                    >
+                      Facturer
+                    </Button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-1 text-sm">
@@ -434,6 +464,16 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                       }
                       placeholder="Prix (centimes)"
                     />
+                    {b.status === "COMPLETED" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPendingInvoiceId(b.id)}
+                        disabled={savingId === b.id}
+                      >
+                        Facturer
+                      </Button>
+                    ) : null}
                     <Select
                       value={b.status}
                       onValueChange={(v) =>
@@ -510,6 +550,34 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingInvoiceId !== null}
+        title="Générer la facture ?"
+        message="Une facture PDF sera créée pour cette réservation terminée."
+        confirmLabel="Générer"
+        onConfirm={async () => {
+          if (pendingInvoiceId == null) return;
+          const id = pendingInvoiceId;
+          setPendingInvoiceId(null);
+          setSavingId(id);
+          setMessage(null);
+          setError(null);
+          const res = await fetch("/api/admin/bills", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingId: id }),
+          });
+          if (res.ok) {
+            setMessage("Facture générée.");
+          } else {
+            const payload = await res.json().catch(() => ({}));
+            setError(payload?.error ?? "Impossible de générer la facture.");
+          }
+          setSavingId(null);
+        }}
+        onCancel={() => setPendingInvoiceId(null)}
+      />
     </div>
   );
 }

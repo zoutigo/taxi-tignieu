@@ -62,6 +62,26 @@ describe("BookingsAdminTable UI", () => {
     });
   });
 
+  it("ouvre la modale de confirmation quand on clique sur Facturer", async () => {
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(
+        <BookingsAdminTable
+          initialBookings={[{ ...baseBooking, status: "COMPLETED" as BookingStatus }]}
+          drivers={drivers}
+          currentUser={{ isAdmin: true }}
+        />
+      );
+    });
+    const root = tree!.root;
+    const btn = root.find((n) => n.type === "button" && n.props.children === "Facturer");
+    await act(async () => {
+      (btn.props.onClick as () => void)();
+    });
+    const modal = root.findAll((n) => n.props?.title === "Générer la facture ?");
+    expect(modal.length).toBe(1);
+  });
+
   afterAll(() => {
     (console.error as jest.Mock).mockRestore();
   });

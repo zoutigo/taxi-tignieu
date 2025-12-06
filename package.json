@@ -30,6 +30,8 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@tanstack/react-store": "^0.8.0",
     "@tanstack/store": "^0.8.0",
+    "pdfkit": "^0.15.0",
+    "pdf-lib": "^1.17.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.553.0",
