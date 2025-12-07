@@ -12,7 +12,7 @@ const navLinks = [
   { label: "Avis", href: "/avis" },
   { label: "Entreprises", href: "#entreprises" },
   { label: "À propos", href: "/apropos" },
-  { label: "Contact", href: "#contact" },
+  { label: "Contact", href: "/contact" },
 ];
 
 export function SiteHeader() {

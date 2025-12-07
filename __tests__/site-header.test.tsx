@@ -58,6 +58,18 @@ describe("SiteHeader actions", () => {
     expect(avisLink.props.href).toBe("/avis");
   });
 
+  it("le lien Contact pointe vers /contact", () => {
+    let tree: renderer.ReactTestRenderer | null = null;
+    act(() => {
+      tree = renderer.create(<SiteHeader />);
+    });
+    openMenu(tree!);
+    const contactLink = tree!.root.find(
+      (node) => node.type === "a" && node.props.children === "Contact"
+    );
+    expect(contactLink.props.href).toBe("/contact");
+  });
+
   it("affiche le Dashboard pour admin/manager", () => {
     (useSession as jest.Mock).mockReturnValue({
       status: "authenticated",

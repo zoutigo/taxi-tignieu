@@ -23,6 +23,7 @@ model User {
   bookings       Booking[]
   driverBookings Booking[] @relation("DriverBookings")
   reviews        Review[]
+  contactMessages ContactMessage[]
   createdAt      DateTime  @default(now())
 }
 
@@ -172,4 +173,14 @@ model Invoice {
   issuedAt    DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
 }

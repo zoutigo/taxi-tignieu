@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { User } from "@prisma/client";
 import { Mail, PhoneCall } from "lucide-react";
+import { AppMessage } from "@/components/app-message";
 
 type UserRow = Pick<
   User,
@@ -51,14 +52,8 @@ export function UsersTable({ initialUsers }: Props) {
 
   return (
     <div className="space-y-3">
-      {message ? (
-        <div className="rounded-md bg-emerald-100 px-3 py-2 text-sm text-emerald-800">
-          {message}
-        </div>
-      ) : null}
-      {error ? (
-        <div className="rounded-md bg-rose-100 px-3 py-2 text-sm text-rose-800">{error}</div>
-      ) : null}
+      {message ? <AppMessage variant="success">{message}</AppMessage> : null}
+      {error ? <AppMessage variant="error">{error}</AppMessage> : null}
 
       {users.map((u) => (
         <div key={u.id} className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">

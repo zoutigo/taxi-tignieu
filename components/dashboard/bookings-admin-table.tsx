@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
+import { AppMessage } from "@/components/app-message";
 
 type Driver = Pick<User, "id" | "name" | "email" | "phone">;
 
@@ -198,14 +199,8 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
 
   return (
     <div className="space-y-4">
-      {message ? (
-        <div className="rounded-md bg-emerald-100 px-3 py-2 text-sm text-emerald-800">
-          {message}
-        </div>
-      ) : null}
-      {error ? (
-        <div className="rounded-md bg-rose-100 px-3 py-2 text-sm text-rose-800">{error}</div>
-      ) : null}
+      {message ? <AppMessage variant="success">{message}</AppMessage> : null}
+      {error ? <AppMessage variant="error">{error}</AppMessage> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-2 text-sm">
