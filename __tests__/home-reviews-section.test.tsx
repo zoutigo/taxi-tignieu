@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReviewStatus, type Review } from "@prisma/client";
 import Home from "@/app/page";
 import { prisma } from "@/lib/prisma";
+import { getSiteContact } from "@/lib/site-config";
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -14,13 +15,29 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/site-config", () => ({
+  getSiteContact: jest.fn(),
+}));
+
 const mockedFindMany = prisma.review.findMany as unknown as jest.MockedFunction<
   typeof prisma.review.findMany
 >;
+const mockedGetSiteContact = getSiteContact as jest.MockedFunction<typeof getSiteContact>;
 
 describe("Landing reviews section", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedGetSiteContact.mockResolvedValue({
+      phone: "04 95 78 54 00",
+      email: "contact@taxitignieu.fr",
+      address: {
+        street: "Rue de la République",
+        streetNumber: "9",
+        postalCode: "38230",
+        city: "Tignieu-Jameyzieu",
+        country: "France",
+      },
+    });
   });
 
   it("affiche les 3 derniers avis approuvés avec note et lien plus d'avis", async () => {

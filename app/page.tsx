@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getSiteContact } from "@/lib/site-config";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,11 @@ export default async function Home() {
     include: { user: { select: { name: true, image: true } } },
     take: 3,
   });
+  const contact = await getSiteContact();
+  const addressLine = `${contact.address.streetNumber ? `${contact.address.streetNumber} ` : ""}${
+    contact.address.street
+  }, ${contact.address.postalCode} ${contact.address.city}`;
+  const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-16 px-4 py-12 sm:px-6 lg:px-8">
@@ -86,7 +92,7 @@ export default async function Home() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
-                href="tel:+33495785400"
+                href={phoneHref}
                 className="btn w-full justify-center border border-primary/90 bg-transparent text-white hover:border-primary hover:bg-primary/15 sm:flex-1 md:flex-none md:w-56"
               >
                 Appeler
@@ -153,11 +159,13 @@ export default async function Home() {
               <ul className="mt-6 space-y-3 text-sm text-white/90">
                 <li className="flex items-center gap-3">
                   <PhoneCall className="h-4 w-4 text-primary" />
-                  04 95 78 54 00
+                  <a href={phoneHref} className="hover:text-primary">
+                    {contact.phone}
+                  </a>
                 </li>
                 <li className="flex items-center gap-3">
                   <MapPin className="h-4 w-4 text-primary" />
-                  9, rue de la République — 38230
+                  {addressLine}
                 </li>
                 <li className="flex items-center gap-3">
                   <ShieldCheck className="h-4 w-4 text-primary" />
@@ -165,10 +173,10 @@ export default async function Home() {
                 </li>
               </ul>
               <a
-                href="mailto:contact@taxitignieu.fr"
+                href={`mailto:${contact.email}`}
                 className="mt-6 inline-flex items-center text-sm font-semibold text-primary"
               >
-                contact@taxitignieu.fr
+                {contact.email}
               </a>
             </div>
           </div>
