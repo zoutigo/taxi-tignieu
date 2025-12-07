@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
+  BadgeCheck,
   Clock,
   Hospital,
   MapPin,
@@ -178,6 +179,56 @@ export default async function Home() {
               >
                 {contact.email}
               </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[32px] border border-border/70 bg-gradient-to-r from-sidebar via-sidebar/95 to-[#0d1a32] px-6 py-10 text-sidebar-foreground shadow-[0_35px_55px_rgba(2,8,32,0.35)] sm:px-10">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
+              Confiance locale
+            </p>
+            <h2 className="font-display text-3xl text-white sm:text-4xl">
+              Au service de l&apos;Est lyonnais depuis 2010
+            </h2>
+            <p className="text-sm text-white/80">
+              Entreprises, particuliers, établissements de santé : une équipe de chauffeurs
+              expérimentés qui connaît chaque route et chaque aéroport de la région.
+            </p>
+          </div>
+
+          <div className="grid w-full max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
+              <div className="flex items-center gap-3 text-white">
+                <BadgeCheck className="h-5 w-5 text-primary" />
+                <p className="text-sm font-semibold">+12 000 trajets réalisés</p>
+              </div>
+              <p className="mt-1 text-xs text-white/70">
+                Navettes aéroport, longues distances, VSL
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
+              <div className="flex items-center gap-3 text-white">
+                <Star className="h-5 w-5 text-primary" />
+                <p className="text-sm font-semibold">Note moyenne 4.9 / 5</p>
+              </div>
+              <p className="mt-1 text-xs text-white/70">Avis vérifiés clients et partenaires</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
+              <div className="flex items-center gap-3 text-white">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <p className="text-sm font-semibold">Chauffeurs agréés & CPAM</p>
+              </div>
+              <p className="mt-1 text-xs text-white/70">Professionnels, discrets, assurés</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
+              <div className="flex items-center gap-3 text-white">
+                <Clock className="h-5 w-5 text-primary" />
+                <p className="text-sm font-semibold">Disponibilité 24/7</p>
+              </div>
+              <p className="mt-1 text-xs text-white/70">Réponse immédiate, suivi en temps réel</p>
             </div>
           </div>
         </div>
