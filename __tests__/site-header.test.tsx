@@ -70,6 +70,18 @@ describe("SiteHeader actions", () => {
     expect(contactLink.props.href).toBe("/contact");
   });
 
+  it("le lien Services pointe vers /services", () => {
+    let tree: renderer.ReactTestRenderer | null = null;
+    act(() => {
+      tree = renderer.create(<SiteHeader />);
+    });
+    openMenu(tree!);
+    const servicesLink = tree!.root.find(
+      (node) => node.type === "a" && node.props.children === "Services"
+    );
+    expect(servicesLink.props.href).toBe("/services");
+  });
+
   it("affiche le Dashboard pour admin/manager", () => {
     (useSession as jest.Mock).mockReturnValue({
       status: "authenticated",

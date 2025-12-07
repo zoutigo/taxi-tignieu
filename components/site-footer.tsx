@@ -5,7 +5,7 @@ import { getSiteContact } from "@/lib/site-config";
 
 const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
-  { label: "Services entreprises", href: "#entreprises" },
+  { label: "Services", href: "/services" },
   { label: "Avis clients", href: "/avis" },
   { label: "Contact", href: "/contact" },
 ];
