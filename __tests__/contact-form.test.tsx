@@ -56,7 +56,14 @@ const formMock = jest.requireMock("react-hook-form") as {
 };
 
 describe("ContactForm workflow", () => {
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeAll(() => {
+    (global as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
   beforeEach(() => {
+    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     (useSession as jest.Mock).mockReturnValue({ data: null, status: "unauthenticated" });
     (signIn as jest.Mock).mockReset();
     pushMock.mockReset();
@@ -118,5 +125,9 @@ describe("ContactForm workflow", () => {
     const tree = await renderAndSubmit();
     const html = JSON.stringify(tree.toJSON());
     expect(html).toContain("Impossible d'envoyer");
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 });
