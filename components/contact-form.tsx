@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession, signIn } from "next-auth/react";
@@ -41,6 +41,10 @@ export function ContactForm() {
   });
 
   const draftKey = useMemo(() => "contact-draft", []);
+  const watchedValues = useWatch<FormValues>({
+    control: form.control,
+    defaultValue: { category: "", subject: "", message: "" },
+  });
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem(draftKey) : null;
@@ -56,15 +60,40 @@ export function ContactForm() {
     draftLoadedRef.current = true;
   }, [draftKey, form]);
 
-  const saveDraft = (values: FormValues) => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(draftKey, JSON.stringify(values));
-  };
+  const saveDraft = useCallback(
+    (values: FormValues) => {
+      if (typeof window === "undefined") return;
+      localStorage.setItem(draftKey, JSON.stringify(values));
+    },
+    [draftKey]
+  );
 
-  const clearDraft = () => {
+  const clearDraft = useCallback(() => {
     if (typeof window === "undefined") return;
     localStorage.removeItem(draftKey);
-  };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftLoadedRef.current) return;
+
+    const hasContent =
+      Boolean(watchedValues?.category) ||
+      Boolean(watchedValues?.subject?.trim()) ||
+      Boolean(watchedValues?.message?.trim());
+
+    if (!hasContent) {
+      clearDraft();
+      hasDraftRef.current = false;
+      return;
+    }
+
+    hasDraftRef.current = true;
+    saveDraft({
+      category: watchedValues?.category ?? "",
+      subject: watchedValues?.subject ?? "",
+      message: watchedValues?.message ?? "",
+    });
+  }, [clearDraft, saveDraft, watchedValues]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     setSuccess(null);
@@ -78,7 +107,7 @@ export function ContactForm() {
     }
     if (!userPhone) {
       saveDraft(values);
-      router.push("/profil/completer-telephone");
+      router.push(`/profil/completer-telephone?from=${encodeURIComponent("/contact")}`);
       return;
     }
 

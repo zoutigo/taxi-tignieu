@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 
 const isAdminLike = (session: unknown): boolean => {
   const s = session as { user?: { isAdmin?: boolean; isManager?: boolean } } | null;
@@ -49,6 +50,13 @@ export async function PATCH(req: Request) {
     where: { id },
     data,
   });
+  // revalidation est ignorée en test; en prod, Next la gère via tags/ISR
+  try {
+    revalidatePath("/");
+    revalidatePath("/avis");
+  } catch {
+    // ignore in tests
+  }
   return NextResponse.json({ review }, { status: 200 });
 }
 
@@ -63,5 +71,11 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
   await prisma.review.delete({ where: { id } });
+  try {
+    revalidatePath("/");
+    revalidatePath("/avis");
+  } catch {
+    // ignore in tests
+  }
   return NextResponse.json({ ok: true }, { status: 200 });
 }

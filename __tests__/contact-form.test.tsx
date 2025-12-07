@@ -14,6 +14,7 @@ jest.mock("react-hook-form", () => {
     },
     __getLastSubmit: () => lastSubmit,
     useForm: () => ({
+      control: {},
       register: (name: string) => ({
         name,
         onChange: (e: { target: { value: string } }) => {
@@ -32,6 +33,7 @@ jest.mock("react-hook-form", () => {
       },
       formState: { errors: {}, isSubmitting: false },
     }),
+    useWatch: ({ defaultValue }: { defaultValue: typeof values }) => values ?? defaultValue,
   };
 });
 
@@ -102,7 +104,7 @@ describe("ContactForm workflow", () => {
       status: "authenticated",
     });
     await renderAndSubmit();
-    expect(pushMock).toHaveBeenCalledWith("/profil/completer-telephone");
+    expect(pushMock).toHaveBeenCalledWith("/profil/completer-telephone?from=%2Fcontact");
   });
 
   it("envoie le message si connecté avec téléphone", async () => {

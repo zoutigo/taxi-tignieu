@@ -13,6 +13,10 @@ import {
   Star,
   Users,
 } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+export const dynamic = "force-dynamic";
 
 const services = [
   {
@@ -37,7 +41,14 @@ const services = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const latestReviews = await prisma.review.findMany({
+    where: { status: "APPROVED" },
+    orderBy: { createdAt: "desc" },
+    include: { user: { select: { name: true, image: true } } },
+    take: 3,
+  });
+
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-16 px-4 py-12 sm:px-6 lg:px-8">
       <section id="reserver" className="space-y-6">
@@ -173,13 +184,61 @@ export default function Home() {
             Avis clients
           </p>
           <h2 className="font-display text-3xl text-foreground">Ils nous font confiance</h2>
-          <div className="rounded-2xl border border-border/70 bg-muted/30 p-6 shadow-inner">
-            <Quote className="h-6 w-6 text-primary" />
-            <p className="mt-3 text-lg text-foreground">
-              “Service impeccable, chauffeur ponctuel et cordial. Je recommande vivement !”
-            </p>
-            <p className="mt-4 text-sm font-semibold text-muted-foreground">Sophie M.</p>
-          </div>
+          {latestReviews.length ? (
+            <div className="space-y-3">
+              {latestReviews.map((rev) => (
+                <div
+                  key={rev.id}
+                  className="rounded-2xl border border-border/70 bg-gradient-to-r from-muted/60 to-card px-4 py-4 shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage
+                          src={rev.user?.image ?? undefined}
+                          alt={rev.user?.name ?? "Client"}
+                        />
+                        <AvatarFallback>
+                          {(rev.user?.name ?? "C").slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {rev.user?.name ?? "Client"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(rev.createdAt).toLocaleDateString("fr-FR")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-500">
+                      <span className="text-xs font-semibold text-muted-foreground">Note</span>
+                      <span>{"★★★★★".slice(0, rev.rating)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-start gap-3 text-sm text-foreground">
+                    <Quote className="mt-1 h-4 w-4 text-primary" />
+                    <p>{rev.comment}</p>
+                  </div>
+                </div>
+              ))}
+              <Link
+                href="/avis"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+              >
+                Plus d&apos;avis
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border/70 bg-muted/30 p-6 shadow-inner">
+              <Quote className="h-6 w-6 text-primary" />
+              <p className="mt-3 text-lg text-foreground">
+                “Service impeccable, chauffeur ponctuel et cordial. Je recommande vivement !”
+              </p>
+              <p className="mt-4 text-sm font-semibold text-muted-foreground">Sophie M.</p>
+            </div>
+          )}
         </div>
         <div className="space-y-4">
           <div className="stat-card">
