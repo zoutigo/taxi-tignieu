@@ -1,38 +1,20 @@
 import { Briefcase, Car, Crown, HeartPulse, MapPinned, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { getSiteContact } from "@/lib/site-config";
+import { getServiceGroups } from "@/app/services/data";
 
-const serviceGroups = [
-  {
-    title: "Particuliers",
-    Icon: Car,
-    items: ["Trajets classiques", "Aéroport / Gare", "Longue distance"],
-  },
-  {
-    title: "Professionnels",
-    Icon: Briefcase,
-    items: ["Entreprises", "Séminaires", "Hôtels"],
-  },
-  {
-    title: "Spécialisés",
-    Icon: HeartPulse,
-    items: ["Scolaire", "VSL / CPAM", "PMR"],
-  },
-  {
-    title: "Premium",
-    Icon: Crown,
-    items: ["Van / Groupes", "Événementiel", "Stations de ski"],
-  },
-  {
-    title: "Bonus",
-    Icon: Sparkles,
-    items: ["Transport express", "Tourisme"],
-  },
-];
+const iconBySlug = {
+  particuliers: Car,
+  professionnels: Briefcase,
+  specialises: HeartPulse,
+  premium: Crown,
+  bonus: Sparkles,
+} as const;
 
 export default async function ServicesPage() {
   const contact = await getSiteContact();
   const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
+  const serviceGroups = await getServiceGroups();
 
   return (
     <div className="bg-muted/20">
@@ -87,36 +69,45 @@ export default async function ServicesPage() {
             </div>
 
             <div className="relative mt-6 grid gap-4 md:grid-cols-2">
-              {serviceGroups.map(({ title, Icon, items }) => (
-                <div
-                  key={title}
-                  className="group relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-background via-card to-muted/70 p-5 shadow-[0_20px_40px_rgba(5,15,35,0.08)] backdrop-blur"
-                >
-                  <div className="absolute right-3 top-3 h-16 w-16 rounded-full bg-primary/10 blur-2xl transition duration-300 group-hover:scale-110 group-hover:bg-primary/20" />
-                  <div className="relative flex items-center gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        {items.length} prestations
-                      </p>
+              {serviceGroups.map((group) => {
+                const Icon = iconBySlug[group.slug as keyof typeof iconBySlug] ?? Car;
+                return (
+                  <div
+                    key={group.title}
+                    className="group relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-background via-card to-muted/70 p-5 shadow-[0_20px_40px_rgba(5,15,35,0.08)] backdrop-blur"
+                  >
+                    <Link
+                      href={`/services/${group.slug}`}
+                      className="absolute inset-0 z-10"
+                      aria-label={`Découvrir les services ${group.title}`}
+                    />
+                    <div className="absolute right-3 top-3 h-16 w-16 rounded-full bg-primary/10 blur-2xl transition duration-300 group-hover:scale-110 group-hover:bg-primary/20" />
+                    <div className="relative flex items-center gap-3">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">{group.title}</h3>
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                          {group.items.length} prestations
+                        </p>
+                      </div>
                     </div>
+                    <p className="relative mt-3 text-sm text-muted-foreground">{group.summary}</p>
+                    <ul className="relative mt-4 space-y-2 text-sm text-foreground">
+                      {group.items.map((item) => (
+                        <li
+                          key={item.title}
+                          className="flex items-center gap-3 rounded-xl border border-border/50 bg-white/60 px-3 py-2 shadow-sm backdrop-blur dark:bg-black/15"
+                        >
+                          <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_4px_rgba(246,196,49,0.2)]" />
+                          {item.title}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="relative mt-4 space-y-2 text-sm text-foreground">
-                    {items.map((item) => (
-                      <li
-                        key={item}
-                        className="flex items-center gap-3 rounded-xl border border-border/50 bg-white/60 px-3 py-2 shadow-sm backdrop-blur dark:bg-black/15"
-                      >
-                        <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_4px_rgba(246,196,49,0.2)]" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

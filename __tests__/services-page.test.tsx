@@ -57,5 +57,8 @@ describe("ServicesPage", () => {
     expect(html).toContain('href="/reserver"');
     expect(html).toContain('href="/contact"');
     expect(html).toContain('href="tel:0123456789"');
+    ["particuliers", "professionnels", "specialises", "premium", "bonus"].forEach((slug) => {
+      expect(html).toContain(`href="/services/${slug}"`);
+    });
   });
 });

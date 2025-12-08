@@ -184,3 +184,36 @@ model ContactMessage {
   message   String
   createdAt DateTime @default(now())
 }
+
+model SCategory {
+  id        Int       @id @default(autoincrement())
+  slug      String    @unique
+  title     String
+  summary   String
+  position  Int       @default(0)
+  services  Service[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Service {
+  id          Int           @id @default(autoincrement())
+  slug        String        @unique
+  title       String
+  description String        @db.Text
+  isEnabled   Boolean       @default(true)
+  position    Int           @default(0)
+  category    SCategory     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId  Int
+  highlights  SHighlight[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model SHighlight {
+  id        Int      @id @default(autoincrement())
+  label     String
+  position  Int      @default(0)
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId Int
+}

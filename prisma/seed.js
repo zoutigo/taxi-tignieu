@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { serviceSeedData } from "./service-seed-data.js";
 
 const prisma = new PrismaClient();
 
@@ -203,6 +204,39 @@ async function seedReviews(customers, bookings) {
   }
 }
 
+async function seedServices() {
+  await prisma.sHighlight.deleteMany();
+  await prisma.service.deleteMany();
+  await prisma.sCategory.deleteMany();
+
+  for (const [catIndex, cat] of serviceSeedData.entries()) {
+    const createdCategory = await prisma.sCategory.create({
+      data: {
+        slug: cat.slug,
+        title: cat.title,
+        summary: cat.summary,
+        position: cat.position ?? catIndex + 1,
+        services: {
+          create: cat.services.map((svc, svcIndex) => ({
+            slug: svc.slug ?? `${cat.slug}-${svcIndex + 1}`,
+            title: svc.title,
+            description: svc.description,
+            isEnabled: svc.isEnabled ?? true,
+            position: svc.position ?? svcIndex + 1,
+            highlights: {
+              create: (svc.highlights ?? []).map((h, hIndex) => ({
+                label: h,
+                position: hIndex + 1,
+              })),
+            },
+          })),
+        },
+      },
+    });
+    console.log(`Seeded category ${createdCategory.title}`);
+  }
+}
+
 async function main() {
   // démarrage seed
   const drivers = await ensureDrivers();
@@ -210,6 +244,7 @@ async function main() {
   await seedBookings(drivers, customers);
   const allBookings = await prisma.booking.findMany({ select: { id: true } });
   await seedReviews(customers, allBookings);
+  await seedServices();
   // fin seed
 }
 

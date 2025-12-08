@@ -3,6 +3,7 @@ import Link from "next/link";
 const cards = [
   { title: "Utilisateurs", href: "/dashboard/users", desc: "Rôles, infos, réservations" },
   { title: "Réservations", href: "/dashboard/bookings", desc: "Statuts, détails, nettoyage" },
+  { title: "Services", href: "/dashboard/services", desc: "Catégories, textes, highlights" },
   { title: "Avis", href: "/dashboard/avis", desc: "Validation, édition, suppression" },
   { title: "Paramètres", href: "/dashboard/parametres", desc: "Pagination, contact, footer" },
 ];
