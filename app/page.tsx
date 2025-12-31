@@ -122,7 +122,7 @@ export default async function Home() {
                 Tous vos trajets, sur-mesure
               </h2>
               <p className="text-sm text-muted-foreground">
-                Déplacements professionnels, transferts famille, navettes scolaires ou transport
+                Déplacements professionnels, transferts familles, navettes scolaires ou transport
                 médicalisé : nous adaptons la flotte à vos besoins.
               </p>
             </div>
