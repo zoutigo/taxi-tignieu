@@ -292,7 +292,7 @@ jobs:
           set -euo pipefail
 
           set +u
-          source "$O2_NODEENV_ACTIVATE"
+          . "$O2_NODEENV_ACTIVATE"
           set -u
 
           cd "$O2_TARGET_DIR"
