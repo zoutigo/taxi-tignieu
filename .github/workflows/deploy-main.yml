@@ -59,52 +59,28 @@ jobs:
           require(path.join(standaloneDir, "server.js"));
           JS
 
-          # ------------------------------------------------------------
-          # 2) Copy standalone output + static assets
-          # ------------------------------------------------------------
           mkdir -p deploy/.next
-
-          # Next standalone server bundle
           rsync -a .next/standalone/ deploy/.next/standalone/
-
-          # Next static assets (chunks, css, etc.)
           rsync -a .next/static/ deploy/.next/static/
 
-          # ------------------------------------------------------------
-          # 3) IMPORTANT: ensure public/ is available to standalone runtime
-          #    This is what fixes /logo.svg and any other public asset 404.
-          # ------------------------------------------------------------
           if [ -d public ]; then
             mkdir -p deploy/.next/standalone/public
             rsync -a public/ deploy/.next/standalone/public/
-
-            # Optional: also ship public at app root (harmless, sometimes useful)
             rsync -a public/ deploy/public/
           fi
 
-          # ------------------------------------------------------------
-          # 4) OPTIONAL but safe: also expose .next/static under standalone/.next/static
-          #    (some setups expect this exact layout)
-          # ------------------------------------------------------------
           mkdir -p deploy/.next/standalone/.next
           rsync -a .next/static/ deploy/.next/standalone/.next/static/
 
-          # ------------------------------------------------------------
-          # 5) Prisma (needed for migrate deploy)
-          # ------------------------------------------------------------
           if [ -d prisma ]; then
             rsync -a prisma/ deploy/prisma/
           fi
 
-          # ------------------------------------------------------------
-          # 6) Minimal package files (for prisma CLI / node deps resolution if needed)
-          # ------------------------------------------------------------
           cp -f package.json deploy/
           if [ -f package-lock.json ]; then
             cp -f package-lock.json deploy/
           fi
 
-          # (Optional) include next config for trace/debug
           if [ -f next.config.js ]; then
             cp -f next.config.js deploy/
           fi
@@ -248,7 +224,7 @@ jobs:
         shell: bash
         env:
           O2_SSH_HOST: ${{ secrets.O2_HOST }}
-          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_USER: ${{ secrets.O2_SSH_USER }} # <-- CHANGED
           O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
           O2_SSH_KEY: ${{ secrets.O2_SSH_KEY }}
         run: |
@@ -277,7 +253,7 @@ jobs:
         shell: bash
         env:
           O2_SSH_HOST: ${{ secrets.O2_HOST }}
-          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_USER: ${{ secrets.O2_SSH_USER }} # <-- CHANGED
           O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
           O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
         run: |
@@ -292,7 +268,7 @@ jobs:
         shell: bash
         env:
           O2_SSH_HOST: ${{ secrets.O2_HOST }}
-          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_USER: ${{ secrets.O2_SSH_USER }} # <-- CHANGED
           O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
           O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
           O2_NODEENV_ACTIVATE: ${{ secrets.O2_NODEENV_ACTIVATE }}
@@ -315,19 +291,16 @@ jobs:
             "export DATABASE_URL_B64='$DATABASE_URL_B64'; export O2_TARGET_DIR='$O2_TARGET_DIR'; export O2_NODEENV_ACTIVATE='$O2_NODEENV_ACTIVATE'; bash -s" <<'EOF'
           set -euo pipefail
 
-          # Activate CloudLinux Node env
           set +u
           source "$O2_NODEENV_ACTIVATE"
           set -u
 
           cd "$O2_TARGET_DIR"
 
-          # Decode DB URL safely
           export DATABASE_URL="$(printf '%s' "$DATABASE_URL_B64" | base64 --decode)"
 
           echo "node: $(node -v) / npm: $(npm -v)"
 
-          # Handle VENV/CL_VIRTUAL_ENV
           VENV="${VIRTUAL_ENV:-${CL_VIRTUAL_ENV:-}}"
           echo "VENV=${VENV:-unset}"
           if [ -z "${VENV:-}" ]; then
@@ -335,7 +308,6 @@ jobs:
             exit 1
           fi
 
-          # Ensure node_modules points to nodevenv
           if [ -e node_modules ] && [ ! -L node_modules ]; then
             echo "node_modules is a real directory/file -> removing"
             rm -rf node_modules
@@ -343,7 +315,6 @@ jobs:
           ln -sfn "$VENV/lib/node_modules" node_modules
           echo "node_modules -> $(readlink node_modules || true)"
 
-          # Ensure shared upload dir is kept across deploys
           mkdir -p "$O2_TARGET_DIR/files"
 
           npm ci --include=dev
@@ -361,7 +332,7 @@ jobs:
         shell: bash
         env:
           O2_SSH_HOST: ${{ secrets.O2_HOST }}
-          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_USER: ${{ secrets.O2_SSH_USER }} # <-- CHANGED
           O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
           O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
         run: |
