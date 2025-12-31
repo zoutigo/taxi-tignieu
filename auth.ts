@@ -10,6 +10,15 @@ if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET) {
 }
 
 const authResult = NextAuth({
+  debug: true,
+  logger: {
+    error(code, ...message) {
+      console.error("NEXTAUTH_ERROR", code, message);
+    },
+    warn(code, ...message) {
+      console.warn("NEXTAUTH_WARN", code, message);
+    },
+  },
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
