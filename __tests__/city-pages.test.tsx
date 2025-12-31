@@ -51,7 +51,7 @@ jest.mock("next/image", () => ({
   __esModule: true,
   default: (props: ImageProps) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    const { src, ...rest } = props;
+    const { src, fill: _fill, priority: _priority, ...rest } = props;
     const stringSrc = typeof src === "string" ? src : (src as StaticImageData).src;
     return <img src={stringSrc} {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)} />;
   },
