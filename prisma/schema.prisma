@@ -1,5 +1,7 @@
 generator client {
   provider = "prisma-client-js"
+    // Ship engines for local dev and o2switch (OpenSSL 1.0.x) + newer Debian (3.0.x)
+  binaryTargets = ["native", "debian-openssl-1.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
