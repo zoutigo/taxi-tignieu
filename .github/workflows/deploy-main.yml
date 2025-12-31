@@ -1,0 +1,393 @@
+name: Deploy to o2switch (Next.js standalone + Prisma)
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Prisma generate (include debian-openssl-1.0.x engine)
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Build (standalone)
+        run: npm run build
+
+      - name: Prepare deploy artifact (standalone only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf deploy
+          mkdir -p deploy
+
+          cat > deploy/server.js <<'JS'
+          /* eslint-disable @typescript-eslint/no-require-imports */
+          const path = require("path");
+
+          const appRoot = __dirname;
+          const standaloneDir = path.join(appRoot, ".next", "standalone");
+
+          process.env.NODE_ENV = process.env.NODE_ENV || "production";
+          process.env.PORT = process.env.PORT || "3000";
+
+          // Run from the standalone directory (required by Next standalone)
+          process.chdir(standaloneDir);
+
+          // Start the standalone server
+          require(path.join(standaloneDir, "server.js"));
+          JS
+
+          # ------------------------------------------------------------
+          # 2) Copy standalone output + static assets
+          # ------------------------------------------------------------
+          mkdir -p deploy/.next
+
+          # Next standalone server bundle
+          rsync -a .next/standalone/ deploy/.next/standalone/
+
+          # Next static assets (chunks, css, etc.)
+          rsync -a .next/static/ deploy/.next/static/
+
+          # ------------------------------------------------------------
+          # 3) IMPORTANT: ensure public/ is available to standalone runtime
+          #    This is what fixes /logo.svg and any other public asset 404.
+          # ------------------------------------------------------------
+          if [ -d public ]; then
+            mkdir -p deploy/.next/standalone/public
+            rsync -a public/ deploy/.next/standalone/public/
+
+            # Optional: also ship public at app root (harmless, sometimes useful)
+            rsync -a public/ deploy/public/
+          fi
+
+          # ------------------------------------------------------------
+          # 4) OPTIONAL but safe: also expose .next/static under standalone/.next/static
+          #    (some setups expect this exact layout)
+          # ------------------------------------------------------------
+          mkdir -p deploy/.next/standalone/.next
+          rsync -a .next/static/ deploy/.next/standalone/.next/static/
+
+          # ------------------------------------------------------------
+          # 5) Prisma (needed for migrate deploy)
+          # ------------------------------------------------------------
+          if [ -d prisma ]; then
+            rsync -a prisma/ deploy/prisma/
+          fi
+
+          # ------------------------------------------------------------
+          # 6) Minimal package files (for prisma CLI / node deps resolution if needed)
+          # ------------------------------------------------------------
+          cp -f package.json deploy/
+          if [ -f package-lock.json ]; then
+            cp -f package-lock.json deploy/
+          fi
+
+          # (Optional) include next config for trace/debug
+          if [ -f next.config.js ]; then
+            cp -f next.config.js deploy/
+          fi
+          if [ -f next.config.mjs ]; then
+            cp -f next.config.mjs deploy/
+          fi
+
+          echo "Deploy content (sample):"
+          find deploy -maxdepth 4 -type f | sed -n '1,200p'
+
+      - name: Install tools (jq)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get runner public IP
+        id: ip
+        uses: haythem/public-ip@v1.3
+
+      - name: Debug cPanel host
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+        run: |
+          set -e
+          echo "CPANEL_HOST=$CPANEL_HOST"
+          echo | openssl s_client -connect "${CPANEL_HOST}:2083" -servername "${CPANEL_HOST}" 2>/dev/null | openssl x509 -noout -subject -issuer -ext subjectAltName | sed -n '1,120p'
+
+      - name: Check cPanel port reachability (2083)
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+        run: |
+          set -euo pipefail
+          echo "nc to ${CPANEL_HOST}:2083"
+          nc -vz -w 5 "$CPANEL_HOST" 2083 || true
+
+      - name: Whitelist runner IP on o2switch (cPanel)
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_PASSWORD: ${{ secrets.CPANEL_PASSWORD }}
+          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+        run: |
+          set -euo pipefail
+          ENDPOINT='frontend/o2switch/o2switch-ssh-whitelist/index.live.php'
+
+          if [ -z "${RUNNER_IP:-}" ]; then
+            echo "RUNNER_IP is empty (no IPv4 detected)."
+            exit 1
+          fi
+
+          echo "Runner IP: ${RUNNER_IP}"
+          fetch() {
+            curl -4 -sS -v --connect-timeout 10 --max-time 20 -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+              "https://${CPANEL_HOST}:2083/${ENDPOINT}?$1"
+          }
+
+          echo "Fetching whitelist..."
+          RAW=""
+          for i in 1 2 3; do
+            RAW="$(fetch "r=list")" && break || true
+            echo "Retry list ($i)..."
+            sleep 5
+          done
+          if [ -z "$RAW" ]; then
+            echo "Unable to fetch whitelist after retries"
+            exit 1
+          fi
+
+          echo "$RAW" | jq -e . >/dev/null
+          IPS="$(echo "$RAW" | jq -r '.data.list[]?.address' | sort -u || true)"
+
+          echo "Current whitelist IPs:"
+          echo "$IPS" | sed '/^$/d' || true
+
+          echo "Adding RUNNER_IP on port 22 (in/out)..."
+          echo "[ADD IN]"
+          curl -4 -sS -v --connect-timeout 10 --max-time 20 -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+            -X POST -d "whitelist[address]=${RUNNER_IP}" -d "whitelist[port]=22" \
+            "https://${CPANEL_HOST}:2083/${ENDPOINT}?r=add" || true
+
+          sleep 2
+
+          echo "[ADD OUT]"
+          curl -4 -sS -v --connect-timeout 10 --max-time 20 -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+            -X POST -d "whitelist[address]=${RUNNER_IP}" -d "whitelist[port]=22" \
+            "https://${CPANEL_HOST}:2083/${ENDPOINT}?r=add" || true
+
+          echo "Wait for runner IP to appear in whitelist (up to ~10 min)..."
+          for i in {1..60}; do
+            RAW="$(fetch "r=list" || true)"
+            echo "$RAW" | jq -e . >/dev/null || true
+            if echo "$RAW" | jq -r '.data.list[]?.address' | grep -q "^${RUNNER_IP}$"; then
+              echo "Runner IP found in whitelist."
+              break
+            fi
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Re-adding runner IP (attempt $i)..."
+              curl -4 -sS --connect-timeout 10 --max-time 20 -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+                -X POST -d "whitelist[address]=${RUNNER_IP}" -d "whitelist[port]=22" \
+                "https://${CPANEL_HOST}:2083/${ENDPOINT}?r=add" || true
+            fi
+            echo "IP not yet present, retry $i..."
+            sleep 10
+          done
+
+      - name: Show whitelist after update
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_PASSWORD: ${{ secrets.CPANEL_PASSWORD }}
+          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+        run: |
+          set -euo pipefail
+          ENDPOINT='frontend/o2switch/o2switch-ssh-whitelist/index.live.php'
+          RAW="$(curl -4 -sS -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+            "https://${CPANEL_HOST}:2083/${ENDPOINT}?r=list")"
+          echo "$RAW" | jq -e . >/dev/null
+          echo "Whitelist after update:"
+          echo "$RAW" | jq -r '.data.list[]?.address'
+          echo "Runner IP expected: ${RUNNER_IP}"
+          echo "Full response:"
+          echo "$RAW"
+
+      - name: Diagnose SSH reachability
+        shell: bash
+        env:
+          O2_SSH_HOST: ${{ secrets.O2_HOST }}
+          O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          echo "Resolving host..."
+          getent hosts "$O2_SSH_HOST" || true
+          echo "nslookup:"
+          nslookup "$O2_SSH_HOST" || true
+          echo "nc probe:"
+          nc -vz -w 5 "$O2_SSH_HOST" "$O2_SSH_PORT" || true
+
+      - name: Wait for whitelist to be effective
+        shell: bash
+        env:
+          O2_SSH_HOST: ${{ secrets.O2_HOST }}
+          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
+          O2_SSH_KEY: ${{ secrets.O2_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$O2_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          SSH_OPTS="-i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+          for i in $(seq 1 30); do
+            echo "SSH check attempt $i..."
+            if ssh $SSH_OPTS -o BatchMode=yes -o ConnectTimeout=5 -p "$O2_SSH_PORT" \
+              "$O2_SSH_USER@$O2_SSH_HOST" "echo OK" >/dev/null 2>&1; then
+              echo "SSH is reachable."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "SSH still not reachable after 5 min."
+          exit 1
+
+      - name: Deploy via rsync (standalone artifact)
+        shell: bash
+        env:
+          O2_SSH_HOST: ${{ secrets.O2_HOST }}
+          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
+          O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
+        run: |
+          set -euo pipefail
+          SSH_OPTS="-4 -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          rsync -az --delete --exclude 'files/' \
+            -e "ssh $SSH_OPTS -p ${O2_SSH_PORT}" \
+            deploy/ \
+            "${O2_SSH_USER}@${O2_SSH_HOST}:${O2_TARGET_DIR}/"
+
+      - name: Prisma migrate + restart (server)
+        shell: bash
+        env:
+          O2_SSH_HOST: ${{ secrets.O2_HOST }}
+          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
+          O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
+          O2_NODEENV_ACTIVATE: ${{ secrets.O2_NODEENV_ACTIVATE }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "ERROR: DATABASE_URL secret is empty."
+            exit 1
+          fi
+
+          DATABASE_URL_B64="$(printf '%s' "$DATABASE_URL" | base64 -w 0)"
+
+          ssh -4 -i ~/.ssh/id_ed25519 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -p "$O2_SSH_PORT" \
+            "$O2_SSH_USER@$O2_SSH_HOST" \
+            "export DATABASE_URL_B64='$DATABASE_URL_B64'; export O2_TARGET_DIR='$O2_TARGET_DIR'; export O2_NODEENV_ACTIVATE='$O2_NODEENV_ACTIVATE'; bash -s" <<'EOF'
+          set -euo pipefail
+
+          # Activate CloudLinux Node env
+          set +u
+          source "$O2_NODEENV_ACTIVATE"
+          set -u
+
+          cd "$O2_TARGET_DIR"
+
+          # Decode DB URL safely
+          export DATABASE_URL="$(printf '%s' "$DATABASE_URL_B64" | base64 --decode)"
+
+          echo "node: $(node -v) / npm: $(npm -v)"
+
+          # Handle VENV/CL_VIRTUAL_ENV
+          VENV="${VIRTUAL_ENV:-${CL_VIRTUAL_ENV:-}}"
+          echo "VENV=${VENV:-unset}"
+          if [ -z "${VENV:-}" ]; then
+            echo "ERROR: VENV is not set (activation failed)."
+            exit 1
+          fi
+
+          # Ensure node_modules points to nodevenv
+          if [ -e node_modules ] && [ ! -L node_modules ]; then
+            echo "node_modules is a real directory/file -> removing"
+            rm -rf node_modules
+          fi
+          ln -sfn "$VENV/lib/node_modules" node_modules
+          echo "node_modules -> $(readlink node_modules || true)"
+
+          # Ensure shared upload dir is kept across deploys
+          mkdir -p "$O2_TARGET_DIR/files"
+
+          npm ci --include=dev
+          npx --no-install prisma generate
+          npx --no-install prisma migrate deploy
+          npx --no-install prisma db seed
+
+          mkdir -p tmp
+          touch tmp/restart.txt
+
+          echo "Deploy OK"
+          EOF
+
+      - name: Post-deploy sanity check (server)
+        shell: bash
+        env:
+          O2_SSH_HOST: ${{ secrets.O2_HOST }}
+          O2_SSH_USER: ${{ secrets.O2_USER }}
+          O2_SSH_PORT: ${{ secrets.O2_SSH_PORT }}
+          O2_TARGET_DIR: ${{ secrets.O2_TARGET_DIR }}
+        run: |
+          set -euo pipefail
+          ssh -4 -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -p "$O2_SSH_PORT" "$O2_SSH_USER@$O2_SSH_HOST" \
+            "bash -lc '
+              set -e
+              cd \"$O2_TARGET_DIR\"
+              test -f server.js && echo \"server.js OK\" || (echo \"server.js missing\" && exit 1)
+              test -f .next/standalone/server.js && echo \"standalone server OK\" || (echo \"standalone missing\" && exit 1)
+              test -d .next/static && echo \"static OK\" || (echo \"static missing\" && exit 1)
+            '"
+
+      - name: Cleanup whitelist (remove runner IP)
+        if: ${{ always() }}
+        shell: bash
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_PASSWORD: ${{ secrets.CPANEL_PASSWORD }}
+          RUNNER_IP: ${{ steps.ip.outputs.ipv4 }}
+        run: |
+          set -euo pipefail
+          ENDPOINT='frontend/o2switch/o2switch-ssh-whitelist/index.live.php'
+          fetch() {
+            curl -4 -sS --connect-timeout 10 --max-time 20 -u "${CPANEL_USER}:${CPANEL_PASSWORD}" \
+              "https://${CPANEL_HOST}:2083/${ENDPOINT}?$1"
+          }
+          fetch "r=remove&address=${RUNNER_IP}&direction=in&port=22" || true
+          fetch "r=remove&address=${RUNNER_IP}&direction=out&port=22" || true

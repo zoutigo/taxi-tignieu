@@ -17,6 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getSiteContact } from "@/lib/site-config";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cities } from "@/app/cities/city-data";
 
 export const dynamic = "force-dynamic";
 
@@ -315,6 +316,55 @@ export default async function Home() {
             <h3 className="text-2xl font-semibold text-foreground">15 min</h3>
             <p className="text-sm text-muted-foreground">Temps moyen de prise en charge</p>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_30px_55px_rgba(5,15,35,0.08)] sm:p-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
+              Zones desservies
+            </p>
+            <h2 className="font-display text-3xl text-foreground">L&apos;Est lyonnais en direct</h2>
+            <p className="text-sm text-muted-foreground">
+              Villes couvertes avec prise en charge rapide et tarifs annoncés. Cliquez pour la page
+              dédiée.
+            </p>
+          </div>
+          <Link href="/reserver" className="btn btn-primary justify-center sm:w-auto">
+            Réserver un taxi
+          </Link>
+        </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cities.map((city) => (
+            <Link
+              key={city.slug}
+              href={`/${city.slug}`}
+              className="group relative flex items-start gap-3 rounded-2xl border border-border/70 bg-gradient-to-br from-background via-card to-muted/70 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(5,15,35,0.12)]"
+              aria-label={`Taxi ${city.name}`}
+            >
+              <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <MapPin className="h-4 w-4" />
+              </span>
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-lg font-semibold text-foreground">{city.name}</h3>
+                  <ArrowRight className="h-4 w-4 text-primary transition group-hover:translate-x-1" />
+                </div>
+                <p className="text-sm text-muted-foreground line-clamp-2">{city.heroSubtitle}</p>
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  {city.poiPrices.slice(0, 2).map((poi) => (
+                    <span
+                      key={poi.label}
+                      className="rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-foreground"
+                    >
+                      {poi.label}: {poi.price}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
     </div>
