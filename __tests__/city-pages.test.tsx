@@ -49,14 +49,14 @@ jest.mock("@/app/services/data", () => ({
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: ({ src, alt, ...rest }: ImageProps) => {
+  default: ({ src, alt, fill: _fill, priority: _priority, ...rest }: ImageProps) => {
     const stringSrc = typeof src === "string" ? src : (src as StaticImageData).src;
-    // eslint-disable-next-line @next/next/no-img-element
     return (
-      <img
-        src={stringSrc}
-        alt={alt ?? ""}
-        {...(rest as React.ImgHTMLAttributes<HTMLImageElement>)}
+      <span
+        data-testid="mock-image"
+        data-src={stringSrc}
+        data-alt={alt ?? ""}
+        {...(rest as React.HTMLAttributes<HTMLSpanElement>)}
       />
     );
   },

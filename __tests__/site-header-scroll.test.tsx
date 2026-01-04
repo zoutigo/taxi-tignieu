@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { act } from "react-dom/test-utils";
+import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { SiteHeader } from "@/components/site-header";
 
@@ -27,6 +27,7 @@ describe("SiteHeader scroll behavior", () => {
   let root: ReturnType<typeof createRoot>;
 
   beforeEach(() => {
+    (global as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
     setScroll(0);
