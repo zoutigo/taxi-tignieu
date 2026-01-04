@@ -1,74 +1,18 @@
 import { PrismaClient } from "@prisma/client";
 import { serviceSeedData } from "./service-seed-data.js";
+import {
+  AVATARS,
+  CUSTOMER_EMAILS,
+  DRIVER_EMAILS,
+  DROPOFFS,
+  FAQ_CATEGORIES,
+  FAQ_ITEMS,
+  PICKUPS,
+  REVIEW_COMMENTS,
+  STATUSES,
+} from "../lib/data/seed-static-data.js";
 
 const prisma = new PrismaClient();
-
-const DRIVER_EMAILS = [
-  "driver1@seed.test",
-  "driver2@seed.test",
-  "driver3@seed.test",
-  "driver4@seed.test",
-  "driver5@seed.test",
-];
-
-const CUSTOMER_EMAILS = Array.from({ length: 20 }).map((_, idx) => `user${idx + 1}@seed.test`);
-
-const AVATARS = Array.from({ length: 30 }).map(
-  (_, i) => `https://api.dicebear.com/7.x/thumbs/svg?seed=avatar-${i + 1}`
-);
-
-const pickups = [
-  "114 B route de Crémieu, Tignieu-Jameyzieu",
-  "3 rue du Travail, Pont-de-Chéruy",
-  "Gare de Lyon Part-Dieu",
-  "Aéroport de Marseille",
-  "Centre-ville de Lyon",
-  "Aéroport de Genève",
-];
-
-const dropoffs = [
-  "Aéroport de Lyon-Saint Exupéry",
-  "Gare TGV Saint-Exupéry",
-  "Aéroport de Marseille",
-  "Gare Part-Dieu",
-  "Aéroport de Genève",
-  "114 B route de Crémieu, Tignieu-Jameyzieu",
-];
-
-const statuses = ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"];
-
-const reviewComments = [
-  "Service impeccable, chauffeur ponctuel et voiture très propre. Je recommande sans hésiter.",
-  "Trajet agréable, discussion sympa et conduite sécurisante. Merci !",
-  "Un peu de retard au départ mais communication claire et trajet fluide ensuite.",
-  "Excellente expérience, prise en charge rapide à l'aéroport et aide avec les bagages.",
-  "Voiture confortable, bon itinéraire pour éviter les bouchons. Très satisfait.",
-  "Chauffeur discret et professionnel, parfait pour travailler pendant le trajet.",
-  "Petite bouteille d'eau et musique douce, attention délicate très appréciée.",
-  "Trajet nocturne rassurant, conduite prudente et véhicule nickel.",
-  "Réactivité au téléphone et adaptation à un changement d'horaire de dernière minute.",
-  "Super contact humain, et prix estimé respecté. Je referai appel à vous.",
-  "Conduite souple, respect des limitations, on se sent en sécurité.",
-  "Quelques minutes de retard mais chauffeur très aimable et excuse présenté.",
-  "Très bon service VSL, aide pour l’installation et respect des consignes médicales.",
-  "Voiture propre et spacieuse, prise en charge efficace à la gare.",
-  "Excellent rapport qualité/prix, réservation simple et confirmation rapide.",
-  "Connaissance parfaite de la région, itinéraire optimisé malgré les travaux.",
-  "Un léger manque de clim au début, vite réglé. Pour le reste, parfait.",
-  "Chauffeur souriant, discussion agréable, et arrivée à l'heure prévue.",
-  "Très disponible au téléphone, a attendu malgré un vol en retard.",
-  "Aide avec les bagages, installation siège enfant impeccable.",
-  "Bonne expérience globale, juste un peu de musique trop forte au départ.",
-  "Toujours ponctuels et professionnels, je recommande pour les trajets pro.",
-  "VSL bien équipé, prise en charge rassurante, merci pour la patience.",
-  "Chauffeur courtois, véhicule récent, confort au top pour longue distance.",
-  "Disponible tard le soir, conduite sereine et respectueuse.",
-  "Prise en charge rapide, confirmation SMS utile, bon suivi.",
-  "Chauffeur très flexible sur l'heure de départ, merci.",
-  "Pas de problème, tout s’est bien passé et dans les temps.",
-  "Un service premium à prix raisonnable, bravo.",
-  "J’ai apprécié le suivi et la communication avant le trajet.",
-];
 
 function randChoice(list) {
   return list[Math.floor(Math.random() * list.length)];
@@ -158,10 +102,10 @@ async function seedBookings(drivers, customers) {
   for (let i = 0; i < toCreate; i += 1) {
     const customer = randChoice(customers);
     const driver = Math.random() < 0.6 ? randChoice(drivers) : null;
-    const status = driver ? "CONFIRMED" : randChoice(statuses);
+    const status = driver ? "CONFIRMED" : randChoice(STATUSES);
     const dt = randomFutureDate(60);
-    const pickupLabel = randChoice(pickups);
-    const dropoffLabel = randChoice(dropoffs);
+    const pickupLabel = randChoice(PICKUPS);
+    const dropoffLabel = randChoice(DROPOFFS);
     const pickupAddr = await createAddress(pickupLabel);
     const dropoffAddr = await createAddress(dropoffLabel);
     await prisma.booking.create({
@@ -197,7 +141,7 @@ async function seedReviews(customers, bookings) {
         userId: user.id,
         bookingId: booking ? booking.id : null,
         rating: Math.floor(Math.random() * 2) + 4, // 4 or 5 stars
-        comment: reviewComments[i % reviewComments.length],
+        comment: REVIEW_COMMENTS[i % REVIEW_COMMENTS.length],
         status: randChoice(approvedStatuses),
       },
     });
@@ -237,6 +181,39 @@ async function seedServices() {
   }
 }
 
+async function seedFaqCategories() {
+  const existingCount = await prisma.faqCategory.count();
+  if (existingCount > 0) return;
+
+  await prisma.faqCategory.createMany({
+    data: FAQ_CATEGORIES.map((name) => ({
+      name,
+      order: 0,
+    })),
+  });
+}
+
+async function seedFaqs() {
+  const existingFaqs = await prisma.faq.count();
+  if (existingFaqs > 0) return;
+
+  const categories = await prisma.faqCategory.findMany({ select: { id: true, name: true } });
+  const map = new Map(categories.map((c) => [c.name, c.id]));
+
+  const data = Object.entries(FAQ_ITEMS).flatMap(([categoryName, items]) => {
+    const categoryId = map.get(categoryName) ?? null;
+    return items.map((item) => ({
+      question: item.question,
+      answer: item.answer,
+      isFeatured: false,
+      isValidated: true,
+      categoryId,
+    }));
+  });
+
+  await prisma.faq.createMany({ data });
+}
+
 async function main() {
   // démarrage seed
   const drivers = await ensureDrivers();
@@ -245,6 +222,8 @@ async function main() {
   const allBookings = await prisma.booking.findMany({ select: { id: true } });
   await seedReviews(customers, allBookings);
   await seedServices();
+  await seedFaqCategories();
+  await seedFaqs();
   // fin seed
 }
 

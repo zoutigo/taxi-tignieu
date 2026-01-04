@@ -35,7 +35,7 @@
 - Auth: NextAuth v5 (JWT sessions) with Prisma adapter and Google provider. Required envs: `DATABASE_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`; optional: `ADMIN_EMAILS`, `MANAGER_EMAILS`, `DRIVER_EMAILS`.
 - Tarifs and geocoding endpoints rely on `OPENROUTESERVICE_API_KEY`.
 - Prisma targets MySQL; keep generator binary targets as-is in `prisma/schema.prisma`.
-- Seed data lives in `prisma/seed.js` + `prisma/service-seed-data.js` (drivers, customers, bookings, reviews, services). Static city content is in `app/cities/city-data.ts`; contact fallback data is in `lib/site-config.ts`.
+- Seed data lives in `prisma/seed.js` + `prisma/service-seed-data.js`, with all listes statiques centralisées dans `lib/data/seed-static-data.js` (drivers, clients, avatars, trajets, reviews, FAQ catégories). Static city content is in `app/cities/city-data.ts`; contact fallback data is in `lib/site-config.ts`.
 - Tests run with Jest using `tests/setup-jest.js` (default environment: node; switch to jsdom per test when rendering UI).
 
 ## Dev commands

@@ -6,6 +6,7 @@ const cards = [
   { title: "Services", href: "/dashboard/services", desc: "Catégories, textes, highlights" },
   { title: "Avis", href: "/dashboard/avis", desc: "Validation, édition, suppression" },
   { title: "Paramètres", href: "/dashboard/parametres", desc: "Pagination, contact, footer" },
+  { title: "FAQ", href: "/dashboard/faq", desc: "Questions fréquentes, catégories" },
 ];
 
 export default function DashboardPage() {
