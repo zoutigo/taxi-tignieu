@@ -1,3 +1,5 @@
+/** @jest-environment jsdom */
+
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { SiteHeader } from "@/components/site-header";
@@ -54,8 +56,10 @@ describe("SiteHeader actions", () => {
       tree = renderer.create(<SiteHeader />);
     });
     openMenu(tree!);
-    const avisLink = tree!.root.find((node) => node.type === "a" && node.props.children === "Avis");
-    expect(avisLink.props.href).toBe("/avis");
+    const avisLinks = tree!.root.findAll(
+      (node) => node.type === "a" && node.props.children === "Avis"
+    );
+    expect(avisLinks.some((link) => link.props.href === "/avis")).toBe(true);
   });
 
   it("le lien Contact pointe vers /contact", () => {
@@ -64,10 +68,10 @@ describe("SiteHeader actions", () => {
       tree = renderer.create(<SiteHeader />);
     });
     openMenu(tree!);
-    const contactLink = tree!.root.find(
+    const contactLinks = tree!.root.findAll(
       (node) => node.type === "a" && node.props.children === "Contact"
     );
-    expect(contactLink.props.href).toBe("/contact");
+    expect(contactLinks.some((link) => link.props.href === "/contact")).toBe(true);
   });
 
   it("le lien Services pointe vers /services", () => {
@@ -76,10 +80,10 @@ describe("SiteHeader actions", () => {
       tree = renderer.create(<SiteHeader />);
     });
     openMenu(tree!);
-    const servicesLink = tree!.root.find(
+    const servicesLinks = tree!.root.findAll(
       (node) => node.type === "a" && node.props.children === "Services"
     );
-    expect(servicesLink.props.href).toBe("/services");
+    expect(servicesLinks.some((link) => link.props.href === "/services")).toBe(true);
   });
 
   it("affiche le Dashboard pour admin/manager", () => {

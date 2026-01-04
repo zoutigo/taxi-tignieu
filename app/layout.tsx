@@ -31,7 +31,7 @@ export default async function RootLayout({
           >
             <div className="flex min-h-screen flex-col bg-background text-foreground">
               <SiteHeader />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 pt-20 md:pt-24">{children}</main>
               <SiteFooter />
             </div>
           </ThemeProvider>
