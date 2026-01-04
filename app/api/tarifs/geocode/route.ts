@@ -11,28 +11,29 @@ export async function GET(request: Request) {
     }
 
     const apiKey = process.env.OPENROUTESERVICE_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Clé OpenRouteService manquante côté serveur." },
-        { status: 500 }
+    let first:
+      | {
+          geometry?: { coordinates?: [number, number] };
+          properties?: Record<string, unknown>;
+        }
+      | undefined;
+
+    if (apiKey) {
+      const orsRes = await fetch(
+        `${ORS_GEOCODE_URL}?api_key=${apiKey}&text=${encodeURIComponent(text)}&size=1&lang=fr`
       );
+      const data = orsRes.ok
+        ? ((await orsRes.json().catch(() => null)) as {
+            features?: Array<{
+              geometry?: { coordinates?: [number, number] };
+              properties?: Record<string, unknown>;
+            }>;
+          } | null)
+        : null;
+      first = data?.features?.[0];
     }
 
-    const orsRes = await fetch(
-      `${ORS_GEOCODE_URL}?api_key=${apiKey}&text=${encodeURIComponent(text)}&size=1&lang=fr`
-    );
-    const data = orsRes.ok
-      ? ((await orsRes.json().catch(() => null)) as {
-          features?: Array<{
-            geometry?: { coordinates?: [number, number] };
-            properties?: Record<string, unknown>;
-          }>;
-        } | null)
-      : null;
-    const firstOrs = data?.features?.[0];
-
-    // Fallback Photon si ORS ne trouve rien
-    let first = firstOrs;
+    // Fallback Photon si ORS ne trouve rien ou si pas de clé
     if (!first?.geometry?.coordinates) {
       const photonRes = await fetch(
         `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&limit=1&lang=fr`

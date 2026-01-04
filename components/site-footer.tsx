@@ -7,12 +7,13 @@ const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
   { label: "Services", href: "/services" },
   { label: "Avis clients", href: "/avis" },
+  { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
 ];
 
 const infoLinks = [
   { label: "Mentions légales", href: "/mentions-legales" },
-  { label: "Politique de confidentialité", href: "/confidentialite" },
+  { label: "Politique de confidentialité", href: "/politique-de-confidentialite" },
   { label: "CGV", href: "/cgv" },
 ];
 

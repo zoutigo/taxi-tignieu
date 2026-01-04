@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
+import Link from "next/link";
 import { AppMessage } from "./app-message";
 
 const categories = [
@@ -22,6 +23,9 @@ const schema = z.object({
   category: z.string().min(1, "Catégorie requise"),
   subject: z.string().min(2, "Sujet requis"),
   message: z.string().min(5, "Message requis"),
+  policiesAccepted: z.boolean().refine((val) => val === true, {
+    message: "Confirmez avoir lu la politique de confidentialité et les mentions légales.",
+  }),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -37,21 +41,27 @@ export function ContactForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { category: "", subject: "", message: "" },
+    defaultValues: { category: "", subject: "", message: "", policiesAccepted: false },
   });
 
   const draftKey = useMemo(() => "contact-draft", []);
   const watchedValues = useWatch<FormValues>({
     control: form.control,
-    defaultValue: { category: "", subject: "", message: "" },
+    defaultValue: { category: "", subject: "", message: "", policiesAccepted: false },
   });
+  const policiesAccepted = watchedValues?.policiesAccepted ?? false;
 
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem(draftKey) : null;
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as FormValues;
-        form.reset(parsed);
+        form.reset({
+          category: parsed.category ?? "",
+          subject: parsed.subject ?? "",
+          message: parsed.message ?? "",
+          policiesAccepted: parsed.policiesAccepted ?? false,
+        });
         hasDraftRef.current = true;
       } catch {
         /* ignore */
@@ -92,12 +102,18 @@ export function ContactForm() {
       category: watchedValues?.category ?? "",
       subject: watchedValues?.subject ?? "",
       message: watchedValues?.message ?? "",
+      policiesAccepted: watchedValues?.policiesAccepted ?? false,
     });
   }, [clearDraft, saveDraft, watchedValues]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     setSuccess(null);
     setError(null);
+
+    if (!values.policiesAccepted) {
+      setError("Confirmez avoir lu la politique de confidentialité et les mentions légales.");
+      return;
+    }
 
     const userPhone = (session?.user as { phone?: string } | undefined)?.phone;
     if (!session) {
@@ -122,7 +138,7 @@ export function ContactForm() {
     }
     setSuccess("Message envoyé ! Nous revenons vers vous rapidement.");
     clearDraft();
-    form.reset({ category: "", subject: "", message: "" });
+    form.reset({ category: "", subject: "", message: "", policiesAccepted: false });
   });
 
   useEffect(() => {
@@ -131,12 +147,13 @@ export function ContactForm() {
       hasDraftRef.current &&
       !autoSubmittedRef.current &&
       session &&
+      policiesAccepted &&
       (session.user as { phone?: string } | undefined)?.phone
     ) {
       autoSubmittedRef.current = true;
       void handleSubmit();
     }
-  }, [handleSubmit, session]);
+  }, [handleSubmit, session, policiesAccepted]);
 
   return (
     <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
@@ -180,12 +197,35 @@ export function ContactForm() {
         />
         <p className="mt-1 text-xs text-destructive">{form.formState.errors.message?.message}</p>
       </div>
+      <div className="rounded-2xl border border-muted bg-background/60 px-4 py-3 text-sm text-foreground">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            {...form.register("policiesAccepted")}
+            className="mt-1 h-4 w-4 cursor-pointer rounded border-primary text-primary focus:ring-primary"
+          />
+          <span className="leading-relaxed">
+            J&apos;ai lu et j&apos;accepte la{" "}
+            <Link href="/politique-de-confidentialite" className="text-primary underline">
+              politique de confidentialité
+            </Link>{" "}
+            ainsi que les{" "}
+            <Link href="/mentions-legales" className="text-primary underline">
+              mentions légales
+            </Link>
+            .
+          </span>
+        </label>
+        <p className="mt-1 text-xs text-destructive">
+          {form.formState.errors.policiesAccepted?.message as string | undefined}
+        </p>
+      </div>
       {error ? <AppMessage variant="error">{error}</AppMessage> : null}
       {success ? <AppMessage variant="success">{success}</AppMessage> : null}
       <button
         type="submit"
-        className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_15px_30px_rgba(245,195,49,0.35)] transition hover:brightness-95 focus:outline-none"
-        disabled={form.formState.isSubmitting}
+        className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_15px_30px_rgba(245,195,49,0.35)] transition hover:brightness-95 focus:outline-none cursor-pointer"
+        disabled={form.formState.isSubmitting || !policiesAccepted}
       >
         <Send className="h-4 w-4" />
         {form.formState.isSubmitting ? "Envoi..." : "Envoyer"}

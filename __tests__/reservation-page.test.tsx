@@ -30,6 +30,19 @@ jest.mock("@/components/ui/select", () => ({
   SelectValue: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
+jest.mock("@/components/ui/checkbox", () => ({
+  Checkbox: ({
+    onCheckedChange,
+    ...props
+  }: { onCheckedChange?: (v: boolean) => void } & Record<string, unknown>) => (
+    <input
+      type="checkbox"
+      {...props}
+      onChange={(e) => onCheckedChange?.((e.target as HTMLInputElement).checked)}
+    />
+  ),
+}));
+
 const pushMock = jest.fn();
 (useRouter as jest.Mock).mockReturnValue({ push: pushMock });
 (useSearchParams as jest.Mock).mockReturnValue({
@@ -114,5 +127,31 @@ describe("ReservationPage - calcul tarif", () => {
       (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/tarifs/quote")
     );
     expect(quoteCall).toBeTruthy();
+  });
+
+  it("requiert l’acceptation des mentions avant l’envoi", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<ReservationPage />);
+    });
+    const root = tree!.root;
+
+    const submitButton = root.find(
+      (n) => n.type === "button" && n.props.children === "Confirmer ma demande"
+    );
+    expect(submitButton.props.disabled).toBe(true);
+
+    const checkbox = root.find((n) => n.type === "input" && n.props.id === "policiesAccepted");
+    const changeHandler = (checkbox.props.onChange ?? checkbox.props.onCheckedChange) as
+      | ((...args: unknown[]) => void)
+      | undefined;
+    expect(typeof changeHandler).toBe("function");
+    await act(async () => {
+      changeHandler?.({ target: { checked: true } });
+    });
+
+    expect(submitButton.props.disabled).toBe(false);
   });
 });

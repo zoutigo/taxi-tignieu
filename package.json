@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "type-check": "npm run typecheck",
     "test": "jest",
     "test:watch": "jest --watch",
     "prisma:generate": "prisma generate",

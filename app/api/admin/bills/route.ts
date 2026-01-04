@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { Address, SiteConfig } from "@prisma/client";
 import { generateInvoicePdf } from "@/lib/billing";
 
 export async function POST(request: Request) {
@@ -30,10 +31,12 @@ export async function POST(request: Request) {
   }
 
   const amountCents = booking.priceCents ?? 0;
-  const siteConfig = await prisma.siteConfig.findFirst({ include: { address: true } });
+  const siteConfig = (await prisma.siteConfig.findFirst({
+    include: { address: true },
+  })) as (SiteConfig & { address: Address }) | null;
   const company = siteConfig
     ? {
-        name: "Taxi Tignieu",
+        name: siteConfig.name ?? "Taxi Tignieu",
         phone: siteConfig.phone ?? "",
         email: siteConfig.email ?? "",
         addressLine: siteConfig.address

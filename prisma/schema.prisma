@@ -144,6 +144,10 @@ model Address {
 
 model SiteConfig {
   id        Int      @id @default(autoincrement())
+  name      String?
+  ownerName String?
+  siret     String?
+  ape       String?
   phone     String
   email     String
   addressId Int      @unique
@@ -218,4 +222,23 @@ model SHighlight {
   position  Int      @default(0)
   service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   serviceId Int
+}
+
+model FaqCategory {
+  id    String @id @default(uuid())
+  name  String @db.VarChar(191)
+  order Int    @default(0)
+  faqs  Faq[]
+}
+
+model Faq {
+  id         String       @id @default(uuid())
+  question   String       @db.Text
+  answer     String       @db.Text
+  isFeatured   Boolean       @default(false)
+  isValidated   Boolean       @default(false)
+  category   FaqCategory? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 }

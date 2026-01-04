@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `SiteConfig` ADD COLUMN `ape` VARCHAR(191) NULL,
+    ADD COLUMN `siret` VARCHAR(191) NULL;

@@ -7,6 +7,9 @@ const schema = z.object({
   category: z.string().min(1),
   subject: z.string().min(2),
   message: z.string().min(5),
+  policiesAccepted: z.boolean().refine((val) => val === true, {
+    message: "Les mentions légales et la politique de confidentialité doivent être acceptées.",
+  }),
 });
 
 export const runtime = "nodejs";
