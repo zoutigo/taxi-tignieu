@@ -10,6 +10,7 @@
 - Prefer UUID primary keys on models
 - Do not modify Prisma migration files
 - Favor UI interaction tests (React Testing Library + fireEvent) for links/buttons when validating navigation flows.
+- All links and buttons must use `cursor-pointer`.
 
 ## Preferences (follow unless justified)
 

@@ -5,34 +5,48 @@ import renderer, { act } from "react-test-renderer";
 import { ContactForm } from "@/components/contact-form";
 import { useSession, signIn } from "next-auth/react";
 
+type MockValues = Record<string, string | boolean | undefined>;
+
 jest.mock("react-hook-form", () => {
-  let values: Record<string, string> = { category: "", subject: "", message: "" };
+  let values: MockValues = {
+    category: "",
+    subject: "",
+    message: "",
+    policiesAccepted: false,
+  };
   let lastSubmit: (() => Promise<void>) | null = null;
   return {
-    __setValues: (next: Record<string, string>) => {
+    __setValues: (next: MockValues) => {
       values = next;
     },
     __getLastSubmit: () => lastSubmit,
-    useForm: () => ({
-      control: {},
-      register: (name: string) => ({
-        name,
-        onChange: (e: { target: { value: string } }) => {
-          values[name] = e.target.value;
+    __getValues: () => values,
+    useForm: (opts?: { defaultValues?: typeof values }) => {
+      if (opts?.defaultValues) {
+        values = { ...opts.defaultValues, ...values };
+      }
+      return {
+        control: {},
+        register: (name: string) => ({
+          name,
+          onChange: (e: { target: { value?: string; checked?: boolean } }) => {
+            values[name] =
+              typeof e.target.checked === "boolean" ? e.target.checked : e.target.value;
+          },
+        }),
+        handleSubmit: (cb: (vals: typeof values) => unknown) => {
+          const runner = async () => {
+            await cb(values);
+          };
+          lastSubmit = runner;
+          return runner;
         },
-      }),
-      handleSubmit: (cb: (vals: typeof values) => unknown) => {
-        const runner = async () => {
-          await cb(values);
-        };
-        lastSubmit = runner;
-        return runner;
-      },
-      reset: (next?: typeof values) => {
-        if (next) values = next;
-      },
-      formState: { errors: {}, isSubmitting: false },
-    }),
+        reset: (next?: typeof values) => {
+          if (next) values = next;
+        },
+        formState: { errors: {}, isSubmitting: false },
+      };
+    },
     useWatch: ({ defaultValue }: { defaultValue: typeof values }) => values ?? defaultValue,
   };
 });
@@ -53,8 +67,9 @@ jest.mock("@/components/app-message", () => ({
 }));
 
 const formMock = jest.requireMock("react-hook-form") as {
-  __setValues: (v: Record<string, string>) => void;
+  __setValues: (v: MockValues) => void;
   __getLastSubmit: () => (() => Promise<void>) | null;
+  __getValues: () => MockValues;
 };
 
 describe("ContactForm workflow", () => {
@@ -75,10 +90,11 @@ describe("ContactForm workflow", () => {
       category: "Réservation",
       subject: "Sujet test",
       message: "Message test complet",
+      policiesAccepted: true,
     });
   });
 
-  const renderAndSubmit = async () => {
+  const renderAndSubmit = async (forcePoliciesAccepted = true) => {
     let tree: renderer.ReactTestRenderer;
     await act(async () => {
       tree = renderer.create(<ContactForm />);
@@ -86,6 +102,10 @@ describe("ContactForm workflow", () => {
     const submitFn = formMock.__getLastSubmit();
     if (submitFn) {
       await act(async () => {
+        if (forcePoliciesAccepted) {
+          const vals = formMock.__getValues();
+          formMock.__setValues({ ...vals, policiesAccepted: true });
+        }
         await submitFn();
       });
     }
@@ -96,6 +116,19 @@ describe("ContactForm workflow", () => {
     await renderAndSubmit();
     expect(signIn).toHaveBeenCalledWith("google", { callbackUrl: "/contact" });
     expect(localStorage.getItem("contact-draft")).toBeTruthy();
+  });
+
+  it("bloque l’envoi tant que la politique et les mentions ne sont pas acceptées", async () => {
+    formMock.__setValues({
+      category: "Réservation",
+      subject: "Sujet test",
+      message: "Message test complet",
+      policiesAccepted: false,
+    });
+    const tree = await renderAndSubmit(false);
+    expect(signIn).not.toHaveBeenCalled();
+    const html = JSON.stringify(tree.toJSON());
+    expect(html).toContain("Confirmez avoir lu");
   });
 
   it("redirige vers la complétion téléphone si manquant", async () => {

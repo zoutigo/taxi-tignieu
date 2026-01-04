@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { bookingEstimateSchema } from "@/schemas/booking";
@@ -26,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
   computePriceEuros,
@@ -63,6 +65,7 @@ export function ReservationPage() {
       passengers: 1,
       luggage: 0,
       notes: "",
+      policiesAccepted: false,
     };
   }, []);
 
@@ -178,6 +181,7 @@ export function ReservationPage() {
     mode: "onChange",
     defaultValues,
   });
+  const policiesAccepted = form.watch("policiesAccepted");
   const pickupAddress = form.watch("pickup") as AddressData;
   const dropoffAddress = form.watch("dropoff") as AddressData;
 
@@ -320,6 +324,11 @@ export function ReservationPage() {
   };
 
   const onSubmit = form.handleSubmit(async (data: BookingEstimateInput) => {
+    if (!data.policiesAccepted) {
+      setError("Veuillez confirmer la politique de confidentialité et les mentions légales.");
+      return;
+    }
+
     const priceToUse = quotePrice ?? storedPrice ?? 0;
     const pickup = await ensureAddress("pickup");
     const dropoff = await ensureAddress("dropoff");
@@ -339,6 +348,13 @@ export function ReservationPage() {
 
   useEffect(() => {
     if (sessionStatus === "authenticated" && storedEstimate && !hasPosted && readyToPost) {
+      if (!storedEstimate.policiesAccepted) {
+        setError(
+          "Confirmez la lecture de la politique de confidentialité et des mentions légales avant d’envoyer."
+        );
+        setReadyToPost(false);
+        return;
+      }
       void createBooking(storedEstimate, storedPrice ?? null);
       setReadyToPost(false);
     }
@@ -708,10 +724,44 @@ export function ReservationPage() {
               ) : null}
             </div>
 
+            <FormField
+              control={form.control}
+              name="policiesAccepted"
+              render={({ field }) => (
+                <FormItem className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/40 px-3 py-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="policiesAccepted"
+                      checked={field.value}
+                      onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                      className="mt-1 cursor-pointer"
+                    />
+                    <label
+                      htmlFor="policiesAccepted"
+                      className="text-sm text-foreground cursor-pointer leading-relaxed"
+                    >
+                      Je confirme avoir pris connaissance de la{" "}
+                      <Link href="/politique-de-confidentialite" className="text-primary underline">
+                        politique de confidentialité
+                      </Link>{" "}
+                      et des{" "}
+                      <Link href="/mentions-legales" className="text-primary underline">
+                        mentions légales
+                      </Link>
+                      .
+                    </label>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Button
               type="submit"
-              className="btn btn-primary w-full"
-              disabled={form.formState.isSubmitting || sessionStatus === "loading"}
+              className="btn btn-primary w-full cursor-pointer"
+              disabled={
+                form.formState.isSubmitting || sessionStatus === "loading" || !policiesAccepted
+              }
             >
               {form.formState.isSubmitting ? "Enregistrement..." : "Confirmer ma demande"}
             </Button>

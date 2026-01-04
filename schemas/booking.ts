@@ -24,6 +24,10 @@ export const bookingEstimateSchema = z
     passengers: z.number().int().min(1, "1 passager minimum.").max(7, "7 passagers maximum."),
     luggage: z.number().int().min(0).max(6),
     notes: z.string().max(280).optional().or(z.literal("")),
+    policiesAccepted: z.boolean().refine((val) => val === true, {
+      message:
+        "Veuillez confirmer avoir lu la politique de confidentialité et les mentions légales.",
+    }),
   })
   .superRefine((value, ctx) => {
     (["pickup", "dropoff"] as const).forEach((key) => {

@@ -19,7 +19,9 @@ const navLinks = [
 export function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const lastScrollY = useRef(0);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
   const { status, data } = useSession();
   const isAuthenticated = status === "authenticated";
@@ -32,6 +34,7 @@ export function SiteHeader() {
     setMenuOpen((prev) => {
       const next = !prev;
       if (next) setIsHidden(false);
+      setAccountMenuOpen(false);
       return next;
     });
   const closeMenu = () => setMenuOpen(false);
@@ -59,6 +62,17 @@ export function SiteHeader() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (accountMenuRef.current && !accountMenuRef.current.contains(target)) {
+        setAccountMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const hideHeader = !menuOpen && isHidden;
@@ -95,24 +109,67 @@ export function SiteHeader() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                if (isAuthenticated) {
-                  router.push("/espace-client");
-                } else {
-                  handleLogin();
-                }
-              }}
-              aria-label={isAuthenticated ? "Ouvrir l'espace client" : "Se connecter"}
-              className={`hidden h-11 w-11 cursor-pointer items-center justify-center rounded-2xl border transition md:inline-flex ${
-                isAuthenticated
-                  ? "border-emerald-400 text-emerald-300 hover:border-emerald-300 hover:text-emerald-200"
-                  : "border-white/20 text-white hover:border-primary/80 hover:text-primary"
-              }`}
-            >
-              <UserRound className="h-5 w-5" />
-            </button>
+            <div ref={accountMenuRef} className="relative hidden md:flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isAuthenticated) {
+                    setAccountMenuOpen((prev) => !prev);
+                    setIsHidden(false);
+                  } else {
+                    handleLogin();
+                  }
+                }}
+                aria-label={isAuthenticated ? "Ouvrir l'espace client" : "Se connecter"}
+                aria-expanded={accountMenuOpen}
+                className={`h-11 w-11 cursor-pointer items-center justify-center rounded-2xl border transition md:inline-flex ${
+                  isAuthenticated
+                    ? "border-emerald-400 text-emerald-300 hover:border-emerald-300 hover:text-emerald-200"
+                    : "border-white/20 text-white hover:border-primary/80 hover:text-primary"
+                }`}
+              >
+                <UserRound className="h-5 w-5" />
+              </button>
+
+              {accountMenuOpen && isAuthenticated ? (
+                <div className="absolute right-0 top-full mt-3 w-56 overflow-hidden rounded-2xl border border-border/70 bg-card/95 text-sm text-foreground shadow-[0_18px_35px_rgba(8,22,49,0.22)] backdrop-blur">
+                  <div className="flex flex-col divide-y divide-border/70">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold transition hover:bg-muted/70 cursor-pointer"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        router.push("/espace-client");
+                      }}
+                    >
+                      Espace client
+                    </button>
+                    {isAdminLike ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold transition hover:bg-muted/70 cursor-pointer"
+                        onClick={() => {
+                          setAccountMenuOpen(false);
+                          router.push("/dashboard");
+                        }}
+                      >
+                        Dashboard
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between px-4 py-3 text-left font-semibold text-destructive transition hover:bg-muted/70 cursor-pointer"
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        handleLogout();
+                      }}
+                    >
+                      Déconnexion
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               onClick={toggleMenu}

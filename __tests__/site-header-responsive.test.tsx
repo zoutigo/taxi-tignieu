@@ -75,7 +75,9 @@ describe("SiteHeader responsive layout", () => {
     expect(nav?.className).toContain("md:flex");
 
     const userButton = container.querySelector('button[aria-label="Se connecter"]');
-    expect(userButton?.className).toContain("hidden");
+    const accountWrapper = userButton?.parentElement;
+    expect(accountWrapper?.className).toContain("hidden");
+    expect(accountWrapper?.className).toContain("md:flex");
     expect(userButton?.className).toContain("md:inline-flex");
     expect(userButton?.className).toContain("text-white");
 

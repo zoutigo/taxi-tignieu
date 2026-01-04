@@ -86,6 +86,7 @@ describe("POST /api/bookings", () => {
       luggage: 1,
       notes: "Test",
       estimatedPrice: 42,
+      policiesAccepted: true,
     };
 
     const res = await POST(makeRequest(payload));
@@ -135,6 +136,7 @@ describe("POST /api/bookings", () => {
         luggage: 0,
         notes: "",
         estimatedPrice: null,
+        policiesAccepted: true,
       })
     );
 

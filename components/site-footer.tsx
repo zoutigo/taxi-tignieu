@@ -12,7 +12,7 @@ const quickLinks = [
 
 const infoLinks = [
   { label: "Mentions légales", href: "/mentions-legales" },
-  { label: "Politique de confidentialité", href: "/confidentialite" },
+  { label: "Politique de confidentialité", href: "/politique-de-confidentialite" },
   { label: "CGV", href: "/cgv" },
 ];
 
