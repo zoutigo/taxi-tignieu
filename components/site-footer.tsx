@@ -7,6 +7,7 @@ const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
   { label: "Services", href: "/services" },
   { label: "Avis clients", href: "/avis" },
+  { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
 ];
 

@@ -11,6 +11,7 @@ import { UserRound } from "lucide-react";
 const navLinks = [
   { label: "Services", href: "/services" },
   { label: "Avis", href: "/avis" },
+  { label: "FAQ", href: "/faq" },
   { label: "Entreprises", href: "#entreprises" },
   { label: "À propos", href: "/apropos" },
   { label: "Contact", href: "/contact" },

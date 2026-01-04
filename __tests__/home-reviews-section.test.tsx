@@ -12,6 +12,9 @@ jest.mock("@/lib/prisma", () => ({
     review: {
       findMany: jest.fn(),
     },
+    faq: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
@@ -22,11 +25,15 @@ jest.mock("@/lib/site-config", () => ({
 const mockedFindMany = prisma.review.findMany as unknown as jest.MockedFunction<
   typeof prisma.review.findMany
 >;
+const mockedFaqFindMany = prisma.faq.findMany as unknown as jest.MockedFunction<
+  typeof prisma.faq.findMany
+>;
 const mockedGetSiteContact = getSiteContact as jest.MockedFunction<typeof getSiteContact>;
 
 describe("Landing reviews section", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedFaqFindMany.mockResolvedValue([]);
     mockedGetSiteContact.mockResolvedValue({
       phone: "04 95 78 54 00",
       email: "contact@taxitignieu.fr",

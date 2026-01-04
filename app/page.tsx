@@ -9,6 +9,7 @@ import {
   Navigation,
   PhoneCall,
   Plane,
+  MessageCircle,
   Quote,
   ShieldCheck,
   Star,
@@ -18,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { getSiteContact } from "@/lib/site-config";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cities } from "@/app/cities/city-data";
+import { FAQ_CATEGORIES, FAQ_ITEMS } from "@/lib/data/seed-static-data";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,38 @@ export default async function Home() {
     include: { user: { select: { name: true, image: true } } },
     take: 3,
   });
+  const featuredFaqs = await prisma.faq.findMany({
+    where: { isFeatured: true, isValidated: true },
+    include: { category: { select: { name: true, order: true } } },
+    orderBy: [{ category: { order: "asc" } }, { createdAt: "desc" }],
+  });
+  const seenCategories = new Set<string>();
+  const curatedFaqs =
+    featuredFaqs
+      .filter((faq) => {
+        const cat = faq.category?.name ?? "Autres";
+        if (seenCategories.has(cat)) {
+          return false;
+        }
+        seenCategories.add(cat);
+        return true;
+      })
+      .map((faq) => ({
+        question: faq.question,
+        answer: faq.answer,
+        category: faq.category?.name ?? "FAQ",
+      })) || [];
+
+  const fallbackFaqs = FAQ_CATEGORIES.map((category) => {
+    const first = FAQ_ITEMS[category as keyof typeof FAQ_ITEMS]?.[0];
+    return {
+      category,
+      question: first?.question ?? "Question fréquente",
+      answer: first?.answer ?? "Retrouvez ici les réponses aux questions les plus posées.",
+    };
+  });
+
+  const faqs = curatedFaqs.length ? curatedFaqs : fallbackFaqs;
   const contact = await getSiteContact();
   const addressLine = `${contact.address.streetNumber ? `${contact.address.streetNumber} ` : ""}${
     contact.address.street
@@ -365,6 +399,62 @@ export default async function Home() {
               </div>
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section
+        id="faq"
+        className="rounded-[32px] border border-border/70 bg-gradient-to-br from-muted/60 via-card to-background p-8 shadow-[0_35px_55px_rgba(5,15,35,0.12)] sm:p-10"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+              FAQ
+            </p>
+            <div className="flex items-center gap-3">
+              <MessageCircle className="h-5 w-5 text-primary" />
+              <h2 className="font-display text-3xl text-foreground sm:text-4xl">
+                Questions fréquentes
+              </h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Une réponse claire par catégorie, mise à jour depuis notre base. Réservez en toute
+              sérénité.
+            </p>
+          </div>
+          <Link href="/contact" className="btn btn-secondary justify-center sm:w-auto">
+            Poser une question
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          {faqs.map((faq) => (
+            <div
+              key={`${faq.category}-${faq.question}`}
+              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(5,15,35,0.12)]"
+            >
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/80 via-primary to-primary/70 opacity-70" />
+              <div className="flex items-center justify-between gap-3">
+                <span className="badge-pill bg-primary/10 text-xs font-semibold uppercase tracking-wide text-primary">
+                  {faq.category}
+                </span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-foreground">{faq.question}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{faq.answer}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 text-right">
+          <Link
+            href="/faq"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
+          >
+            Voir toutes les questions
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
     </div>

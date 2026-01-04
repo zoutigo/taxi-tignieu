@@ -22,9 +22,11 @@ const streamToString = async (stream: ReadableStream): Promise<string> => {
 
 jest.mock("@/lib/prisma", () => {
   const mockFindMany = jest.fn().mockResolvedValue([]);
+  const mockFaqFindMany = jest.fn().mockResolvedValue([]);
   return {
     prisma: {
       review: { findMany: mockFindMany },
+      faq: { findMany: mockFaqFindMany },
     },
   };
 });
