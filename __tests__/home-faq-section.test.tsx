@@ -53,10 +53,28 @@ jest.mock("@/lib/site-config", () => ({
 jest.mock("next/image", () => ({
   __esModule: true,
   // strip non-DOM props to avoid React warnings in tests
-  default: ({ src, alt, ...rest }: { src: string; alt?: string }) => (
+  default: ({
+    src,
+    alt,
+    ...rest
+  }: {
+    src: string;
+    alt?: string;
+    fill?: boolean;
+    priority?: boolean;
+  }) => {
+    const { fill, priority, ...safeRest } = rest;
+    void fill;
+    void priority;
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={typeof src === "string" ? src : (src as { src: string }).src} alt={alt} {...rest} />
-  ),
+    return (
+      <img
+        src={typeof src === "string" ? src : (src as { src: string }).src}
+        alt={alt}
+        {...safeRest}
+      />
+    );
+  },
 }));
 
 const mockedReviewFindMany = prisma.review.findMany as unknown as jest.MockedFunction<
