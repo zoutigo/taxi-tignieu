@@ -45,7 +45,7 @@ jest.mock("@/lib/site-config", () => ({
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: ({ src, alt, fill: _fill, priority: _priority, ...rest }: ImageProps) => {
+  default: ({ src, alt, ...rest }: ImageProps) => {
     const stringSrc = typeof src === "string" ? src : (src as StaticImageData).src;
     return (
       <span
