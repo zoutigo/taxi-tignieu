@@ -45,13 +45,15 @@ jest.mock("@/lib/site-config", () => ({
 
 jest.mock("next/image", () => ({
   __esModule: true,
-  default: ({ src, alt, ...rest }: ImageProps) => {
+  default: ({ src, alt, fill, priority, ...rest }: ImageProps) => {
     const stringSrc = typeof src === "string" ? src : (src as StaticImageData).src;
     return (
       <span
         data-testid="mock-image"
         data-src={stringSrc}
         data-alt={alt ?? ""}
+        data-fill={fill ? "true" : "false"}
+        data-priority={priority ? "true" : "false"}
         {...(rest as React.HTMLAttributes<HTMLSpanElement>)}
       />
     );
