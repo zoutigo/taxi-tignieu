@@ -21,7 +21,17 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("next/link", () => ({
   __esModule: true,
-  default: ({ children, ...props }: { children: React.ReactNode }) => <a {...props}>{children}</a>,
+  default: ({
+    children,
+    prefetch: _prefetch, // omit to avoid DOM warning
+    ...props
+  }: {
+    children: React.ReactNode;
+    prefetch?: boolean;
+  }) => {
+    void _prefetch;
+    return <a {...props}>{children}</a>;
+  },
 }));
 
 describe("SiteHeader account menu", () => {
