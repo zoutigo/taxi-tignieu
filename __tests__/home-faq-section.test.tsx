@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+/* eslint-disable @next/next/no-img-element */
 import Home from "@/app/page";
 import { prisma } from "@/lib/prisma";
 import { getSiteContact } from "@/lib/site-config";
@@ -66,7 +67,6 @@ jest.mock("next/image", () => ({
     const { fill, priority, ...safeRest } = rest;
     void fill;
     void priority;
-    // eslint-disable-next-line @next/next/no-img-element
     return (
       <img
         src={typeof src === "string" ? src : (src as { src: string }).src}
