@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Car, PhoneCall, Menu, X } from "lucide-react";
+import { PhoneCall, Menu, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { useEffect, useRef, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { UserRound } from "lucide-react";
+import { SiteLogo } from "@/components/site-logo";
 
 const navLinks = [
   { label: "Services", href: "/services" },
@@ -87,9 +88,7 @@ export function SiteHeader() {
       >
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_15px_25px_rgba(246,196,49,0.45)]">
-              <Car className="h-6 w-6" />
-            </span>
+            <SiteLogo />
             <div className="flex flex-col">
               <span className="font-display text-lg font-semibold">Taxi Tignieu</span>
               <span className="text-xs font-medium text-white/70">À votre service 24/7</span>
