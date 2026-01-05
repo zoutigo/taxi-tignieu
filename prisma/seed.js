@@ -1,13 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const seedStaticPath = path.join(__dirname, "../lib/data/seed-static-data.js");
-const serviceSeedPath = path.join(__dirname, "./service-seed-data.js");
-
-const {
+import {
   AVATARS,
   CUSTOMER_EMAILS,
   DRIVER_EMAILS,
@@ -17,9 +9,8 @@ const {
   PICKUPS,
   REVIEW_COMMENTS,
   STATUSES,
-} = await import(seedStaticPath);
-
-const { serviceSeedData } = await import(serviceSeedPath);
+} from "./data/seed-static-data.js";
+import { serviceSeedData } from "./service-seed-data.js";
 
 const prisma = new PrismaClient();
 
