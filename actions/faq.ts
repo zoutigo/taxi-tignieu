@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { getPermissionsForUser, getUserRole } from "@/lib/permissions";
 
 const upsertSchema = z
   .object({
@@ -24,6 +26,19 @@ const upsertSchema = z
   });
 
 export async function upsertFaq(formData: FormData) {
+  const session = await auth();
+  if (!session?.user) return { error: "Non autorisé" };
+
+  const role = getUserRole(
+    session.user as { isAdmin?: boolean; isManager?: boolean; isDriver?: boolean }
+  );
+  const isAdmin = role === "ADMIN";
+  const perms = await getPermissionsForUser(
+    session.user as { isAdmin?: boolean; isManager?: boolean; isDriver?: boolean }
+  );
+  const canCreate = isAdmin || perms.faq?.canCreate;
+  const canUpdate = isAdmin || perms.faq?.canUpdate;
+
   const parsed = upsertSchema.safeParse({
     id: formData.get("id")?.toString() || undefined,
     question: formData.get("question")?.toString() ?? "",
@@ -38,6 +53,9 @@ export async function upsertFaq(formData: FormData) {
   }
 
   const { id, question, answer, categoryId } = parsed.data;
+  if (id && !canUpdate) return { error: "Interdit" };
+  if (!id && !canCreate) return { error: "Interdit" };
+
   if (id) {
     await prisma.faq.update({
       where: { id },
@@ -66,6 +84,17 @@ export async function upsertFaq(formData: FormData) {
 }
 
 export async function deleteFaq(formData: FormData) {
+  const session = await auth();
+  if (!session?.user) return { error: "Non autorisé" };
+  const role = getUserRole(
+    session.user as { isAdmin?: boolean; isManager?: boolean; isDriver?: boolean }
+  );
+  const isAdmin = role === "ADMIN";
+  const perms = await getPermissionsForUser(
+    session.user as { isAdmin?: boolean; isManager?: boolean; isDriver?: boolean }
+  );
+  if (!isAdmin && !perms.faq?.canDelete) return { error: "Interdit" };
+
   const id = formData.get("id")?.toString();
   if (!id) return { error: "Identifiant manquant" };
 

@@ -1,15 +1,64 @@
 import Link from "next/link";
+import { auth } from "@/auth";
+import { getPermissionsForUser, getUserRole } from "@/lib/permissions";
 
 const cards = [
-  { title: "Utilisateurs", href: "/dashboard/users", desc: "Rôles, infos, réservations" },
-  { title: "Réservations", href: "/dashboard/bookings", desc: "Statuts, détails, nettoyage" },
-  { title: "Services", href: "/dashboard/services", desc: "Catégories, textes, highlights" },
-  { title: "Avis", href: "/dashboard/avis", desc: "Validation, édition, suppression" },
-  { title: "Paramètres", href: "/dashboard/parametres", desc: "Pagination, contact, footer" },
-  { title: "FAQ", href: "/dashboard/faq", desc: "Questions fréquentes, catégories" },
+  {
+    title: "Utilisateurs",
+    href: "/dashboard/users",
+    desc: "Rôles, infos, réservations",
+    moduleId: "users",
+  },
+  {
+    title: "Réservations",
+    href: "/dashboard/bookings",
+    desc: "Statuts, détails, nettoyage",
+    moduleId: "bookings",
+  },
+  {
+    title: "Services",
+    href: "/dashboard/services",
+    desc: "Catégories, textes, highlights",
+    moduleId: "services",
+  },
+  {
+    title: "Avis",
+    href: "/dashboard/avis",
+    desc: "Validation, édition, suppression",
+    moduleId: "reviews",
+  },
+  {
+    title: "Paramètres",
+    href: "/dashboard/parametres",
+    desc: "Pagination, contact, footer",
+    moduleId: "site-info",
+  },
+  {
+    title: "FAQ",
+    href: "/dashboard/faq",
+    desc: "Questions fréquentes, catégories",
+    moduleId: "faq",
+  },
+  {
+    title: "Rôles",
+    href: "/dashboard/roles",
+    desc: "Permissions manager par module",
+    adminOnly: true,
+  },
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await auth();
+  const role = getUserRole(session?.user ?? {});
+  const isAdmin = role === "ADMIN";
+  const perms = await getPermissionsForUser(session?.user ?? {});
+  const visibleCards = cards.filter((card) => {
+    if (card.adminOnly) return isAdmin;
+    if (!card.moduleId) return true;
+    const perm = perms[card.moduleId];
+    return isAdmin || perm?.canView;
+  });
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
       <header className="rounded-2xl bg-sidebar px-6 py-5 text-sidebar-foreground shadow-lg">
@@ -19,7 +68,7 @@ export default function DashboardPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((card) => (
+        {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}

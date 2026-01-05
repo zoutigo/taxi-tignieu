@@ -13,7 +13,7 @@ const navLinks = [
   { label: "Services", href: "/services" },
   { label: "Avis", href: "/avis" },
   { label: "FAQ", href: "/faq" },
-  { label: "Entreprises", href: "#entreprises" },
+  { label: "Réservation", href: "/reserver" },
   { label: "À propos", href: "/apropos" },
   { label: "Contact", href: "/contact" },
 ];
