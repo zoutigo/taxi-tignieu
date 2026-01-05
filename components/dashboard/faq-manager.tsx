@@ -24,9 +24,19 @@ type Faq = {
 type Props = {
   faqs: Faq[];
   categories: Category[];
+  permissions?: {
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+  };
 };
 
-export function FaqManager({ faqs, categories }: Props) {
+export function FaqManager({ faqs, categories, permissions }: Props) {
+  const perms = {
+    canCreate: permissions?.canCreate ?? true,
+    canUpdate: permissions?.canUpdate ?? true,
+    canDelete: permissions?.canDelete ?? true,
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
@@ -80,6 +90,7 @@ export function FaqManager({ faqs, categories }: Props) {
   };
 
   const populateFromFaq = (faq: Faq) => {
+    if (!perms.canUpdate) return;
     setSelectedId(faq.id);
     setQuestion(faq.question);
     setAnswer(faq.answer);
@@ -184,26 +195,30 @@ export function FaqManager({ faqs, categories }: Props) {
                   <p className="text-sm text-muted-foreground leading-relaxed">{faq.answer}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 cursor-pointer"
-                    onClick={() => populateFromFaq(faq)}
-                    aria-label="Modifier"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 cursor-pointer text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDelete(faq.id)}
-                    aria-label="Supprimer"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {perms.canUpdate ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 cursor-pointer"
+                      onClick={() => populateFromFaq(faq)}
+                      aria-label="Modifier"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {perms.canDelete ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 cursor-pointer text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(faq.id)}
+                      aria-label="Supprimer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </article>
@@ -265,19 +280,21 @@ export function FaqManager({ faqs, categories }: Props) {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Retour
             </Button>
-            <Button
-              type="button"
-              variant="default"
-              className="cursor-pointer"
-              onClick={() => {
-                resetForm();
-                if (isMobile) setShowList(false);
-              }}
-              aria-label="Nouvelle question"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nouvelle
-            </Button>
+            {perms.canCreate ? (
+              <Button
+                type="button"
+                variant="default"
+                className="cursor-pointer"
+                onClick={() => {
+                  resetForm();
+                  if (isMobile) setShowList(false);
+                }}
+                aria-label="Nouvelle question"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvelle
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -290,6 +307,7 @@ export function FaqManager({ faqs, categories }: Props) {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Quelle est la procédure ?"
+              disabled={!perms.canCreate && !perms.canUpdate}
             />
           </label>
 
@@ -302,6 +320,7 @@ export function FaqManager({ faqs, categories }: Props) {
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="Expliquez clairement la réponse..."
               rows={4}
+              disabled={!perms.canCreate && !perms.canUpdate}
             />
           </label>
 
@@ -312,6 +331,7 @@ export function FaqManager({ faqs, categories }: Props) {
               className="rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground shadow-inner focus:border-primary focus:outline-none cursor-pointer"
               value={categoryId ?? ""}
               onChange={(e) => setCategoryId(e.target.value || undefined)}
+              disabled={!perms.canCreate && !perms.canUpdate}
             >
               <option value="">Sans catégorie</option>
               {categories.map((cat) => (
@@ -330,10 +350,12 @@ export function FaqManager({ faqs, categories }: Props) {
                   className="h-4 w-4 cursor-pointer rounded border-border"
                   checked={isValidated}
                   onChange={(e) => {
+                    if (!perms.canCreate && !perms.canUpdate) return;
                     const next = e.target.checked;
                     setIsValidated(next);
                     if (!next) setIsFeatured(false);
                   }}
+                  disabled={!perms.canCreate && !perms.canUpdate}
                 />
                 Valider
               </label>
@@ -343,24 +365,34 @@ export function FaqManager({ faqs, categories }: Props) {
                     type="checkbox"
                     className="h-4 w-4 cursor-pointer rounded border-border"
                     checked={isFeatured}
-                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    onChange={(e) => {
+                      if (!perms.canCreate && !perms.canUpdate) return;
+                      setIsFeatured(e.target.checked);
+                    }}
+                    disabled={!perms.canCreate && !perms.canUpdate}
                   />
                   Mettre en avant
                 </label>
               ) : null}
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              className="cursor-pointer"
-              onClick={resetForm}
-              disabled={pending}
-            >
-              Annuler
-            </Button>
-            <Button type="submit" className="cursor-pointer" disabled={pending}>
-              {pending ? "En cours..." : selectedId ? "Mettre à jour" : "Ajouter"}
-            </Button>
+            {perms.canCreate || perms.canUpdate ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="cursor-pointer"
+                  onClick={resetForm}
+                  disabled={pending}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit" className="cursor-pointer" disabled={pending}>
+                  {pending ? "En cours..." : selectedId ? "Mettre à jour" : "Ajouter"}
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Lecture seule pour ce module.</p>
+            )}
           </div>
         </form>
       </section>

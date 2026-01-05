@@ -1,12 +1,27 @@
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { FaqManager } from "@/components/dashboard/faq-manager";
 import { BackButton } from "@/components/back-button";
+import { getPermissionsForUser } from "@/lib/permissions";
 
 export const metadata = {
   title: "FAQ | Dashboard",
 };
 
 export default async function DashboardFaqPage() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/dashboard");
+  }
+
+  const perms = await getPermissionsForUser(
+    session.user as { isAdmin?: boolean; isManager?: boolean; isDriver?: boolean }
+  );
+  if (!perms.faq?.canView && !session.user.isAdmin) {
+    redirect("/dashboard");
+  }
+
   const categories = await prisma.faqCategory.findMany({
     orderBy: [{ order: "asc" }, { name: "asc" }],
   });
@@ -43,7 +58,15 @@ export default async function DashboardFaqPage() {
       </div>
 
       <div className="mt-8">
-        <FaqManager faqs={safeFaqs} categories={safeCategories} />
+        <FaqManager
+          faqs={safeFaqs}
+          categories={safeCategories}
+          permissions={{
+            canCreate: Boolean(perms.faq?.canCreate || session.user.isAdmin),
+            canUpdate: Boolean(perms.faq?.canUpdate || session.user.isAdmin),
+            canDelete: Boolean(perms.faq?.canDelete || session.user.isAdmin),
+          }}
+        />
       </div>
     </div>
   );

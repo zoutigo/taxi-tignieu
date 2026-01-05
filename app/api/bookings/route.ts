@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { bookingEstimateSchema } from "@/schemas/booking";
 import { z } from "zod";
+import { sendMail } from "@/lib/mailer";
 
 const patchSchema = bookingEstimateSchema
   .partial()
@@ -58,6 +59,50 @@ export async function POST(req: Request) {
         userId: session.user.id,
       },
     });
+
+    if (session.user.email) {
+      const when = dateTime.toLocaleString("fr-FR", {
+        dateStyle: "full",
+        timeStyle: "short",
+      });
+      const priceText =
+        priceCents !== null ? `${(priceCents / 100).toFixed(2)} € (estimé)` : "À confirmer";
+      const html = `
+        <p>Bonjour ${session.user.name ?? ""},</p>
+        <p>Votre réservation a bien été enregistrée.</p>
+        <ul>
+          <li><strong>Date & heure :</strong> ${when}</li>
+          <li><strong>Passagers :</strong> ${passengers}</li>
+          <li><strong>Bagages :</strong> ${luggage ?? 0}</li>
+          <li><strong>Départ :</strong> ${pickup.name ?? ""} ${pickup.street ?? ""} ${pickup.postcode ?? ""} ${pickup.city ?? ""}</li>
+          <li><strong>Arrivée :</strong> ${dropoff.name ?? ""} ${dropoff.street ?? ""} ${dropoff.postcode ?? ""} ${dropoff.city ?? ""}</li>
+          <li><strong>Tarif :</strong> ${priceText}</li>
+        </ul>
+        <p>Notes : ${notes || "—"}</p>
+        <p>Merci de votre confiance,<br/>Taxi Tignieu</p>
+      `;
+      const text = `
+Votre réservation a bien été enregistrée.
+- Date & heure : ${when}
+- Passagers : ${passengers}
+- Bagages : ${luggage ?? 0}
+- Départ : ${pickup.name ?? ""} ${pickup.street ?? ""} ${pickup.postcode ?? ""} ${pickup.city ?? ""}
+- Arrivée : ${dropoff.name ?? ""} ${dropoff.street ?? ""} ${dropoff.postcode ?? ""} ${dropoff.city ?? ""}
+- Tarif : ${priceText}
+Notes : ${notes || "—"}
+
+Taxi Tignieu
+      `;
+
+      sendMail({
+        to: session.user.email,
+        subject: "Confirmation de votre réservation",
+        html,
+        text,
+      }).catch((err) => {
+        console.error("Erreur envoi email réservation", err);
+      });
+    }
 
     return NextResponse.json(
       { booking: { ...booking, pickup: pickupAddress, dropoff: dropoffAddress } },

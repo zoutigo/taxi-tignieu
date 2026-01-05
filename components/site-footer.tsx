@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Car, Mail, MapPin, PhoneCall } from "lucide-react";
+import { Mail, MapPin, PhoneCall } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { getSiteContact } from "@/lib/site-config";
+import { SiteLogo } from "@/components/site-logo";
 
 const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
@@ -26,9 +27,7 @@ export async function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <Car className="h-6 w-6" />
-            </span>
+            <SiteLogo />
             <div className="flex flex-col">
               <span className="font-display text-lg font-semibold">Taxi Tignieu</span>
               <span className="text-xs text-white/70">Mobilité premium région lyonnaise</span>
@@ -87,6 +86,22 @@ export async function SiteFooter() {
                 </li>
               ))}
             </ul>
+          </div>
+          <div className="rounded-2xl border border-white/10 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
+              Partenaire
+            </p>
+            <Link
+              href="https://lisaweb.fr"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-white"
+            >
+              LISAWEB
+              <span aria-hidden="true" className="text-white/60">
+                ↗
+              </span>
+            </Link>
           </div>
           <div className="rounded-2xl border border-white/10 p-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-white/60">

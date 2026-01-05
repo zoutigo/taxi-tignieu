@@ -242,3 +242,17 @@ model Faq {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 }
+
+model RolePermission {
+  id         String   @id @default(uuid())
+  role       String   @default("MANAGER")
+  module     String
+  canView    Boolean  @default(false)
+  canCreate  Boolean  @default(false)
+  canUpdate  Boolean  @default(false)
+  canDelete  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([module, role], name: "module_role")
+}

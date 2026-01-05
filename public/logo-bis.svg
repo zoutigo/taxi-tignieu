@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-labelledby="title desc">
+  <title id="title">Taxi logo</title>
+  <desc id="desc">Rounded yellow square with a blue taxi silhouette</desc>
+  <rect x="12" y="12" width="196" height="196" rx="44" fill="#f3c629" />
+  <g fill="#0b3c6b">
+    <path d="M75 130c-6 0-10-4-10-10v-7h14l9-15c2-3 5-5 8-6l28-10c4-2 10-2 14-2h20c5 0 12 1 17 4l23 14c3 2 6 6 7 10l4 15h7c5 0 9 4 9 9v9H75z" />
+    <rect x="110" y="66" width="30" height="12" rx="4" />
+    <path d="M90 99h32c3 0 4 1 4 4v6H86v-6c0-3 1-4 4-4z" fill="#0b4cab" />
+    <path d="M126 99h34c3 0 4 1 4 4v6h-38z" fill="#0d509c" />
+    <circle cx="88" cy="144" r="14" stroke="#0b3c6b" stroke-width="5" fill="#f3c629" />
+    <circle cx="162" cy="144" r="14" stroke="#0b3c6b" stroke-width="5" fill="#f3c629" />
+  </g>
+</svg>
