@@ -1,6 +1,7 @@
 import { POST } from "@/app/api/bookings/route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { buildBookingEmail, sendMail } from "@/lib/mailer";
 
 jest.mock("@/auth", () => ({
   auth: jest.fn(),
@@ -21,6 +22,30 @@ jest.mock("@/lib/prisma", () => ({
   },
 }));
 
+jest.mock("@/lib/mailer", () => ({
+  buildBookingEmail: jest.fn(() => ({
+    to: "user@test.fr",
+    subject: "Email test",
+    html: "<p>t</p>",
+    text: "t",
+  })),
+  sendMail: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock("@/lib/site-config", () => ({
+  getSiteContact: jest.fn().mockResolvedValue({
+    phone: "04 95 78 54 00",
+    email: "contact@taxitignieucharvieur.fr",
+    address: {
+      street: "Rue",
+      streetNumber: "9",
+      postalCode: "38230",
+      city: "Tignieu",
+      country: "France",
+    },
+  }),
+}));
+
 const mockedAuth = auth as unknown as jest.Mock<Promise<unknown>, unknown[]>;
 const mockedAddressCreate = prisma.address.create as unknown as jest.Mock<
   Promise<unknown>,
@@ -34,6 +59,9 @@ const mockedFindUnique = prisma.booking.findUnique as unknown as jest.Mock<
 >;
 const mockedUpdate = prisma.booking.update as unknown as jest.Mock<Promise<unknown>, unknown[]>;
 const mockedDelete = prisma.booking.delete as unknown as jest.Mock<Promise<unknown>, unknown[]>;
+const mockedBuildBookingEmail = buildBookingEmail as unknown as jest.Mock;
+const mockedSendMail = sendMail as unknown as jest.Mock<Promise<unknown>, unknown[]>;
+const mockedGetSiteContact = jest.requireMock("@/lib/site-config").getSiteContact as jest.Mock;
 
 const makeRequest = (body: unknown) =>
   new Request("http://localhost/api/bookings", {
@@ -45,6 +73,13 @@ const makeRequest = (body: unknown) =>
 describe("POST /api/bookings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedBuildBookingEmail.mockReturnValue({
+      to: "user@test.fr",
+      subject: "Email test",
+      html: "<p>test</p>",
+      text: "test",
+    });
+    mockedGetSiteContact.mockClear();
   });
 
   it("refuse sans session", async () => {
@@ -56,7 +91,9 @@ describe("POST /api/bookings", () => {
   });
 
   it("crée une réservation avec user connecté", async () => {
-    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
+    mockedAuth.mockResolvedValue({
+      user: { id: "u1", email: "user@test.fr", name: "User" },
+    } as { user: { id: string; email: string; name: string } });
     mockedAddressCreate.mockResolvedValue({ id: 10 });
     mockedAddressCreate.mockResolvedValueOnce({ id: 10 });
     mockedAddressCreate.mockResolvedValueOnce({ id: 11 });
@@ -105,6 +142,8 @@ describe("POST /api/bookings", () => {
         }),
       })
     );
+    expect(mockedBuildBookingEmail).toHaveBeenCalledTimes(1);
+    expect(mockedSendMail).toHaveBeenCalledTimes(1);
   });
 
   it("calcule dateTime et priceCents, même sans notes", async () => {
@@ -276,6 +315,66 @@ describe("PATCH /api/bookings", () => {
         }),
       })
     );
+  });
+
+  it("envoie un mail de modification au user et au site avec les changements", async () => {
+    mockedAuth.mockResolvedValue({
+      user: { id: "u1", email: "user@test.fr", name: "User", phone: "0601010101" },
+    } as { user: { id: string; email: string; name: string; phone: string } });
+
+    const oldDate = new Date("2025-01-01T10:00:00Z");
+    const newDate = new Date("2025-01-02T11:00:00Z");
+    mockedFindUnique.mockResolvedValue({
+      id: 1,
+      createdAt: oldDate,
+      userId: "u1",
+      pickup: { name: "Ancien dep", street: "Rue A", postalCode: "11111", city: "Old" },
+      dropoff: { name: "Ancienne arr", street: "Rue B", postalCode: "22222", city: "OldCity" },
+      dateTime: oldDate,
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      notes: "Old",
+      priceCents: 1000,
+      status: "PENDING",
+      updatedAt: oldDate,
+      customerId: null,
+    });
+    mockedUpdate.mockResolvedValue({
+      id: 1,
+      createdAt: newDate,
+      userId: "u1",
+      pickup: { name: "Nouveau dep", street: "Rue C", postalCode: "33333", city: "New" },
+      dropoff: { name: "Nouvelle arr", street: "Rue D", postalCode: "44444", city: "NewCity" },
+      dateTime: newDate,
+      pax: 2,
+      luggage: 1,
+      babySeat: false,
+      notes: "New",
+      priceCents: 2000,
+      status: "PENDING",
+      updatedAt: newDate,
+      customerId: null,
+    });
+
+    await (
+      await import("@/app/api/bookings/route")
+    ).PATCH(
+      makeRequest({
+        id: 1,
+        pickup: { label: "Nouveau dep", lat: 1, lng: 1 },
+        dropoff: { label: "Nouvelle arr", lat: 2, lng: 2 },
+        date: "2025-01-02",
+        time: "11:00",
+        passengers: 2,
+        luggage: 1,
+        notes: "New",
+        estimatedPrice: 20,
+      })
+    );
+
+    expect(mockedBuildBookingEmail).toHaveBeenCalled();
+    expect(mockedSendMail).toHaveBeenCalledTimes(2);
   });
 });
 

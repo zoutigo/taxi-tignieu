@@ -3,7 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { bookingEstimateSchema } from "@/schemas/booking";
 import { z } from "zod";
-import { sendMail } from "@/lib/mailer";
+import { buildBookingEmail, sendMail } from "@/lib/mailer";
+import { getSiteContact } from "@/lib/site-config";
 
 const patchSchema = bookingEstimateSchema
   .partial()
@@ -67,39 +68,44 @@ export async function POST(req: Request) {
       });
       const priceText =
         priceCents !== null ? `${(priceCents / 100).toFixed(2)} € (estimé)` : "À confirmer";
-      const html = `
-        <p>Bonjour ${session.user.name ?? ""},</p>
-        <p>Votre réservation a bien été enregistrée.</p>
-        <ul>
-          <li><strong>Date & heure :</strong> ${when}</li>
-          <li><strong>Passagers :</strong> ${passengers}</li>
-          <li><strong>Bagages :</strong> ${luggage ?? 0}</li>
-          <li><strong>Départ :</strong> ${pickup.name ?? ""} ${pickup.street ?? ""} ${pickup.postcode ?? ""} ${pickup.city ?? ""}</li>
-          <li><strong>Arrivée :</strong> ${dropoff.name ?? ""} ${dropoff.street ?? ""} ${dropoff.postcode ?? ""} ${dropoff.city ?? ""}</li>
-          <li><strong>Tarif :</strong> ${priceText}</li>
-        </ul>
-        <p>Notes : ${notes || "—"}</p>
-        <p>Merci de votre confiance,<br/>Taxi Tignieu</p>
-      `;
-      const text = `
-Votre réservation a bien été enregistrée.
-- Date & heure : ${when}
-- Passagers : ${passengers}
-- Bagages : ${luggage ?? 0}
-- Départ : ${pickup.name ?? ""} ${pickup.street ?? ""} ${pickup.postcode ?? ""} ${pickup.city ?? ""}
-- Arrivée : ${dropoff.name ?? ""} ${dropoff.street ?? ""} ${dropoff.postcode ?? ""} ${dropoff.city ?? ""}
-- Tarif : ${priceText}
-Notes : ${notes || "—"}
+      const site = await getSiteContact();
+      const manageUrl =
+        process.env.NEXTAUTH_URL || process.env.AUTH_URL
+          ? `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/espace-client`
+          : "/espace-client";
 
-Taxi Tignieu
-      `;
-
-      sendMail({
+      const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
+      const email = buildBookingEmail({
+        status: "pending",
         to: session.user.email,
-        subject: "Confirmation de votre réservation",
-        html,
-        text,
-      }).catch((err) => {
+        badgeLabel: "Réservation reçue",
+        title: "Votre demande est enregistrée",
+        intro:
+          "Nous vérifions la disponibilité et vous recontactons rapidement. Retrouvez le détail de votre trajet ci-dessous.",
+        blockTitle: "Détails de votre trajet",
+        bookingRef: `CMD-${booking.id}`,
+        pickupDateTime: when,
+        pickupAddress:
+          `${pickup.name ?? ""} ${pickup.street ?? ""} ${pickup.postcode ?? ""} ${pickup.city ?? ""}`.trim(),
+        dropoffAddress:
+          `${dropoff.name ?? ""} ${dropoff.street ?? ""} ${dropoff.postcode ?? ""} ${dropoff.city ?? ""}`.trim(),
+        passengers: `${passengers}`,
+        luggage: `${luggage ?? 0}`,
+        paymentMethod: priceText,
+        manageUrl,
+        contactName: userInfo.name ?? "",
+        contactEmail: userInfo.email ?? "",
+        contactPhone: userInfo.phone ?? "",
+        phone: site.phone,
+        email: site.email,
+        brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+        preheader: "Votre réservation Taxi Tignieu est enregistrée.",
+        siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
+        privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
+        legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+      });
+
+      sendMail(email).catch((err) => {
         console.error("Erreur envoi email réservation", err);
       });
     }
@@ -185,6 +191,114 @@ export async function PATCH(req: Request) {
     data,
     include: { pickup: true, dropoff: true },
   });
+
+  try {
+    const site = await getSiteContact();
+    const userEmail = session.user.email;
+    const siteEmail = site.email;
+    const formatAddress = (addr?: {
+      name?: string | null;
+      street?: string | null;
+      postalCode?: string | null;
+      city?: string | null;
+    }) =>
+      `${addr?.name ?? ""} ${addr?.street ?? ""} ${addr?.postalCode ?? ""} ${addr?.city ?? ""}`.trim();
+    const changes: string[] = [];
+    if (
+      existing?.dateTime &&
+      booking.dateTime &&
+      existing.dateTime.getTime() !== booking.dateTime.getTime()
+    ) {
+      changes.push(
+        `Date & heure : ${existing.dateTime.toLocaleString("fr-FR")} → ${booking.dateTime.toLocaleString("fr-FR")}`
+      );
+    }
+    if (formatAddress(existing?.pickup) !== formatAddress(booking.pickup)) {
+      changes.push(
+        `Départ : ${formatAddress(existing?.pickup)} → ${formatAddress(booking.pickup)}`
+      );
+    }
+    if (formatAddress(existing?.dropoff) !== formatAddress(booking.dropoff)) {
+      changes.push(
+        `Arrivée : ${formatAddress(existing?.dropoff)} → ${formatAddress(booking.dropoff)}`
+      );
+    }
+    if (existing?.pax !== booking.pax) {
+      changes.push(`Passagers : ${existing?.pax ?? "—"} → ${booking.pax}`);
+    }
+    if (existing?.luggage !== booking.luggage) {
+      changes.push(`Bagages : ${existing?.luggage ?? "—"} → ${booking.luggage}`);
+    }
+    if (existing?.notes !== booking.notes) {
+      changes.push(`Notes modifiées`);
+    }
+
+    const when = booking.dateTime.toLocaleString("fr-FR", {
+      dateStyle: "full",
+      timeStyle: "short",
+    });
+    const manageUrl =
+      process.env.NEXTAUTH_URL || process.env.AUTH_URL
+        ? `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/espace-client`
+        : "/espace-client";
+    const priceText =
+      typeof booking.priceCents === "number"
+        ? `${(booking.priceCents / 100).toFixed(2)} €`
+        : "À confirmer";
+    const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
+    const baseMail = {
+      status: "pending" as const,
+      badgeLabel: "Réservation modifiée",
+      statusLabel: "Modification en attente de confirmation",
+      title: "Votre modification est prise en compte",
+      intro:
+        "Nous examinons votre demande de modification et revenons vers vous rapidement. Détail de votre trajet mis à jour :",
+      blockTitle: "Détails de votre trajet",
+      bookingRef: `CMD-${booking.id}`,
+      pickupDateTime: when,
+      pickupAddress: formatAddress(booking.pickup),
+      dropoffAddress: formatAddress(booking.dropoff),
+      passengers: `${booking.pax}`,
+      luggage: `${booking.luggage ?? 0}`,
+      paymentMethod: priceText,
+      manageUrl,
+      contactName: userInfo.name ?? "",
+      contactEmail: userInfo.email ?? "",
+      contactPhone: userInfo.phone ?? "",
+      phone: site.phone,
+      email: site.email,
+      brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+      preheader: "Votre réservation a été modifiée.",
+      siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
+      privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
+      legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+      changes,
+    };
+
+    const mailForUser = userEmail
+      ? buildBookingEmail({
+          ...baseMail,
+          to: userEmail,
+        })
+      : null;
+    const mailForSite =
+      siteEmail && siteEmail !== userEmail
+        ? buildBookingEmail({
+            ...baseMail,
+            to: siteEmail,
+            title: "Demande de modification client",
+          })
+        : null;
+
+    if (mailForUser) {
+      sendMail(mailForUser).catch((err) => console.error("Erreur mail modif booking user", err));
+    }
+    if (mailForSite) {
+      sendMail(mailForSite).catch((err) => console.error("Erreur mail modif booking site", err));
+    }
+  } catch (err) {
+    console.error("Erreur envoi mail modification booking", err);
+  }
 
   return NextResponse.json({ booking }, { status: 200 });
 }
