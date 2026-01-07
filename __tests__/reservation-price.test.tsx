@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import React from "react";
 import renderer, { act } from "react-test-renderer";
-import { ReservationPage } from "@/components/reservation-page";
+import ReservationPage from "@/components/reservation-page";
 import { useRouter, useSearchParams } from "next/navigation";
 import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
 
@@ -11,7 +11,10 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("next-auth/react", () => ({
-  useSession: jest.fn(() => ({ status: "unauthenticated" })),
+  useSession: jest.fn(() => ({
+    status: "authenticated",
+    data: { user: { phone: "0600000000" } },
+  })),
   signIn: jest.fn(),
 }));
 
@@ -79,33 +82,62 @@ describe("ReservationPage price display", () => {
     });
     const root = tree!.root;
 
+    const startBtn = root.find(
+      (n) => n.type === "button" && n.props.children === "Commencer la réservation"
+    );
+    await act(async () => {
+      (startBtn.props.onClick as () => void)();
+    });
+
     const pickupInput = root.find(
       (n) =>
         n.type === "input" &&
         typeof n.props.placeholder === "string" &&
         n.props.placeholder.includes("Crémieu")
     );
+
+    await act(async () => {
+      (pickupInput.props.onChange as (e: { target: { value: string } }) => void)({
+        target: { value: "114B route de Crémieu" },
+      });
+    });
+
+    // Step 1 -> 2
+    const nextBtn = root.find((n) => n.type === "button" && n.props.children === "Continuer");
+    await act(async () => {
+      (nextBtn.props.onClick as () => void)();
+    });
+
     const dropInput = root.find(
       (n) =>
         n.type === "input" &&
         typeof n.props.placeholder === "string" &&
         n.props.placeholder.includes("Aéroport de Lyon")
     );
-
     await act(async () => {
-      (pickupInput.props.onChange as (e: { target: { value: string } }) => void)({
-        target: { value: "114B route de Crémieu" },
-      });
       (dropInput.props.onChange as (e: { target: { value: string } }) => void)({
         target: { value: "Aéroport de Lyon" },
       });
     });
 
-    const calcBtn = root.find(
-      (n) => n.type === "button" && n.props.children === "Calculer le tarif"
-    );
+    // Step 2 -> 3
     await act(async () => {
-      (calcBtn.props.onClick as () => Promise<void>)();
+      (nextBtn.props.onClick as () => void)();
+    });
+
+    // Fill date/time (quote auto recalculé)
+    const dateInput = root.find((n) => n.type === "input" && n.props.type === "date");
+    const timeInput = root.find((n) => n.type === "input" && n.props.type === "time");
+    await act(async () => {
+      (dateInput.props.onChange as (e: { target: { value: string } }) => void)({
+        target: { value: "2025-11-24" },
+      });
+      (timeInput.props.onChange as (e: { target: { value: string } }) => void)({
+        target: { value: "12:50" },
+      });
+    });
+
+    await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -120,10 +152,10 @@ describe("ReservationPage price display", () => {
     };
 
     const priceSpan = root.find(
-      (n) => n.type === "span" && textFromChildren(n.props.children).includes("Estimation")
+      (n) => n.type === "span" && textFromChildren(n.props.children).includes("€")
     );
     const text = textFromChildren(priceSpan.props.children);
-    const match = text.match(/Estimation:\s*([0-9.,]+)/);
+    const match = text.match(/([0-9.,]+)\s*€/);
     expect(match).toBeTruthy();
     const value = match ? parseFloat(match[1].replace(",", ".")) : 0;
     const expected = computePriceEuros(

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ReservationPage } from "@/components/reservation-page";
+import ReservationPage from "@/components/reservation-page";
 
 export const metadata: Metadata = {
   title: "Réserver un taxi | Taxi Tignieu",

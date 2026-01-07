@@ -1,12 +1,18 @@
 /** @jest-environment jsdom */
 import React from "react";
-import renderer, { act } from "react-test-renderer";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { BookingsManager } from "@/components/bookings-manager";
-import { defaultTariffConfig, computePriceEuros } from "@/lib/tarifs";
 import type { BookingStatus } from "@prisma/client";
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
+
+jest.mock("next/navigation", () => ({
+  useRouter: jest.fn(),
+}));
+
+const pushMock = jest.fn();
+(jest.requireMock("next/navigation").useRouter as jest.Mock).mockReturnValue({ push: pushMock });
 
 describe("BookingsManager", () => {
   beforeEach(() => {
@@ -48,7 +54,7 @@ describe("BookingsManager", () => {
     pax: 2,
     luggage: 1,
     notes: "",
-    priceCents: 0,
+    priceCents: 53603,
     status: "PENDING" as BookingStatus,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -58,81 +64,51 @@ describe("BookingsManager", () => {
     customerId: null,
   };
 
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  it("affiche le prix unique et permet la pagination", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    const bookings = Array.from({ length: 12 }).map((_, idx) => ({ ...booking, id: idx + 1 }));
+    const { getAllByText, getByText } = render(<BookingsManager initialBookings={bookings} />);
 
-  it("calcule un tarif non nul et l'envoie lors de la sauvegarde", async () => {
+    // Le prix formaté apparaît (au moins une fois, aucune duplication inline)
+    expect(getAllByText("536.03 €").length).toBeGreaterThan(0);
+
+    // Pagination : page 1 puis page 2
+    expect(getByText(/Page 1/)).toBeTruthy();
+    fireEvent.click(getByText("Suivant"));
+    await waitFor(() => expect(getByText(/Page 2/)).toBeTruthy());
+  });
+
+  it("redirige vers la page d'édition quand on clique sur Modifier", () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    const { getByText } = render(<BookingsManager initialBookings={[booking]} />);
+    fireEvent.click(getByText("Modifier"));
+    expect(pushMock).toHaveBeenCalledWith(`/espace-client/bookings/${booking.id}/edit`);
+  });
+
+  it("supprime une réservation après confirmation", async () => {
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (url.startsWith("/api/tarifs/config")) {
-        return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
-      }
-      if (url.startsWith("/api/tarifs/search")) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
-      }
-      if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            lat: 45.75,
-            lng: 4.85,
-            country: "France",
-            city: "Lyon",
-            postcode: "69000",
-            label: "114B route de Crémieu, France",
-          }),
-        });
-      }
-      if (url.startsWith("/api/tarifs/quote")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ distanceKm: 12, durationMinutes: 20, price: 0 }),
-        });
-      }
-      if (url.startsWith("/api/bookings") && init?.method === "PATCH") {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ booking: { ...booking, priceCents: 5000 } }),
-        });
+      if (url.startsWith("/api/bookings") && init?.method === "DELETE") {
+        return Promise.resolve({ ok: true, json: async () => ({}) });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
 
-    let tree: renderer.ReactTestRenderer;
-    await act(async () => {
-      tree = renderer.create(<BookingsManager initialBookings={[booking]} />);
-    });
-    const root = tree!.root;
-
-    const editBtn = root.find((n) => n.type === "button" && n.props.children === "Modifier");
-    await act(async () => {
-      (editBtn.props.onClick as () => void)();
-    });
-
-    const calcBtn = root.find(
-      (n) => n.type === "button" && n.props.children === "Recalculer le tarif"
+    const { getByText, getAllByText, queryByText } = render(
+      <BookingsManager initialBookings={[booking]} />
     );
-    await act(async () => {
-      (calcBtn.props.onClick as () => Promise<void>)();
-      await flush();
-    });
-
-    const expected = computePriceEuros(12, "A", { baggageCount: 1 }, defaultTariffConfig);
-    expect(expected).toBeGreaterThan(0);
-
-    const saveBtn = root.find((n) => n.type === "button" && n.props.children === "Enregistrer");
-    await act(async () => {
-      (saveBtn.props.onClick as () => Promise<void>)();
-      await flush();
-    });
-
-    const patchCall = mockFetch.mock.calls.find(
-      (c) =>
-        typeof c[0] === "string" &&
-        (c[0] as string).startsWith("/api/bookings") &&
-        (c[1] as RequestInit | undefined)?.method === "PATCH"
+    fireEvent.click(getByText("Supprimer")); // open dialog
+    const confirmButton = getAllByText("Supprimer")[1]; // in dialog
+    fireEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(
+        mockFetch.mock.calls.some(
+          (c) =>
+            typeof c[0] === "string" &&
+            (c[0] as string).startsWith("/api/bookings") &&
+            (c[1] as RequestInit)?.method === "DELETE"
+        )
+      ).toBe(true)
     );
-    expect(patchCall).toBeTruthy();
-    const body = patchCall && (patchCall[1] as RequestInit).body;
-    const parsed = typeof body === "string" ? JSON.parse(body) : {};
-    expect(parsed.estimatedPrice).toBeGreaterThan(0);
+    expect(queryByText("Supprimer la réservation ?")).toBeTruthy();
   });
 });
