@@ -82,6 +82,13 @@ describe("ReservationPage price display", () => {
     });
     const root = tree!.root;
 
+    const startBtn = root.find(
+      (n) => n.type === "button" && n.props.children === "Commencer la réservation"
+    );
+    await act(async () => {
+      (startBtn.props.onClick as () => void)();
+    });
+
     const pickupInput = root.find(
       (n) =>
         n.type === "input" &&

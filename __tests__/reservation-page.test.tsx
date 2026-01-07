@@ -86,6 +86,8 @@ describe("ReservationPage wizard", () => {
       <ReservationPage />
     );
 
+    fireEvent.click(getByText("Commencer la réservation"));
+
     fireEvent.change(getByPlaceholderText("Ex: 114B route de Crémieu, Tignieu"), {
       target: { value: "114B route de Crémieu" },
     });
@@ -115,6 +117,6 @@ describe("ReservationPage wizard", () => {
     );
 
     // Après estimation on passe à l'étape 4 (connexion)
-    expect(queryByText("Étape 4 · Connexion")).toBeTruthy();
+    expect(queryByText("Connexion")).toBeTruthy();
   });
 });
