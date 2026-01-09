@@ -276,7 +276,7 @@ export function SiteHeader() {
                       handleLogin();
                     }}
                   >
-                    Login
+                    Se connecter
                   </button>
                 )}
                 <a

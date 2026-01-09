@@ -97,8 +97,18 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
           </p>
           <div className="mt-8 rounded-2xl border border-border/60 bg-muted/40 px-5 py-4 text-sm text-muted-foreground">
             Besoin d&apos;ajuster vos informations ?{" "}
-            <Link href="/profil/completer-telephone" className="font-semibold text-primary">
+            <Link
+              href="/profil/completer-telephone"
+              className="font-semibold text-primary cursor-pointer"
+            >
               Modifier mon profil
+            </Link>{" "}
+            •{" "}
+            <Link
+              href="/espace-client/adresses"
+              className="font-semibold text-primary cursor-pointer"
+            >
+              Gérer mes adresses
             </Link>
           </div>
         </div>
@@ -135,6 +145,26 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
               </p>
               <p className="text-base text-foreground">{user.phone ?? "Non renseigné"}</p>
             </div>
+          </div>
+        </div>
+
+        <div className="surface p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+            Liens rapides
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Link href="/espace-client/reservations" className="btn btn-primary cursor-pointer">
+              Mes réservations
+            </Link>
+            <Link href="/espace-client/adresses" className="btn btn-ghost cursor-pointer">
+              Mes adresses
+            </Link>
+            <Link
+              href="/espace-client/infos-personelles"
+              className="btn btn-ghost cursor-pointer sm:col-span-2"
+            >
+              Mes infos personnelles
+            </Link>
           </div>
         </div>
       </div>

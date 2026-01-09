@@ -62,6 +62,7 @@ describe("POST /api/profile/phone", () => {
       phone: "+33 4 95 78 54 00",
       passwordHash: null,
       emailVerified: null,
+      defaultAddressId: null,
       createdAt: new Date(),
       isAdmin: false,
       isManager: false,

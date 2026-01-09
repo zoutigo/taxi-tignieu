@@ -40,9 +40,10 @@ import {
   fetchAddressData,
   haversineKm,
   inferTariffFromDateTime,
-  parseAddressParts,
   type AddressData,
 } from "@/lib/booking-utils";
+import { normalizeAddressSuggestion } from "@/lib/address-search";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 const addressStepSchema = z.object({
   label: z.string().trim().min(3, "Adresse requise"),
@@ -113,8 +114,6 @@ export function ReservationWizard({
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const isPostingRef = useRef(false);
-  const [fromSuggestions, setFromSuggestions] = useState<AddressData[]>([]);
-  const [toSuggestions, setToSuggestions] = useState<AddressData[]>([]);
   const [quotePrice, setQuotePrice] = useState<number | null>(initialPrice);
   const [quoteDistance, setQuoteDistance] = useState<string>("");
   const [quoteDuration, setQuoteDuration] = useState<string>("");
@@ -139,8 +138,6 @@ export function ReservationWizard({
     if (useStore) {
       clearBookingEstimate();
     }
-    setFromSuggestions([]);
-    setToSuggestions([]);
     setQuoteDistance("");
     setQuoteDuration("");
   }, [defaultValues, form, useStore]);
@@ -166,58 +163,9 @@ export function ReservationWizard({
     void loadConfig();
   }, []);
 
-  const searchSuggestions = async (text: string, kind: "pickup" | "dropoff") => {
-    if (text.length < 3) {
-      if (kind === "pickup") setFromSuggestions([]);
-      else setToSuggestions([]);
-      return;
-    }
-    try {
-      const res = await fetch(`/api/tarifs/search?q=${encodeURIComponent(text)}`);
-      const data = (await res.json()) as { results?: AddressData[] };
-      const normalized =
-        data.results
-          ?.map((s) => {
-            const parsed = parseAddressParts(s.label);
-            const withCountry =
-              s.country && !s.label.toLowerCase().includes(s.country.toLowerCase())
-                ? `${s.label}, ${s.country}`
-                : s.label;
-            return {
-              ...s,
-              label: withCountry,
-              city: s.city ?? parsed.city,
-              postcode: s.postcode ?? parsed.cp,
-              street: parsed.street,
-              streetNumber: parsed.streetNumber,
-            };
-          })
-          .filter(
-            (s) =>
-              Number.isFinite(s.lat) &&
-              Number.isFinite(s.lng) &&
-              ((s.city?.trim().length ?? 0) > 0 || (s.postcode?.trim().length ?? 0) > 0)
-          )
-          .filter((s, idx, arr) => {
-            const key = `${s.label.toLowerCase()}-${s.lat}-${s.lng}`;
-            return (
-              arr.findIndex((t) => `${t.label.toLowerCase()}-${t.lat}-${t.lng}` === key) === idx
-            );
-          })
-          .filter((s) => s.label.toLowerCase() !== text.trim().toLowerCase()) ?? [];
-      if (kind === "pickup") setFromSuggestions(normalized);
-      else setToSuggestions(normalized);
-    } catch {
-      if (kind === "pickup") setFromSuggestions([]);
-      else setToSuggestions([]);
-    }
-  };
-
   const applyAddress = useCallback(
     (kind: "pickup" | "dropoff", addr: AddressData) => {
       form.setValue(kind, addr, { shouldValidate: true, shouldDirty: true });
-      if (kind === "pickup") setFromSuggestions([]);
-      else setToSuggestions([]);
     },
     [form]
   );
@@ -226,7 +174,6 @@ export function ReservationWizard({
     const current = form.getValues(kind) as AddressData;
     const next: AddressData = { ...current, label: value, lat: NaN, lng: NaN };
     form.setValue(kind, next, { shouldValidate: false, shouldDirty: true });
-    void searchSuggestions(value, kind);
   };
 
   const ensureAddress = useCallback(
@@ -247,19 +194,7 @@ export function ReservationWizard({
   );
 
   const pickSuggestion = (s: AddressData, kind: "pickup" | "dropoff") => {
-    const parsed = parseAddressParts(s.label);
-    const withCountry =
-      s.country && !s.label.toLowerCase().includes(s.country.toLowerCase())
-        ? `${s.label}, ${s.country}`
-        : s.label;
-    const addr: AddressData = {
-      ...s,
-      label: withCountry,
-      city: s.city ?? parsed.city,
-      postcode: s.postcode ?? parsed.cp,
-      street: s.street ?? parsed.street,
-      streetNumber: s.streetNumber ?? parsed.streetNumber,
-    };
+    const addr = normalizeAddressSuggestion(s);
     applyAddress(kind, addr);
   };
 
@@ -556,7 +491,7 @@ export function ReservationWizard({
             onClick={startReservation}
             className="cursor-pointer w-full rounded-2xl border border-border/80 bg-primary px-5 py-3 text-base font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 sm:w-fit"
           >
-            Commencer la réservation
+            {mode === "edit" ? "Modifier la réservation" : "Commencer la réservation"}
           </Button>
 
           <div className="rounded-[28px] border border-border/80 bg-card p-8 shadow-[0_35px_55px_rgba(5,15,35,0.1)]">
@@ -631,42 +566,20 @@ export function ReservationWizard({
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input
-                              placeholder="Ex: 114B route de Crémieu, Tignieu"
-                              className="border-border/60 bg-white text-base text-foreground placeholder:text-muted-foreground"
+                            <AddressAutocomplete
                               value={field.value ?? ""}
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                                handleAddressInput("pickup", e.target.value);
+                              placeholder="Ex: 114B route de Crémieu, Tignieu"
+                              onChange={(val) => {
+                                field.onChange(val);
+                                handleAddressInput("pickup", val);
                               }}
+                              onSelect={(addr) => pickSuggestion(addr, "pickup")}
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    {fromSuggestions.length > 0 && (
-                      <div className="relative">
-                        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg">
-                          {fromSuggestions.map((s, idx) => (
-                            <button
-                              key={`${s.lat}-${s.lng}-${s.label}-${idx}`}
-                              type="button"
-                              className={cn(
-                                "flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm text-foreground",
-                                "hover:bg-muted/60"
-                              )}
-                              onClick={() => pickSuggestion(s, "pickup")}
-                            >
-                              <span className="truncate">{s.label}</span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {[s.city, s.postcode, s.country].filter(Boolean).join(" • ")}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                       <Input
                         readOnly
@@ -706,42 +619,20 @@ export function ReservationWizard({
                       render={({ field }) => (
                         <FormItem>
                           <FormControl>
-                            <Input
-                              placeholder="Ex: Aéroport de Lyon"
-                              className="border-border/60 bg-white text-base text-foreground placeholder:text-muted-foreground"
+                            <AddressAutocomplete
                               value={field.value ?? ""}
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                                handleAddressInput("dropoff", e.target.value);
+                              placeholder="Ex: Aéroport de Lyon"
+                              onChange={(val) => {
+                                field.onChange(val);
+                                handleAddressInput("dropoff", val);
                               }}
+                              onSelect={(addr) => pickSuggestion(addr, "dropoff")}
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    {toSuggestions.length > 0 && (
-                      <div className="relative">
-                        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg">
-                          {toSuggestions.map((s, idx) => (
-                            <button
-                              key={`${s.lat}-${s.lng}-${s.label}-${idx}`}
-                              type="button"
-                              className={cn(
-                                "flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm text-foreground",
-                                "hover:bg-muted/60"
-                              )}
-                              onClick={() => pickSuggestion(s, "dropoff")}
-                            >
-                              <span className="truncate">{s.label}</span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {[s.city, s.postcode].filter(Boolean).join(" • ")}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                       <Input
                         readOnly
