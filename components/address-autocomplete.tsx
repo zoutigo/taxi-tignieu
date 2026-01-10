@@ -14,6 +14,7 @@ type Props = {
   onSelect: (addr: AddressData) => void;
   disabled?: boolean;
   className?: string;
+  suppressToken?: number;
 };
 
 export function AddressAutocomplete({
@@ -23,12 +24,18 @@ export function AddressAutocomplete({
   onSelect,
   disabled = false,
   className,
+  suppressToken,
 }: Props) {
   const [suggestions, setSuggestions] = useState<AddressData[]>([]);
   const [loading, setLoading] = useState(false);
   const suppressNextFetchRef = useRef(false);
+  const prevSuppressToken = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    if (suppressToken !== prevSuppressToken.current) {
+      suppressNextFetchRef.current = true;
+      prevSuppressToken.current = suppressToken;
+    }
     let active = true;
     const run = async () => {
       if (suppressNextFetchRef.current) {
@@ -50,7 +57,7 @@ export function AddressAutocomplete({
     return () => {
       active = false;
     };
-  }, [value, disabled]);
+  }, [value, disabled, suppressToken]);
 
   const handleSelect = (addr: AddressData) => {
     const normalized = normalizeAddressSuggestion(addr);

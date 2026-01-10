@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { paginateArray, loadPaginationSettings } from "@/lib/pagination";
+import { Pencil, Trash2 } from "lucide-react";
 
 type BookingWithPrice = Pick<
   Booking,
@@ -65,6 +66,19 @@ const statusTone = (status: Booking["status"]) => {
   }
 };
 
+const cardBorderTone = (status: Booking["status"]) => {
+  switch (status) {
+    case "PENDING":
+      return "border-primary/60";
+    case "CONFIRMED":
+      return "border-emerald-300";
+    case "COMPLETED":
+      return "border-blue-200";
+    default:
+      return "border-border/70";
+  }
+};
+
 export function BookingsManager({ initialBookings }: { initialBookings: BookingWithPrice[] }) {
   const router = useRouter();
   const [bookings, setBookings] = useState(initialBookings);
@@ -114,7 +128,10 @@ export function BookingsManager({ initialBookings }: { initialBookings: BookingW
         return (
           <div
             key={booking.id}
-            className="rounded-2xl border border-border/70 bg-card px-5 py-4 shadow-sm"
+            className={cn(
+              "rounded-2xl border bg-card px-5 py-4 shadow-sm",
+              cardBorderTone(booking.status)
+            )}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -132,40 +149,40 @@ export function BookingsManager({ initialBookings }: { initialBookings: BookingW
                 </p>
               </div>
               <div className="text-right">
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
-                    statusTone(booking.status)
-                  )}
-                >
-                  {statusLabel(booking.status)}
-                </span>
                 <p className="text-sm font-semibold text-foreground">
-                  {priceToShow !== null ? `${priceToShow.toFixed(2)} €` : "—"}
+                  {priceToShow !== null ? `${priceToShow.toFixed(2)} €` : "—"}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">(Prix estimé)</span>
                 </p>
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              {priceToShow !== null ? (
-                <span className="font-semibold text-foreground">{priceToShow.toFixed(2)} €</span>
-              ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
+                  statusTone(booking.status)
+                )}
+              >
+                {statusLabel(booking.status)}
+              </span>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => router.push(`/espace-client/bookings/${booking.id}/edit`)}
-                className="cursor-pointer"
+                className="cursor-pointer flex items-center gap-2 text-foreground"
               >
-                Modifier
+                <Pencil className="h-4 w-4" />
+                <span className="hidden md:inline">Modifier</span>
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                className="text-destructive cursor-pointer"
+                className="text-destructive cursor-pointer flex items-center gap-2"
                 onClick={() => setPendingDelete(booking)}
                 disabled={loadingId === booking.id}
               >
-                Supprimer
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden md:inline">Supprimer</span>
               </Button>
             </div>
           </div>

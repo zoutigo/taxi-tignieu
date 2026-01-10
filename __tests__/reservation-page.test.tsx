@@ -1,7 +1,8 @@
 /** @jest-environment jsdom */
-import React from "react";
+import React, { createContext, useContext } from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import ReservationPage from "@/components/reservation-page";
+import { ReservationWizard } from "@/components/reservation-wizard";
 import { useRouter } from "next/navigation";
 import { defaultTariffConfig } from "@/lib/tarifs";
 
@@ -14,15 +15,47 @@ jest.mock("next-auth/react", () => ({
   signIn: jest.fn(),
 }));
 
+jest.mock("@/auth", () => ({
+  auth: jest.fn(() => Promise.resolve(null)),
+}));
+
+jest.mock("@/lib/prisma", () => ({
+  prisma: { user: { findUnique: jest.fn() } },
+}));
+
+jest.mock("@/components/reservation-page", () => ({
+  __esModule: true,
+  default: () => (
+    <ReservationWizard
+      mode="create"
+      successRedirect="/espace-client/bookings"
+      useStore
+      savedAddresses={[]}
+    />
+  ),
+}));
+
+const SelectCtx = createContext<{ onValueChange?: (v: string) => void }>({});
 jest.mock("@/components/ui/select", () => ({
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Select: ({
+    children,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    onValueChange?: (v: string) => void;
+  }) => <SelectCtx.Provider value={{ onValueChange }}>{children}</SelectCtx.Provider>,
   SelectTrigger: ({ children, ...props }: { children: React.ReactNode }) => (
     <button {...props}>{children}</button>
   ),
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
-    <button data-value={value}>{children}</button>
-  ),
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => {
+    const ctx = useContext(SelectCtx);
+    return (
+      <button data-value={value} onClick={() => ctx.onValueChange?.(value)}>
+        {children}
+      </button>
+    );
+  },
   SelectValue: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 

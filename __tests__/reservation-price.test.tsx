@@ -2,6 +2,7 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import ReservationPage from "@/components/reservation-page";
+import { ReservationWizard } from "@/components/reservation-wizard";
 import { useRouter, useSearchParams } from "next/navigation";
 import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
 
@@ -16,6 +17,26 @@ jest.mock("next-auth/react", () => ({
     data: { user: { phone: "0600000000" } },
   })),
   signIn: jest.fn(),
+}));
+
+jest.mock("@/auth", () => ({
+  auth: jest.fn(() => Promise.resolve(null)),
+}));
+
+jest.mock("@/lib/prisma", () => ({
+  prisma: { user: { findUnique: jest.fn() } },
+}));
+
+jest.mock("@/components/reservation-page", () => ({
+  __esModule: true,
+  default: () => (
+    <ReservationWizard
+      mode="create"
+      successRedirect="/espace-client/bookings"
+      useStore
+      savedAddresses={[]}
+    />
+  ),
 }));
 
 jest.mock("@/components/ui/select", () => ({
