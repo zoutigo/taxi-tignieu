@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { ReservationPolicyConsent } from "@/components/reservation-policy-consent";
 import {
   computePriceEuros,
   type TariffCode,
@@ -826,35 +825,7 @@ export function ReservationWizard({
                   <FormField
                     control={form.control}
                     name="policiesAccepted"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-3 rounded-2xl border border-border/80 bg-muted/30 px-4 py-3">
-                        <FormControl>
-                          <Checkbox
-                            id="policiesAccepted"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormLabel
-                          htmlFor="policiesAccepted"
-                          className="text-sm font-medium text-muted-foreground"
-                        >
-                          Je confirme avoir pris connaissance de la{" "}
-                          <Link
-                            href="/politique-de-confidentialite"
-                            className="text-primary underline"
-                          >
-                            politique de confidentialité
-                          </Link>{" "}
-                          et des{" "}
-                          <Link href="/mentions-legales" className="text-primary underline">
-                            mentions légales
-                          </Link>
-                          .
-                        </FormLabel>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => <ReservationPolicyConsent field={field} />}
                   />
                 </div>
               )}

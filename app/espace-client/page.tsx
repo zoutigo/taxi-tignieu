@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { CalendarCheck, MapPin, UserRound } from "lucide-react";
+import { PhoneInlineEditor } from "@/components/phone-inline-editor";
 
 export const metadata: Metadata = {
   title: "Espace client | Taxi Tignieu",
@@ -111,40 +112,9 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
               Gérer mes adresses
             </Link>
           </div>
-        </div>
 
-        <div className="surface p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
-            Informations personnelles
-          </p>
-          <div className="mt-6 space-y-4 text-sm text-muted-foreground">
-            {user.image ? (
-              <div className="flex items-center gap-3">
-                <Image
-                  src={user.image}
-                  alt={user.name ?? "Avatar"}
-                  width={56}
-                  height={56}
-                  className="h-14 w-14 rounded-full border border-border/60 object-cover"
-                />
-                <p className="text-sm font-semibold text-foreground">{user.name ?? "—"}</p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Nom</p>
-                <p className="text-base text-foreground">{user.name ?? "—"}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">Email</p>
-              <p className="text-base text-foreground">{user.email ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground/70">
-                Téléphone
-              </p>
-              <p className="text-base text-foreground">{user.phone ?? "Non renseigné"}</p>
-            </div>
+          <div className="mt-8 rounded-2xl border border-border/60 bg-card/80 px-5 py-5 shadow-sm">
+            <PhoneInlineEditor initialPhone={user.phone ?? ""} />
           </div>
         </div>
 
@@ -152,18 +122,42 @@ export default async function ClientDashboardPage(props: ClientPageProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
             Liens rapides
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Link href="/espace-client/reservations" className="btn btn-primary cursor-pointer">
-              Mes réservations
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <Link
+              href="/espace-client/bookings"
+              className="flex h-full flex-col gap-2 rounded-xl border border-border/70 bg-primary/5 px-4 py-4 text-left transition hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              <div className="flex items-center gap-2 text-primary">
+                <CalendarCheck className="h-4 w-4" />
+                <span className="text-sm font-semibold">Mes réservations</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Consulter, modifier ou reprendre vos trajets en cours.
+              </p>
             </Link>
-            <Link href="/espace-client/adresses" className="btn btn-ghost cursor-pointer">
-              Mes adresses
+            <Link
+              href="/espace-client/adresses"
+              className="flex h-full flex-col gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-4 text-left transition hover:border-primary/60 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+            >
+              <div className="flex items-center gap-2 text-primary">
+                <MapPin className="h-4 w-4" />
+                <span className="text-sm font-semibold">Mes adresses</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Enregistrer vos lieux favoris et choisir l’adresse par défaut.
+              </p>
             </Link>
             <Link
               href="/espace-client/infos-personelles"
-              className="btn btn-ghost cursor-pointer sm:col-span-2"
+              className="flex h-full flex-col gap-2 rounded-xl border border-border/70 bg-muted/40 px-4 py-4 text-left transition hover:border-primary/60 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
             >
-              Mes infos personnelles
+              <div className="flex items-center gap-2 text-primary">
+                <UserRound className="h-4 w-4" />
+                <span className="text-sm font-semibold">Mes infos personnelles</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Mettre à jour votre téléphone, avatar et préférences.
+              </p>
             </Link>
           </div>
         </div>
