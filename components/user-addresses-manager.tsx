@@ -51,6 +51,7 @@ export function UserAddressesManager({ initialAddresses }: { initialAddresses: S
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [lockedFields, setLockedFields] = useState(false);
+  const [showForm, setShowForm] = useState(initialAddresses.length === 0);
 
   const hasDefault = useMemo(() => addresses.some((addr) => addr.isDefault), [addresses]);
 
@@ -270,214 +271,229 @@ export function UserAddressesManager({ initialAddresses }: { initialAddresses: S
   return (
     <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
       <Card className="border-border/80 shadow-[var(--shadow-card)]">
-        <CardHeader>
-          <CardTitle>Ajouter une adresse</CardTitle>
-          <CardDescription>
-            Sauvegardez vos lieux fréquents pour les retrouver plus vite lors de vos réservations.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Mes adresses sauvegardées</CardTitle>
+            <CardDescription>
+              Sauvegardez vos lieux fréquents pour les retrouver plus vite lors de vos réservations.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            className="cursor-pointer"
+            onClick={() => {
+              setShowForm((prev) => !prev);
+              setFormError(null);
+              setFormSuccess(null);
+            }}
+          >
+            {showForm ? "Fermer le formulaire" : "Ajouter une adresse"}
+          </Button>
         </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={onSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <FormLabel>Rechercher une adresse</FormLabel>
-                <AddressAutocomplete
-                  value={searchValue}
-                  placeholder="12 Rue de la République, 69000 Lyon"
-                  onChange={(val) => handleSearchChange(val)}
-                  onSelect={(addr) => applySuggestion(addr)}
-                  disabled={form.formState.isSubmitting}
-                />
-              </div>
+        {showForm ? (
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={onSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <FormLabel>Rechercher une adresse</FormLabel>
+                  <AddressAutocomplete
+                    value={searchValue}
+                    placeholder="12 Rue de la République, 69000 Lyon"
+                    onChange={(val) => handleSearchChange(val)}
+                    onSelect={(addr) => applySuggestion(addr)}
+                    disabled={form.formState.isSubmitting}
+                  />
+                </div>
 
-              <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
-                <FormField
-                  control={form.control}
-                  name="streetNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Numéro</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="12"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                          readOnly={lockedFields}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="street"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-1">
-                      <FormLabel>Rue</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Rue de l'Église"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                          readOnly={lockedFields}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="postalCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code postal</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="38230"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                          readOnly={lockedFields}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ville</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Tignieu-Jameyzieu"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                          readOnly={lockedFields}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pays</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="France"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                          readOnly={lockedFields}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>Complément (bâtiment, société, étage...)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Résidence des Cèdres, Bât B"
-                          className="text-base"
-                          {...field}
-                          value={field.value ?? ""}
-                          disabled={form.formState.isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-3 rounded-xl border border-border/70 bg-muted/40 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Définir par défaut</p>
-                    <p className="text-xs text-muted-foreground">
-                      Utilisée en priorité pour vos futures réservations.
-                    </p>
-                  </div>
+                <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
                   <FormField
                     control={form.control}
-                    name="setDefault"
+                    name="streetNumber"
                     render={({ field }) => (
-                      <FormItem className="flex items-center gap-3">
+                      <FormItem>
+                        <FormLabel>Numéro</FormLabel>
                         <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="cursor-pointer"
+                          <Input
+                            placeholder="12"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                            readOnly={lockedFields}
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="street"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-1">
+                        <FormLabel>Rue</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Rue de l'Église"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                            readOnly={lockedFields}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="postalCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Code postal</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="38230"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                            readOnly={lockedFields}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ville</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Tignieu-Jameyzieu"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                            readOnly={lockedFields}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pays</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="France"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                            readOnly={lockedFields}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="sm:col-span-2">
+                        <FormLabel>Complément (bâtiment, société, étage...)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Résidence des Cèdres, Bât B"
+                            className="text-base"
+                            {...field}
+                            value={field.value ?? ""}
+                            disabled={form.formState.isSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="label"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nom de l&apos;adresse</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Maison, Boulot, Aéroport..."
-                          className="text-base"
-                          {...field}
-                        />
-                      </FormControl>
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/40 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Définir par défaut</p>
                       <p className="text-xs text-muted-foreground">
-                        Choisissez un nom (ex. « Boulot »). Il n&apos;est pas rempli
-                        automatiquement.
+                        Utilisée en priorité pour vos futures réservations.
                       </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="setDefault"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-3">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              className="cursor-pointer"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-              {formSuccess ? <p className="text-sm text-emerald-600">{formSuccess}</p> : null}
+                  <FormField
+                    control={form.control}
+                    name="label"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nom de l&apos;adresse</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Maison, Boulot, Aéroport..."
+                            className="text-base"
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Choisissez un nom (ex. « Boulot »). Il n&apos;est pas rempli
+                          automatiquement.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <Button
-                type="submit"
-                className="w-full cursor-pointer"
-                disabled={loadingId === "create" || !form.formState.isValid}
-              >
-                {loadingId === "create" ? "Enregistrement..." : "Enregistrer l'adresse"}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
+                {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+                {formSuccess ? <p className="text-sm text-emerald-600">{formSuccess}</p> : null}
+
+                <Button
+                  type="submit"
+                  className="w-full cursor-pointer"
+                  disabled={loadingId === "create" || !form.formState.isValid}
+                >
+                  {loadingId === "create" ? "Enregistrement..." : "Enregistrer l'adresse"}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        ) : null}
       </Card>
 
       <Card className="border-border/80 shadow-[var(--shadow-card)]">

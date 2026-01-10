@@ -113,6 +113,9 @@ describe("UserAddressesManager flows", () => {
   it("creates a new address after selecting a suggestion and filling label", async () => {
     render(<UserAddressesManager initialAddresses={[]} />);
 
+    // ouvre le formulaire via le bouton (déjà ouvert par défaut quand aucune adresse)
+    screen.getByRole("button", { name: /fermer le formulaire/i });
+
     const search = screen.getByPlaceholderText(/rue de la république/i);
     fireEvent.change(search, { target: { value: "89 rue du travail" } });
 
@@ -147,6 +150,11 @@ describe("UserAddressesManager flows", () => {
       )
     );
     expect(await screen.findByText("Maison")).toBeTruthy();
+
+    // form reset + fermé
+    fireEvent.click(screen.getByRole("button", { name: /fermer le formulaire/i }));
+    await waitFor(() => expect(screen.queryByPlaceholderText(/rue de la république/i)).toBeNull());
+    screen.getByRole("button", { name: /ajouter une adresse/i });
   });
 
   it("sets an address as default", async () => {
