@@ -50,7 +50,7 @@ export type BookingMailPayload = {
   text: string;
 };
 
-type BookingMailStatus = "pending" | "confirmed" | "cancelled";
+type BookingMailStatus = "pending" | "confirmed" | "cancelled" | "completed";
 
 type BookingEmailInput = {
   status: BookingMailStatus;

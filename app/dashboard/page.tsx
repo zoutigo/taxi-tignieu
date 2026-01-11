@@ -35,6 +35,12 @@ const cards = [
     moduleId: "site-info",
   },
   {
+    title: "Factures",
+    href: "/dashboard/invoices",
+    desc: "Suivi et génération",
+    moduleId: "billing",
+  },
+  {
     title: "FAQ",
     href: "/dashboard/faq",
     desc: "Questions fréquentes, catégories",
