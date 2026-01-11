@@ -26,6 +26,32 @@ jest.mock("@/lib/prisma", () => ({
     },
   },
 }));
+jest.mock("@/lib/site-config", () => ({
+  getSiteContact: jest.fn().mockResolvedValue({
+    name: "Taxi Tignieu",
+    ownerName: "Admin",
+    siret: "",
+    ape: "",
+    phone: "0600000000",
+    email: "contact@test.fr",
+    address: {
+      street: "rue",
+      streetNumber: "1",
+      postalCode: "00000",
+      city: "Ville",
+      country: "France",
+    },
+  }),
+}));
+jest.mock("@/lib/mailer", () => ({
+  buildBookingEmail: jest.fn(() => ({
+    to: "user@test.fr",
+    subject: "Test",
+    html: "<p>test</p>",
+    text: "test",
+  })),
+  sendMail: jest.fn().mockResolvedValue(undefined),
+}));
 
 const mockedAuth = auth as jest.MockedFunction<typeof auth>;
 const mockedFindMany = prisma.booking.findMany as jest.MockedFunction<
@@ -49,6 +75,40 @@ const mockedFindUser = prisma.user.findUnique as jest.MockedFunction<typeof pris
 
 describe("api/admin/bookings", () => {
   beforeEach(() => jest.clearAllMocks());
+  const bookingStub = {
+    id: 1,
+    status: "PENDING",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    userId: "u1",
+    dateTime: new Date(),
+    pax: 1,
+    luggage: 0,
+    babySeat: false,
+    priceCents: null,
+    pickupId: 1,
+    dropoffId: 2,
+    pickup: {
+      street: "rue",
+      streetNumber: "1",
+      postalCode: "00000",
+      city: "Ville",
+      country: "France",
+      name: null,
+    },
+    dropoff: {
+      street: "rue",
+      streetNumber: "1",
+      postalCode: "00000",
+      city: "Ville",
+      country: "France",
+      name: null,
+    },
+    user: { name: "User", email: "user@test.fr", phone: "0600000000" },
+    customer: { fullName: "Client", phone: "0600000000", email: "client@test.fr" },
+    driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600000000" },
+    bookingNotes: [],
+  };
 
   it("bloque l'accès non admin", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: false, isManager: false } });
@@ -68,8 +128,8 @@ describe("api/admin/bookings", () => {
 
   it("update une réservation", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: true } });
-    mockedFindUnique.mockResolvedValue({ driverId: null });
-    mockedUpdate.mockResolvedValue({ id: 1 });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, driverId: null });
+    mockedUpdate.mockResolvedValue({ ...bookingStub });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "PATCH",
@@ -82,7 +142,7 @@ describe("api/admin/bookings", () => {
 
   it("supprime une réservation", async () => {
     mockedAuth.mockResolvedValue({ user: { isManager: true } });
-    mockedDelete.mockResolvedValue({ ok: true });
+    mockedDelete.mockResolvedValue({ ...bookingStub });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "DELETE",
@@ -104,9 +164,9 @@ describe("api/admin/bookings", () => {
 
   it("permet à un driver de prendre une course (driverId + status)", async () => {
     mockedAuth.mockResolvedValue({ user: { isDriver: true, id: "d1" } });
-    mockedFindUnique.mockResolvedValue({ driverId: null });
-    mockedFindUser.mockResolvedValue({ isDriver: true });
-    mockedUpdate.mockResolvedValue({ id: 1 });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, driverId: null });
+    mockedFindUser.mockResolvedValue({ ...bookingStub.driver, isDriver: true, id: "d1" });
+    mockedUpdate.mockResolvedValue({ ...bookingStub, driverId: "d1" });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "PATCH",
@@ -119,7 +179,7 @@ describe("api/admin/bookings", () => {
 
   it("refuse qu'un driver modifie des champs interdits", async () => {
     mockedAuth.mockResolvedValue({ user: { isDriver: true, id: "d1" } });
-    mockedFindUnique.mockResolvedValue({ driverId: "d1" });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, driverId: "d1" });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "PATCH",
