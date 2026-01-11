@@ -39,7 +39,7 @@ const booking = {
   dateTime: new Date("2025-01-01T10:00:00.000Z"),
   pax: 2,
   luggage: 1,
-  notes: "",
+  bookingNotes: [],
   priceCents: null,
   status: "PENDING" as const,
   userId: "u1",

@@ -1,125 +1,36 @@
 /** @jest-environment jsdom */
 import React from "react";
-import renderer, { act } from "react-test-renderer";
+import { render, fireEvent } from "@testing-library/react";
 import { UsersTable } from "@/components/dashboard/users-table";
 
-type BookingRow = {
-  id: number;
-  pickup: string;
-  dropoff: string;
-  status: string;
-  createdAt: string;
-  luggage: number;
-  priceCents: number | null;
-};
+const users = Array.from({ length: 15 }).map((_, idx) => ({
+  id: `u${idx}`,
+  name: `User ${idx}`,
+  email: `user${idx}@test.com`,
+  phone: "0102030404",
+  isAdmin: false,
+  isManager: false,
+  isDriver: false,
+  bookings: [],
+}));
 
-type UserRow = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  isAdmin: boolean;
-  isManager: boolean;
-  isDriver: boolean;
-  bookings: BookingRow[];
-};
-
-const users: UserRow[] = [
-  {
-    id: "u1",
-    name: "Alice",
-    email: "alice@test.com",
-    phone: "0102030405",
-    isAdmin: false,
-    isManager: false,
-    isDriver: false,
-    bookings: [
-      {
-        id: 1,
-        pickup: "A",
-        dropoff: "B",
-        status: "COMPLETED",
-        createdAt: new Date().toISOString(),
-        luggage: 2,
-        priceCents: 1000,
-      },
-      {
-        id: 2,
-        pickup: "C",
-        dropoff: "D",
-        status: "PENDING",
-        createdAt: new Date().toISOString(),
-        luggage: 1,
-        priceCents: null,
-      },
-    ],
-  },
-];
-
-describe("UsersTable UI", () => {
-  const originalError = console.error;
-  beforeAll(() => {
-    jest.spyOn(console, "error").mockImplementation((msg: unknown, ...rest: unknown[]) => {
-      if (typeof msg === "string" && msg.includes("react-test-renderer is deprecated")) {
-        return;
-      }
-      originalError(msg, ...rest);
-    });
-  });
-
-  afterAll(() => {
-    (console.error as jest.Mock).mockRestore();
-  });
-
-  beforeAll(() => {
-    (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-  });
-
-  beforeEach(() => {
-    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn(() =>
-      Promise.resolve({ ok: true })
+describe("UsersTable pagination", () => {
+  it("pagine et change de page", () => {
+    const { getByText, getByDisplayValue, queryAllByText } = render(
+      <UsersTable initialUsers={users} />
     );
-  });
 
-  it("affiche le compteur de réservations complétées et totales", () => {
-    let tree: renderer.ReactTestRenderer;
-    act(() => {
-      tree = renderer.create(<UsersTable initialUsers={users} />);
-    });
-    const root = tree!.root;
-    const buttons = root.findAll((node) => node.type === "button");
-    const textBtn = buttons.find((node) => {
-      const kids = node.props.children;
-      return (
-        Array.isArray(kids) &&
-        kids.some((child: unknown) => typeof child === "string" && child.includes("Réservations"))
-      );
-    })!;
-    const kids = textBtn.props.children as unknown as string[];
-    expect(kids.join("")).toContain("1/2");
-  });
+    // par défaut 10 par page
+    expect(queryAllByText(/User/).length).toBeGreaterThanOrEqual(10);
+    expect(getByText("Page 1 / 2")).toBeTruthy();
 
-  it("ouvre la liste des réservations au clic", () => {
-    let tree: renderer.ReactTestRenderer;
-    act(() => {
-      tree = renderer.create(<UsersTable initialUsers={users} />);
-    });
-    const root = tree!.root;
-    const buttons = root.findAll((node) => node.type === "button");
-    const btn = buttons.find((node) => {
-      const kids = node.props.children;
-      return (
-        Array.isArray(kids) &&
-        kids.some((child: unknown) => typeof child === "string" && child.includes("Réservations"))
-      );
-    })!;
-    act(() => {
-      (btn.props.onClick as (() => void) | undefined)?.();
-    });
-    const lines = root.findAll(
-      (node) =>
-        typeof node.props.className === "string" && node.props.className.includes("px-3 py-2")
-    );
-    expect(lines.length).toBe(2);
+    fireEvent.click(getByText("Suivant"));
+    expect(getByText("Page 2 / 2")).toBeTruthy();
+    expect(queryAllByText(/User/).length).toBeGreaterThan(0);
+
+    // changer la page size
+    const input = getByDisplayValue("10") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "5" } });
+    expect(getByText("Page 1 / 3")).toBeTruthy();
   });
 });

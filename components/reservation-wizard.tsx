@@ -140,9 +140,15 @@ export function ReservationWizard({
     pickup: "saved" | "manual";
     dropoff: "saved" | "manual";
   }>({
-    pickup: savedAddresses.length ? "saved" : "manual",
-    dropoff: savedAddresses.length ? "saved" : "manual",
+    pickup: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
+    dropoff: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
   });
+  useEffect(() => {
+    if (mode === "edit") {
+      updateStep(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [shouldSaveAddress, setShouldSaveAddress] = useState<{ pickup: boolean; dropoff: boolean }>(
     {
       pickup: false,

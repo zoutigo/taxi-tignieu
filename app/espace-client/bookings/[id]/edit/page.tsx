@@ -27,7 +27,7 @@ export default async function EditBookingPage(props: PageProps) {
 
   const booking = await prisma.booking.findUnique({
     where: { id },
-    include: { pickup: true, dropoff: true },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
   });
   if (!booking || booking.userId !== session.user.id) {
     notFound();
@@ -95,7 +95,10 @@ export default async function EditBookingPage(props: PageProps) {
     time,
     passengers: booking.pax,
     luggage: booking.luggage,
-    notes: booking.notes ?? "",
+    notes:
+      booking.bookingNotes && booking.bookingNotes.length
+        ? (booking.bookingNotes[booking.bookingNotes.length - 1]?.content ?? "")
+        : "",
     policiesAccepted: false,
   };
 

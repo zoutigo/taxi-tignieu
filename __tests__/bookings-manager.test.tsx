@@ -1,9 +1,10 @@
 /** @jest-environment jsdom */
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { BookingsManager } from "@/components/bookings-manager";
 import { useRouter } from "next/navigation";
 import type { Booking } from "@prisma/client";
+import type { Address, BookingNote } from "@prisma/client";
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
@@ -18,6 +19,8 @@ const baseBooking: Partial<Booking> = {
   priceCents: 1234,
   status: "PENDING",
 };
+
+type BookingRow = Parameters<typeof BookingsManager>[0]["initialBookings"][number];
 
 describe("BookingsManager", () => {
   it("affiche le prix estimé sur une seule ligne avec le libellé", () => {
@@ -56,5 +59,37 @@ describe("BookingsManager", () => {
 
     expect(getByText(/12\.34 €/)).toBeTruthy();
     expect(getByText(/\(Prix estimé\)/)).toBeTruthy();
+  });
+
+  it("pagine les réservations et change la page", () => {
+    const many: BookingRow[] = Array.from({ length: 12 }).map((_, idx) => ({
+      ...(baseBooking as Booking),
+      id: idx + 1,
+      dateTime: new Date("2025-01-01T10:00:00Z"),
+      pickup: null as Address | null,
+      dropoff: null as Address | null,
+      pickupId: 1,
+      dropoffId: 2,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: null,
+      driverId: null,
+      babySeat: false,
+      priceCents: 1000,
+      bookingNotes: [] as BookingNote[],
+    }));
+
+    const { getAllByText, getByDisplayValue, queryAllByText } = render(
+      <BookingsManager initialBookings={many} />
+    );
+
+    expect(getAllByText("Page 1 / 2").length).toBeGreaterThan(0);
+    fireEvent.click(getAllByText("Suivant")[0]);
+    expect(getAllByText("Page 2 / 2").length).toBeGreaterThan(0);
+
+    const input = getByDisplayValue("10") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "5" } });
+    expect(getAllByText("Page 1 / 3").length).toBeGreaterThan(0);
+    expect(queryAllByText(/\(Prix estimé\)/).length).toBeGreaterThan(0);
   });
 });

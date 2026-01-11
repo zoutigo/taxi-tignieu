@@ -13,6 +13,10 @@ jest.mock("@/lib/prisma", () => {
   };
 });
 
+jest.mock("@/components/back-button", () => ({
+  BackButton: () => <div data-testid="back-button" />,
+}));
+
 const mockedPrisma = jest.requireMock("@/lib/prisma").prisma as {
   sCategory: { findMany: jest.Mock };
 };

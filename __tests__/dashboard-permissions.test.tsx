@@ -13,6 +13,10 @@ jest.mock("@/lib/permissions", () => ({
   getUserRole: jest.fn(),
 }));
 
+jest.mock("@/components/back-button", () => ({
+  BackButton: () => <div data-testid="back-button" />,
+}));
+
 const mockedAuth = jest.requireMock("@/auth").auth as jest.Mock;
 const mockedGetPerms = jest.requireMock("@/lib/permissions").getPermissionsForUser as jest.Mock;
 const mockedGetRole = jest.requireMock("@/lib/permissions").getUserRole as jest.Mock;

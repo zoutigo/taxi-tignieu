@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { UsersTable } from "@/components/dashboard/users-table";
+import { BackButton } from "@/components/back-button";
 
 export default async function DashboardUsersPage() {
   const users = await prisma.user.findMany({
@@ -28,8 +29,15 @@ export default async function DashboardUsersPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-      <h1 className="text-2xl font-semibold text-foreground">Utilisateurs</h1>
-      <p className="text-sm text-muted-foreground">Gestion des rôles et réservations associées.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Utilisateurs</h1>
+          <p className="text-sm text-muted-foreground">
+            Gestion des rôles et réservations associées.
+          </p>
+        </div>
+        <BackButton label="Retour au dashboard" href="/dashboard" />
+      </div>
       <div className="mt-6">
         <UsersTable initialUsers={JSON.parse(JSON.stringify(users))} />
       </div>

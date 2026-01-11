@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Booking, Address } from "@prisma/client";
+import type { Booking, Address, BookingNote } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
-import { paginateArray, loadPaginationSettings } from "@/lib/pagination";
+import { paginateArray, loadPaginationSettings, savePaginationSettings } from "@/lib/pagination";
 import { Pencil, Trash2 } from "lucide-react";
 
 type BookingWithPrice = Pick<
@@ -15,7 +15,6 @@ type BookingWithPrice = Pick<
   | "dateTime"
   | "pax"
   | "luggage"
-  | "notes"
   | "priceCents"
   | "status"
   | "userId"
@@ -29,6 +28,8 @@ type BookingWithPrice = Pick<
   dateTime: Date | string;
   pickup: Address | null;
   dropoff: Address | null;
+  bookingNotes?: BookingNote[];
+  notes?: string | null;
 };
 
 const formatAddressLabel = (addr: Address | null) => {
@@ -86,7 +87,7 @@ export function BookingsManager({ initialBookings }: { initialBookings: BookingW
   const [pendingDelete, setPendingDelete] = useState<BookingWithPrice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(() => loadPaginationSettings().bookings);
+  const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
 
   const formattedBookings = useMemo(() => {
     const paged = paginateArray(bookings, page, pageSize);
@@ -95,6 +96,14 @@ export function BookingsManager({ initialBookings }: { initialBookings: BookingW
     }
     return paged;
   }, [bookings, page, pageSize]);
+
+  const handlePageSizeChange = (value: number) => {
+    const safe = Math.max(1, Number.isFinite(value) ? value : 1);
+    setPageSize(safe);
+    setPage(1);
+    const current = loadPaginationSettings();
+    savePaginationSettings({ ...current, bookings: safe });
+  };
 
   const remove = async (booking: BookingWithPrice) => {
     setLoadingId(booking.id);
@@ -122,6 +131,40 @@ export function BookingsManager({ initialBookings }: { initialBookings: BookingW
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Éléments par page</span>
+          <input
+            type="number"
+            min={1}
+            className="h-9 w-20 rounded-md border border-border px-2"
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-border/70 bg-muted px-3 py-1 text-sm disabled:opacity-50"
+            disabled={formattedBookings.currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Précédent
+          </button>
+          <span className="text-muted-foreground">
+            Page {formattedBookings.currentPage} / {formattedBookings.totalPages}
+          </span>
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-border/70 bg-muted px-3 py-1 text-sm disabled:opacity-50"
+            disabled={formattedBookings.currentPage >= formattedBookings.totalPages}
+            onClick={() => setPage((p) => Math.min(formattedBookings.totalPages, p + 1))}
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+
       {formattedBookings.items.map((booking) => {
         const priceToShow = booking.priceCents ? booking.priceCents / 100 : null;
 

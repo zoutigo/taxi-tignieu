@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { User } from "@prisma/client";
 import { Mail, PhoneCall } from "lucide-react";
 import { AppMessage } from "@/components/app-message";
+import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
 
 type UserRow = Pick<
   User,
@@ -29,6 +30,10 @@ export function UsersTable({ initialUsers }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => loadPaginationSettings().users);
+
+  const paged = useMemo(() => paginateArray(users, page, pageSize), [users, page, pageSize]);
 
   const toggleRole = async (
     id: string,
@@ -50,12 +55,54 @@ export function UsersTable({ initialUsers }: Props) {
     setTimeout(() => setMessage(null), 2500);
   };
 
+  const handlePageSizeChange = (value: number) => {
+    const next = Math.max(1, value || 1);
+    setPageSize(next);
+    setPage(1);
+    const current = loadPaginationSettings();
+    savePaginationSettings({ ...current, users: next });
+  };
+
   return (
     <div className="space-y-3">
       {message ? <AppMessage variant="success">{message}</AppMessage> : null}
       {error ? <AppMessage variant="error">{error}</AppMessage> : null}
 
-      {users.map((u) => (
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">Éléments par page</span>
+          <input
+            type="number"
+            min={1}
+            className="h-9 w-20 rounded-md border border-border px-2"
+            value={pageSize}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-border/70 bg-muted px-3 py-1 text-sm disabled:opacity-50"
+            disabled={paged.currentPage <= 1}
+            onClick={() => setPage(Math.max(1, paged.currentPage - 1))}
+          >
+            Précédent
+          </button>
+          <span className="text-muted-foreground">
+            Page {paged.currentPage} / {paged.totalPages}
+          </span>
+          <button
+            type="button"
+            className="cursor-pointer rounded-md border border-border/70 bg-muted px-3 py-1 text-sm disabled:opacity-50"
+            disabled={paged.currentPage >= paged.totalPages}
+            onClick={() => setPage(Math.min(paged.totalPages, paged.currentPage + 1))}
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+
+      {paged.items.map((u) => (
         <div key={u.id} className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-foreground">
             <div className="space-y-1">

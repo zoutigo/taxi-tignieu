@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { getPermissionsForUser, getUserRole } from "@/lib/permissions";
+import { BackButton } from "@/components/back-button";
 
 const cards = [
   {
@@ -65,6 +66,9 @@ export default async function DashboardPage() {
         <p className="text-xs uppercase tracking-[0.35em] text-white/70">Admin</p>
         <h1 className="font-display text-3xl">Dashboard</h1>
         <p className="text-sm text-white/80">Sélectionnez une section à gérer.</p>
+        <div className="mt-3">
+          <BackButton label="Retour au site" href="/" />
+        </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

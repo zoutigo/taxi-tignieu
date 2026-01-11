@@ -191,7 +191,7 @@ function renderBookingHtml(input: BookingEmailInput) {
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#e5f1ff;border-radius:14px;padding:14px;">
                   <tr>
                     <td style="font-size:14px;color:#0b3c6b;line-height:1.5;font-weight:700;padding-bottom:6px;">
-                      Vos coordonnées
+                      ${status === "pending" ? "Coordonnées du client" : "Vos coordonnées"}
                     </td>
                   </tr>
                   <tr>
@@ -220,11 +220,9 @@ function renderBookingHtml(input: BookingEmailInput) {
                         <tr><td style="padding:6px 0;color:rgba(255,255,255,0.85);">Bagages</td><td style="padding:6px 0;color:#ffffff;font-weight:700;">${luggage}</td></tr>
                         <tr><td style="padding:6px 0;color:rgba(255,255,255,0.85);">Paiement</td><td style="padding:6px 0;color:#ffffff;font-weight:700;">${paymentMethod}</td></tr>
                       </table>
-                      <div style="margin-top:14px;">
-                        <a href="${manageUrl}" style="display:inline-block;background:#f6c431;color:#0b3c6b;text-decoration:none;padding:12px 16px;border-radius:14px;font-size:14px;font-weight:900;">Modifier / Annuler</a>
-                        <span style="display:inline-block;margin-left:10px;color:rgba(255,255,255,0.85);font-size:13px;">
-                          Besoin d’aide ? <a href="${phone ? `tel:${phone}` : "#"}" style="color:#ffffff;font-weight:800;text-decoration:underline;">${phone}</a>
-                        </span>
+                      ${""}
+                      <div style="margin-top:14px;color:rgba(255,255,255,0.85);font-size:13px;line-height:1.4;">
+                        Consultez vos courses sur <a href="${manageUrl}" style="color:#ffffff;font-weight:800;text-decoration:underline;">le tableau de bord</a> pour vérifier les infos et mettre à jour si besoin.
                       </div>
                     </td>
                   </tr>

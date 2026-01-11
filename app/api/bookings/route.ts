@@ -27,7 +27,8 @@ const createAddressData = (addr: z.infer<typeof bookingEstimateSchema>["pickup"]
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user?.id) {
+  const userId = session?.user?.id;
+  if (!userId) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
@@ -48,20 +49,38 @@ export async function POST(req: Request) {
     const pickupAddress = await prisma.address.create({ data: createAddressData(pickup) });
     const dropoffAddress = await prisma.address.create({ data: createAddressData(dropoff) });
 
-    const booking = await prisma.booking.create({
-      data: {
-        pickupId: pickupAddress.id,
-        dropoffId: dropoffAddress.id,
-        dateTime,
-        pax: passengers,
-        luggage,
-        notes: notes || null,
-        priceCents,
-        userId: session.user.id,
-      },
-    });
+    const createBookingWithNotes = async (tx: typeof prisma) => {
+      const created = await tx.booking.create({
+        data: {
+          pickupId: pickupAddress.id,
+          dropoffId: dropoffAddress.id,
+          dateTime,
+          pax: passengers,
+          luggage,
+          priceCents,
+          userId,
+        },
+      });
 
-    if (session.user.email) {
+      if (notes && notes.trim().length > 0 && tx.bookingNote?.create) {
+        await tx.bookingNote.create({
+          data: {
+            content: notes.trim(),
+            bookingId: created.id,
+            authorId: userId,
+          },
+        });
+      }
+      return created;
+    };
+
+    const booking =
+      typeof prisma.$transaction === "function"
+        ? await prisma.$transaction((tx) => createBookingWithNotes(tx as typeof prisma))
+        : await createBookingWithNotes(prisma);
+
+    const userEmail = session.user?.email ?? null;
+    if (userEmail) {
       const when = dateTime.toLocaleString("fr-FR", {
         dateStyle: "full",
         timeStyle: "short",
@@ -77,7 +96,7 @@ export async function POST(req: Request) {
       const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
       const email = buildBookingEmail({
         status: "pending",
-        to: session.user.email,
+        to: userEmail,
         badgeLabel: "Réservation reçue",
         title: "Votre demande est enregistrée",
         intro:
@@ -110,10 +129,12 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json(
-      { booking: { ...booking, pickup: pickupAddress, dropoff: dropoffAddress } },
-      { status: 201 }
-    );
+    const bookingFull = await prisma.booking.findUnique({
+      where: { id: booking.id },
+      include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
+    });
+
+    return NextResponse.json({ booking: bookingFull }, { status: 201 });
   } catch (error) {
     console.error("Failed to create booking", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -129,7 +150,7 @@ export async function GET() {
   const bookings = await prisma.booking.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
-    include: { pickup: true, dropoff: true },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
   });
 
   return NextResponse.json({ bookings }, { status: 200 });
@@ -137,9 +158,17 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   const session = await auth();
-  if (!session?.user?.id) {
+  const userId = session?.user?.id;
+  if (!userId) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
+  const sessionUser = session.user as {
+    id?: string;
+    email?: string;
+    name?: string;
+    phone?: string;
+    isAdmin?: boolean;
+  };
 
   const body = await req.json();
   const parsed = patchSchema.safeParse(body);
@@ -156,14 +185,14 @@ export async function PATCH(req: Request) {
 
   const existing = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { pickup: true, dropoff: true },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
   });
-  const isOwner = existing?.userId === session.user.id;
+  const isOwner = existing?.userId === userId;
   const adminList =
     process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
   const isAdmin =
-    Boolean(session.user.isAdmin) ||
-    (session.user.email && adminList.includes(session.user.email.toLowerCase()));
+    Boolean(sessionUser.isAdmin) ||
+    (sessionUser.email && adminList.includes(sessionUser.email.toLowerCase()));
 
   if (!existing || (!isOwner && !isAdmin)) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
@@ -181,7 +210,15 @@ export async function PATCH(req: Request) {
   if (date && time) data.dateTime = new Date(`${date}T${time}`);
   if (typeof passengers === "number") data.pax = passengers;
   if (typeof luggage === "number") data.luggage = luggage;
-  if (notes !== undefined) data.notes = notes || null;
+  if (notes !== undefined && notes && notes.trim().length > 0 && prisma.bookingNote?.create) {
+    await prisma.bookingNote.create({
+      data: {
+        content: notes.trim(),
+        bookingId: bookingId,
+        authorId: userId,
+      },
+    });
+  }
   if (typeof estimatedPrice === "number" && Number.isFinite(estimatedPrice)) {
     data.priceCents = Math.round(estimatedPrice * 100);
   }
@@ -189,12 +226,12 @@ export async function PATCH(req: Request) {
   const booking = await prisma.booking.update({
     where: { id: bookingId },
     data,
-    include: { pickup: true, dropoff: true },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
   });
 
   try {
     const site = await getSiteContact();
-    const userEmail = session.user.email;
+    const userEmail = sessionUser.email;
     const siteEmail = site.email;
     const formatAddress = (addr?: {
       name?: string | null;
@@ -229,8 +266,16 @@ export async function PATCH(req: Request) {
     if (existing?.luggage !== booking.luggage) {
       changes.push(`Bagages : ${existing?.luggage ?? "—"} → ${booking.luggage}`);
     }
-    if (existing?.notes !== booking.notes) {
-      changes.push(`Notes modifiées`);
+    const existingNote =
+      existing?.bookingNotes && existing.bookingNotes.length
+        ? existing.bookingNotes[existing.bookingNotes.length - 1]?.content
+        : "";
+    const updatedNote =
+      booking.bookingNotes && booking.bookingNotes.length
+        ? booking.bookingNotes[booking.bookingNotes.length - 1]?.content
+        : "";
+    if (existingNote !== updatedNote && updatedNote) {
+      changes.push(`Note ajoutée : ${updatedNote}`);
     }
 
     const when = booking.dateTime.toLocaleString("fr-FR", {

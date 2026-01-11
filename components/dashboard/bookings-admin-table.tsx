@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Booking, BookingStatus, User } from "@prisma/client";
+import type { Booking, BookingNote, BookingStatus, User } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Mail, PhoneCall, Pencil } from "lucide-react";
+import { ExternalLink, Mail, PhoneCall, Pencil, XCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
 import { AppMessage } from "@/components/app-message";
+import { cn } from "@/lib/utils";
 
 type Driver = Pick<User, "id" | "name" | "email" | "phone">;
 
@@ -24,8 +25,11 @@ type BookingRow = Booking & {
   customer?: { fullName: string; phone: string; email: string | null } | null;
   driver?: Driver | null;
   driverId?: string | null;
-  pickup?: string;
-  dropoff?: string;
+  pickupLabel?: string;
+  dropoffLabel?: string;
+  distanceKm?: number | null;
+  bookingNotes?: BookingNote[];
+  notes?: string | null;
 };
 
 type CurrentUser = {
@@ -48,6 +52,30 @@ const statusLabel: Record<BookingStatus, string> = {
   CANCELLED: "Annulée",
 };
 
+const cardTone = (status: BookingStatus) => {
+  switch (status) {
+    case "PENDING":
+      return "border-primary/60 bg-amber-50/60";
+    case "CONFIRMED":
+      return "border-emerald-300 bg-emerald-50/60";
+    case "COMPLETED":
+      return "border-blue-200 bg-blue-50/60";
+    case "CANCELLED":
+      return "border-rose-300 bg-rose-50/60";
+    default:
+      return "border-border/70 bg-card";
+  }
+};
+
+const nextStatus = (status: BookingStatus): BookingStatus | null => {
+  if (status === "PENDING") return "CONFIRMED";
+  if (status === "CONFIRMED") return "COMPLETED";
+  return null;
+};
+
+const mapsUrl = (addr?: string | null) =>
+  addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null;
+
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
   return `${date.toLocaleDateString("fr-FR")} · ${date.toLocaleTimeString("fr-FR", {
@@ -67,6 +95,11 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [confirmDriver, setConfirmDriver] = useState<Record<number, string>>({});
+  const [finishingId, setFinishingId] = useState<number | null>(null);
+  const [finishNote, setFinishNote] = useState<Record<number, string>>({});
+  const [finishInvoice, setFinishInvoice] = useState<Record<number, boolean>>({});
 
   const adminLike = Boolean(currentUser?.isAdmin || currentUser?.isManager);
   const driverLike = Boolean(currentUser?.isDriver);
@@ -197,6 +230,79 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     }
   };
 
+  const handleAdvanceStatus = async (b: BookingRow) => {
+    const target = nextStatus(b.status);
+    if (!target) return;
+    setSavingId(b.id);
+    try {
+      const updated = await patchBooking({ id: b.id, status: target });
+      updateLocal(updated as BookingRow);
+      setMessage(`Statut mis à jour (${statusLabel[target]})`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de mettre à jour le statut.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleConfirmWithDriver = async (b: BookingRow) => {
+    const driverId = confirmDriver[b.id];
+    if (!driverId) {
+      setError("Choisissez un chauffeur avant de confirmer.");
+      return;
+    }
+    setSavingId(b.id);
+    try {
+      const updated = await patchBooking({ id: b.id, status: "CONFIRMED", driverId });
+      updateLocal(updated as BookingRow);
+      setMessage("Réservation confirmée et assignée.");
+      setConfirmingId(null);
+      setConfirmDriver((prev) => ({ ...prev, [b.id]: "" }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de confirmer la réservation.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleComplete = async (b: BookingRow) => {
+    const note = finishNote[b.id]?.trim() || "";
+    const generateInvoice = Boolean(finishInvoice[b.id]);
+    setSavingId(b.id);
+    try {
+      const updated = await patchBooking({
+        id: b.id,
+        status: "COMPLETED",
+        generateInvoice,
+      } as Partial<BookingRow> & { id: number } & { completionNotes?: string });
+      if (note) {
+        updated.notes = note;
+      }
+      updateLocal(updated as BookingRow);
+      setMessage("Réservation terminée.");
+      setFinishingId(null);
+      setFinishNote((prev) => ({ ...prev, [b.id]: "" }));
+      setFinishInvoice((prev) => ({ ...prev, [b.id]: false }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible de terminer la réservation.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleCancel = async (b: BookingRow) => {
+    setSavingId(b.id);
+    try {
+      const updated = await patchBooking({ id: b.id, status: "CANCELLED" });
+      updateLocal(updated as BookingRow);
+      setMessage("Réservation annulée.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Impossible d'annuler la réservation.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {message ? <AppMessage variant="success">{message}</AppMessage> : null}
@@ -246,11 +352,18 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
         const dateValue =
           b.dateTime instanceof Date ? b.dateTime.toISOString() : (b.dateTime as unknown as string);
         const priceLabel = b.priceCents != null ? `${(b.priceCents / 100).toFixed(0)} €` : "—";
+        const pickupText = b.pickupLabel ?? "";
+        const dropoffText = b.dropoffLabel ?? "";
+        const noteText =
+          b.notes ??
+          (b.bookingNotes && b.bookingNotes.length
+            ? b.bookingNotes[b.bookingNotes.length - 1]?.content
+            : "");
 
         return (
           <div
             key={b.id}
-            className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5"
+            className={cn("rounded-2xl border p-4 shadow-sm sm:p-5", cardTone(b.status))}
           >
             <div className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
@@ -289,9 +402,47 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
               </div>
 
               <div className="space-y-1 text-sm">
-                <p className="font-semibold text-foreground">Départ : {b.pickup}</p>
-                <p className="font-semibold text-foreground">Arrivée : {b.dropoff}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-foreground">Départ : {pickupText}</p>
+                  {mapsUrl(pickupText) ? (
+                    <a
+                      href={mapsUrl(pickupText) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-primary transition hover:bg-primary/10 cursor-pointer"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ouvrir dans Maps</span>
+                    </a>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-foreground">Arrivée : {dropoffText}</p>
+                  {mapsUrl(dropoffText) ? (
+                    <a
+                      href={mapsUrl(dropoffText) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-primary transition hover:bg-primary/10 cursor-pointer"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ouvrir dans Maps</span>
+                    </a>
+                  ) : null}
+                </div>
               </div>
+
+              <div className="text-sm text-muted-foreground">
+                {b.pax} passager{b.pax > 1 ? "s" : ""} · {b.luggage} bagage
+                {b.luggage > 1 ? "s" : ""}
+                {b.distanceKm != null ? <> · {b.distanceKm.toFixed(1)} km</> : null}
+              </div>
+
+              {noteText ? (
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Notes :</span> {noteText}
+                </p>
+              ) : null}
 
               <p className="text-sm font-medium text-foreground">{clientName}</p>
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
@@ -335,9 +486,47 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                 <span className="text-muted-foreground">
                   {b.driver?.name ? `Chauffeur: ${b.driver.name}` : "Chauffeur non assigné"}
                 </span>
-                <span className="ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold">
-                  Statut: {statusLabel[b.status]}
-                </span>
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {adminLike && nextStatus(b.status) ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        if (b.status === "PENDING") {
+                          setConfirmingId((prev) => (prev === b.id ? null : b.id));
+                          setConfirmDriver((prev) => ({
+                            ...prev,
+                            [b.id]: prev[b.id] ?? b.driver?.id ?? "",
+                          }));
+                        } else if (b.status === "CONFIRMED") {
+                          setFinishingId((prev) => (prev === b.id ? null : b.id));
+                          setFinishNote((prev) => ({ ...prev, [b.id]: prev[b.id] ?? "" }));
+                        } else {
+                          handleAdvanceStatus(b);
+                        }
+                      }}
+                      disabled={savingId === b.id}
+                      className="cursor-pointer"
+                    >
+                      {b.status === "PENDING" ? "Confirmer" : "Terminer"}
+                    </Button>
+                  ) : null}
+                  {adminLike ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCancel(b)}
+                      disabled={savingId === b.id}
+                      className="text-destructive hover:text-destructive cursor-pointer"
+                      aria-label="Annuler la réservation"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold">
+                    Statut: {statusLabel[b.status]}
+                  </span>
+                </div>
               </div>
 
               {driverLike ? (
@@ -393,26 +582,109 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                 </div>
               ) : null}
 
+              {adminLike && confirmingId === b.id && b.status === "PENDING" ? (
+                <div className="rounded-lg border border-border/60 bg-background px-3 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={confirmDriver[b.id] ?? ""}
+                      onValueChange={(v) => setConfirmDriver((prev) => ({ ...prev, [b.id]: v }))}
+                    >
+                      <SelectTrigger className="w-56">
+                        <SelectValue placeholder="Sélectionner un chauffeur" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {driverOptions.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => handleConfirmWithDriver(b)}
+                      disabled={savingId === b.id || !confirmDriver[b.id]}
+                      className="cursor-pointer"
+                    >
+                      Valider l&apos;assignation
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmingId(null)}
+                      disabled={savingId === b.id}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {adminLike && finishingId === b.id && b.status === "CONFIRMED" ? (
+                <div className="rounded-lg border border-border/60 bg-background px-3 py-3 space-y-3">
+                  <p className="text-sm font-semibold text-foreground">Terminer la course</p>
+                  <Textarea
+                    value={finishNote[b.id] ?? ""}
+                    onChange={(e) =>
+                      setFinishNote((prev) => ({
+                        ...prev,
+                        [b.id]: e.target.value,
+                      }))
+                    }
+                    placeholder="Commentaires (attente, incidents, etc.)"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 cursor-pointer"
+                      checked={finishInvoice[b.id] ?? false}
+                      onChange={(e) =>
+                        setFinishInvoice((prev) => ({ ...prev, [b.id]: e.target.checked }))
+                      }
+                    />
+                    Générer une facture maintenant
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleComplete(b)}
+                      disabled={savingId === b.id}
+                      className="cursor-pointer"
+                    >
+                      Valider la fin de course
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setFinishingId(null)}
+                      disabled={savingId === b.id}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               {editingId === b.id ? (
                 <div className="rounded-xl border border-border/70 bg-background p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
-                      value={b.pickup}
+                      value={b.pickupLabel ?? ""}
                       onChange={(e) =>
                         setBookings((prev) =>
                           prev.map((bk) =>
-                            bk.id === b.id ? { ...bk, pickup: e.target.value } : bk
+                            bk.id === b.id ? { ...bk, pickupLabel: e.target.value } : bk
                           )
                         )
                       }
                       placeholder="Départ"
                     />
                     <Input
-                      value={b.dropoff}
+                      value={b.dropoffLabel ?? ""}
                       onChange={(e) =>
                         setBookings((prev) =>
                           prev.map((bk) =>
-                            bk.id === b.id ? { ...bk, dropoff: e.target.value } : bk
+                            bk.id === b.id ? { ...bk, dropoffLabel: e.target.value } : bk
                           )
                         )
                       }
@@ -500,7 +772,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                           prev.map((bk) => (bk.id === b.id ? { ...bk, notes: e.target.value } : bk))
                         )
                       }
-                      placeholder="Notes"
+                      placeholder="Ajouter une note (sera enregistrée)"
                     />
                   </div>
                   <div className="mt-3 flex gap-2">

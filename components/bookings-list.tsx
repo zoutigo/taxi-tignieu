@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { Booking, Address } from "@prisma/client";
+import type { Booking, Address, BookingNote } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,7 @@ type BookingWithPrice = Omit<Booking, "dateTime"> & {
   dateTime: Date | string;
   pickup: Address | string | null;
   dropoff: Address | string | null;
+  bookingNotes?: BookingNote[];
 };
 
 type EditForm = {
@@ -49,7 +50,10 @@ function toForm(booking: BookingWithPrice): EditForm {
     time,
     passengers: booking.pax,
     luggage: booking.luggage,
-    notes: booking.notes ?? "",
+    notes:
+      booking.bookingNotes && booking.bookingNotes.length
+        ? (booking.bookingNotes[booking.bookingNotes.length - 1]?.content ?? "")
+        : "",
   };
 }
 
@@ -158,7 +162,17 @@ export function BookingsList({ initialBookings }: Props) {
         }
         const payload = await res.json();
         setBookings((prev) =>
-          prev.map((b) => (b.id === booking.id ? { ...b, ...payload.booking } : b))
+          prev.map((b) =>
+            b.id === booking.id
+              ? {
+                  ...b,
+                  ...payload.booking,
+                  notes:
+                    payload.booking.bookingNotes?.[payload.booking.bookingNotes.length - 1]
+                      ?.content ?? "",
+                }
+              : b
+          )
         );
         setEditingId(null);
         setForm(null);

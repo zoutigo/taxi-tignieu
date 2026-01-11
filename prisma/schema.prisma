@@ -26,6 +26,7 @@ model User {
   sessions       Session[]
   bookings       Booking[]
   driverBookings Booking[] @relation("DriverBookings")
+  bookingNotes   BookingNote[] @relation("BookingNoteAuthor")
   reviews        Review[]
   addresses      UserAddress[]
   contactMessages ContactMessage[]
@@ -74,7 +75,6 @@ model Booking {
   pax        Int           @default(1)
   luggage    Int           @default(0)
   babySeat   Boolean       @default(false)
-  notes      String?
   priceCents Int?
   userId     String?
   user       User?         @relation(fields: [userId], references: [id])
@@ -91,6 +91,7 @@ model Booking {
   pickup     Address       @relation("PickupAddress", fields: [pickupId], references: [id])
   dropoff    Address       @relation("DropoffAddress", fields: [dropoffId], references: [id])
   invoice    Invoice?
+  bookingNotes BookingNote[]
 }
 
 enum BookingStatus {
@@ -144,6 +145,17 @@ model Address {
   pickupBookings  Booking[]   @relation("PickupAddress")
   dropoffBookings Booking[]   @relation("DropoffAddress")
   userAddresses   UserAddress[]
+}
+
+model BookingNote {
+  id        Int      @id @default(autoincrement())
+  content   String
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  bookingId Int
+  author    User?    @relation("BookingNoteAuthor", fields: [authorId], references: [id])
+  authorId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model SiteConfig {

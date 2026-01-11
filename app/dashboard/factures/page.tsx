@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { BackButton } from "@/components/back-button";
 
 export default async function BillsPage() {
   const session = await auth();
@@ -19,6 +20,7 @@ export default async function BillsPage() {
           <p className="badge-pill text-xs text-muted-foreground">Facturation</p>
           <h1 className="font-display text-3xl text-foreground">Factures générées</h1>
         </div>
+        <BackButton label="Retour au dashboard" href="/dashboard" />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
