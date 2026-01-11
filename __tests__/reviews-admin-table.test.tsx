@@ -23,7 +23,7 @@ jest.mock("@/components/ui/select", () => ({
 type ReviewRow = Parameters<typeof ReviewsAdminTable>[0]["initialReviews"][number];
 
 const baseReview: ReviewRow = {
-  id: 1,
+  id: "r1",
   userId: "u1",
   bookingId: null,
   rating: 5,
@@ -104,7 +104,7 @@ describe("ReviewsAdminTable UI", () => {
   });
 
   it("trie par date décroissante (le plus récent en premier)", () => {
-    const older = { ...baseReview, id: 2, createdAt: new Date("2024-01-01T10:00:00Z") };
+    const older = { ...baseReview, id: "r2", createdAt: new Date("2024-01-01T10:00:00Z") };
     let tree: renderer.ReactTestRenderer;
     act(() => {
       tree = renderer.create(<ReviewsAdminTable initialReviews={[older, baseReview]} />);

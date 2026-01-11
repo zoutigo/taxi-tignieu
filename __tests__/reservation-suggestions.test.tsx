@@ -2,6 +2,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReservationPage from "@/components/reservation-page";
+import { ReservationWizard } from "@/components/reservation-wizard";
 import { useRouter } from "next/navigation";
 import { defaultTariffConfig } from "@/lib/tarifs";
 
@@ -12,6 +13,26 @@ jest.mock("next/navigation", () => ({
 jest.mock("next-auth/react", () => ({
   useSession: jest.fn(() => ({ status: "unauthenticated", data: null })),
   signIn: jest.fn(),
+}));
+
+jest.mock("@/auth", () => ({
+  auth: jest.fn(() => Promise.resolve(null)),
+}));
+
+jest.mock("@/lib/prisma", () => ({
+  prisma: { user: { findUnique: jest.fn() } },
+}));
+
+jest.mock("@/components/reservation-page", () => ({
+  __esModule: true,
+  default: () => (
+    <ReservationWizard
+      mode="create"
+      successRedirect="/espace-client/bookings"
+      useStore
+      savedAddresses={[]}
+    />
+  ),
 }));
 
 jest.mock("@/components/ui/select", () => ({

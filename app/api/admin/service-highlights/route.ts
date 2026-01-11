@@ -10,13 +10,13 @@ const isAdminLike = (session: unknown): boolean => {
 };
 
 const createSchema = z.object({
-  serviceId: z.number(),
+  serviceId: z.string(),
   label: z.string().trim().min(2).max(200),
   position: z.number().int().min(0).optional(),
 });
 
 const updateSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   label: z.string().trim().min(2).max(200).optional(),
   position: z.number().int().min(0).optional(),
 });
@@ -105,8 +105,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" ? body.id : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
   const highlight = await prisma.sHighlight.findUnique({

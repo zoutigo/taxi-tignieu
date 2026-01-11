@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { Booking, Address } from "@prisma/client";
+import type { Booking, Address, BookingNote } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ type BookingWithPrice = Omit<Booking, "dateTime"> & {
   dateTime: Date | string;
   pickup: Address | string | null;
   dropoff: Address | string | null;
+  bookingNotes?: BookingNote[];
+  invoice?: { id: string } | null;
 };
 
 type EditForm = {
@@ -49,7 +51,10 @@ function toForm(booking: BookingWithPrice): EditForm {
     time,
     passengers: booking.pax,
     luggage: booking.luggage,
-    notes: booking.notes ?? "",
+    notes:
+      booking.bookingNotes && booking.bookingNotes.length
+        ? (booking.bookingNotes[booking.bookingNotes.length - 1]?.content ?? "")
+        : "",
   };
 }
 
@@ -97,10 +102,10 @@ type Props = {
 
 export function BookingsList({ initialBookings }: Props) {
   const [bookings, setBookings] = useState(initialBookings);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BookingWithPrice | null>(null);
 
   const handleEdit = useCallback((booking: BookingWithPrice) => {
@@ -158,7 +163,17 @@ export function BookingsList({ initialBookings }: Props) {
         }
         const payload = await res.json();
         setBookings((prev) =>
-          prev.map((b) => (b.id === booking.id ? { ...b, ...payload.booking } : b))
+          prev.map((b) =>
+            b.id === booking.id
+              ? {
+                  ...b,
+                  ...payload.booking,
+                  notes:
+                    payload.booking.bookingNotes?.[payload.booking.bookingNotes.length - 1]
+                      ?.content ?? "",
+                }
+              : b
+          )
         );
         setEditingId(null);
         setForm(null);
@@ -301,15 +316,17 @@ export function BookingsList({ initialBookings }: Props) {
                 >
                   Modifier
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPendingDelete(booking)}
-                  disabled={loadingId === booking.id}
-                >
-                  Supprimer
-                </Button>
+                {booking.status !== "COMPLETED" && !booking.invoice ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPendingDelete(booking)}
+                    disabled={loadingId === booking.id}
+                  >
+                    Supprimer
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>

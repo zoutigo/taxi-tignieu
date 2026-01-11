@@ -42,9 +42,9 @@ export function ReviewsAdminTable({ initialReviews }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPaginationSettings().avis);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ReviewStatus | "ALL">("ALL");
-  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const save = async (r: ReviewRow) => {
     setError(null);
@@ -61,7 +61,7 @@ export function ReviewsAdminTable({ initialReviews }: Props) {
     setTimeout(() => setMessage(null), 2500);
   };
 
-  const del = async (id: number) => {
+  const del = async (id: string) => {
     setError(null);
     const res = await fetch("/api/admin/reviews", {
       method: "DELETE",

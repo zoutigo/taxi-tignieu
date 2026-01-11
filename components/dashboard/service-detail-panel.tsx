@@ -12,18 +12,18 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 type ServiceWithRelations = {
-  id: number;
+  id: string;
   slug: string;
   title: string;
   description: string;
   isEnabled: boolean;
   position?: number;
-  categoryId: number;
-  category?: { id: number; title: string; slug: string };
-  highlights: { id: number; label: string; position?: number }[];
+  categoryId: string;
+  category?: { id: string; title: string; slug: string };
+  highlights: { id: string; label: string; position?: number }[];
 };
 
-type Category = { id: number; title: string };
+type Category = { id: string; title: string };
 
 type Props = {
   service: ServiceWithRelations;
@@ -39,7 +39,7 @@ export function ServiceDetailPanel({ service, categories }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
-  const [pendingDeleteHighlight, setPendingDeleteHighlight] = useState<number | null>(null);
+  const [pendingDeleteHighlight, setPendingDeleteHighlight] = useState<string | null>(null);
 
   const isLoading = (key: string) => loading === key;
 
@@ -87,7 +87,7 @@ export function ServiceDetailPanel({ service, categories }: Props) {
     }
   };
 
-  const moveToCategory = async (categoryId: number) => {
+  const moveToCategory = async (categoryId: string) => {
     setLoading("category");
     try {
       const { service: updated } = await api("/api/admin/services", "PATCH", {
@@ -104,7 +104,7 @@ export function ServiceDetailPanel({ service, categories }: Props) {
     }
   };
 
-  const saveHighlight = async (id: number, label: string, position?: number) => {
+  const saveHighlight = async (id: string, label: string, position?: number) => {
     setLoading(`hl-${id}`);
     try {
       const { highlight } = await api("/api/admin/service-highlights", "PATCH", {

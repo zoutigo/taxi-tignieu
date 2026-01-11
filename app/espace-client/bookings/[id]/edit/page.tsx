@@ -1,18 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ReservationWizard } from "@/components/reservation-wizard";
+import { ReservationWizard, type SavedAddressOption } from "@/components/reservation-wizard";
+import type { Address } from "@prisma/client";
 
 type PageProps = {
   params: Promise<{ id: string }> | { id: string };
 };
 
+const formatAddressLine = (address: Address) =>
+  [address.streetNumber, address.street, address.postalCode, address.city, address.country]
+    .filter(Boolean)
+    .join(" ");
+
 export default async function EditBookingPage(props: PageProps) {
   const params = await Promise.resolve(props.params);
-  const id = Number(params.id);
-  if (!Number.isFinite(id)) {
-    notFound();
-  }
+  const id = params.id;
 
   const session = await auth();
   if (!session?.user?.id) {
@@ -21,11 +24,37 @@ export default async function EditBookingPage(props: PageProps) {
 
   const booking = await prisma.booking.findUnique({
     where: { id },
-    include: { pickup: true, dropoff: true },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
   });
   if (!booking || booking.userId !== session.user.id) {
     notFound();
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      defaultAddressId: true,
+      addresses: { include: { address: true }, orderBy: { createdAt: "desc" } },
+    },
+  });
+  const savedAddresses: SavedAddressOption[] =
+    user?.addresses.map((addr) => ({
+      id: addr.id,
+      label: addr.label,
+      addressLine: formatAddressLine(addr.address),
+      address: {
+        label: formatAddressLine(addr.address),
+        street: addr.address.street ?? "",
+        streetNumber: addr.address.streetNumber ?? "",
+        postcode: addr.address.postalCode ?? "",
+        city: addr.address.city ?? "",
+        country: addr.address.country ?? "",
+        lat: addr.address.latitude ?? NaN,
+        lng: addr.address.longitude ?? NaN,
+        name: addr.address.name ?? undefined,
+      },
+      isDefault: addr.id === user.defaultAddressId,
+    })) ?? [];
 
   const date = booking.dateTime.toISOString().split("T")[0];
   const time = booking.dateTime.toISOString().split("T")[1]?.slice(0, 5) ?? "";
@@ -63,7 +92,10 @@ export default async function EditBookingPage(props: PageProps) {
     time,
     passengers: booking.pax,
     luggage: booking.luggage,
-    notes: booking.notes ?? "",
+    notes:
+      booking.bookingNotes && booking.bookingNotes.length
+        ? (booking.bookingNotes[booking.bookingNotes.length - 1]?.content ?? "")
+        : "",
     policiesAccepted: false,
   };
 
@@ -77,6 +109,7 @@ export default async function EditBookingPage(props: PageProps) {
       initialPrice={initialPrice}
       successRedirect="/espace-client/bookings"
       useStore={false}
+      savedAddresses={savedAddresses}
     />
   );
 }

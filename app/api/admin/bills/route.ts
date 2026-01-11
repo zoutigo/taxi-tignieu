@@ -11,8 +11,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const bookingId = typeof body?.bookingId === "number" ? body.bookingId : Number(body?.bookingId);
-  if (!Number.isFinite(bookingId)) {
+  const bookingId = typeof body?.bookingId === "string" ? body.bookingId : null;
+  if (!bookingId) {
     return NextResponse.json({ error: "bookingId requis" }, { status: 400 });
   }
 

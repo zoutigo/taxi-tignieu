@@ -7,11 +7,11 @@ type FetchResponse = { ok: boolean; json: () => Promise<unknown> };
 const mockFetch = jest.fn<Promise<FetchResponse>, [RequestInfo | URL, RequestInit?]>();
 
 const booking = {
-  id: 1,
-  pickupId: 1,
-  dropoffId: 2,
+  id: "b1",
+  pickupId: "a1",
+  dropoffId: "a2",
   pickup: {
-    id: 1,
+    id: "a1",
     name: "A",
     street: "A",
     streetNumber: "1",
@@ -24,7 +24,7 @@ const booking = {
     updatedAt: new Date(),
   },
   dropoff: {
-    id: 2,
+    id: "a2",
     name: "B",
     street: "B",
     streetNumber: "2",
@@ -39,7 +39,7 @@ const booking = {
   dateTime: new Date("2025-01-01T10:00:00.000Z"),
   pax: 2,
   luggage: 1,
-  notes: "",
+  bookingNotes: [],
   priceCents: null,
   status: "PENDING" as const,
   userId: "u1",
@@ -123,5 +123,20 @@ describe("BookingsList actions", () => {
       "/api/bookings",
       expect.objectContaining({ method: "PATCH" })
     );
+  });
+
+  it("n'affiche pas le bouton supprimer pour une réservation terminée ou facturée", async () => {
+    const completed = { ...booking, id: "b-completed", status: "COMPLETED" as const };
+    const invoiced = { ...booking, id: "b-inv", invoice: { id: "inv1" } };
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<BookingsList initialBookings={[completed, invoiced]} />);
+    });
+
+    const buttons = tree!.root.findAll(
+      (node) => node.type === "button" && node.props.children === "Supprimer"
+    );
+    expect(buttons.length).toBe(0);
   });
 });

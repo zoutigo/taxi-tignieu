@@ -56,7 +56,7 @@ describe("Landing reviews section", () => {
 
     const reviews: Review[] = [
       {
-        id: 1,
+        id: "r1",
         userId: "u1",
         rating: 5,
         comment: "Parfait",
@@ -64,7 +64,7 @@ describe("Landing reviews section", () => {
         ...base,
       },
       {
-        id: 2,
+        id: "r2",
         userId: "u2",
         rating: 4,
         comment: "Très bien",
@@ -72,7 +72,7 @@ describe("Landing reviews section", () => {
         ...base,
       },
       {
-        id: 3,
+        id: "r3",
         userId: "u3",
         rating: 5,
         comment: "Rapide et pro",

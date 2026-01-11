@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { ReservationPolicyConsent } from "@/components/reservation-policy-consent";
 import {
@@ -43,6 +44,16 @@ import {
 } from "@/lib/booking-utils";
 import { normalizeAddressSuggestion } from "@/lib/address-search";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { userAddressSchema } from "@/schemas/profile";
+import type { ZodIssue } from "zod";
+
+export type SavedAddressOption = {
+  id: string;
+  label: string;
+  addressLine: string;
+  address: AddressData;
+  isDefault?: boolean;
+};
 
 const addressStepSchema = z.object({
   label: z.string().trim().min(3, "Adresse requise"),
@@ -68,11 +79,12 @@ type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 type Props = {
   mode?: "create" | "edit";
-  bookingId?: number;
+  bookingId?: string;
   initialValues?: Partial<BookingEstimateInput>;
   initialPrice?: number | null;
   successRedirect?: string;
   useStore?: boolean;
+  savedAddresses?: SavedAddressOption[];
 };
 
 export function ReservationWizard({
@@ -82,6 +94,7 @@ export function ReservationWizard({
   initialPrice = null,
   successRedirect = "/espace-client/bookings",
   useStore = true,
+  savedAddresses = [],
 }: Props) {
   const storePrice = useBookingStore((state) => state.estimatedPrice);
   const defaultValues = useMemo<BookingEstimateInput>(() => {
@@ -118,11 +131,39 @@ export function ReservationWizard({
   const [quoteDuration, setQuoteDuration] = useState<string>("");
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [tariffConfig, setTariffConfig] = useState<TariffConfigValues>(defaultTariffConfig);
+  const savedSelectionRef = useRef<{ pickup: boolean; dropoff: boolean }>({
+    pickup: false,
+    dropoff: false,
+  });
+  const [suppressTokens, setSuppressTokens] = useState({ pickup: 0, dropoff: 0 });
+  const [addressMode, setAddressMode] = useState<{
+    pickup: "saved" | "manual";
+    dropoff: "saved" | "manual";
+  }>({
+    pickup: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
+    dropoff: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
+  });
+  useEffect(() => {
+    if (mode === "edit") {
+      updateStep(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [shouldSaveAddress, setShouldSaveAddress] = useState<{ pickup: boolean; dropoff: boolean }>(
+    {
+      pickup: false,
+      dropoff: false,
+    }
+  );
+  const [saveLabels, setSaveLabels] = useState<{ pickup: string; dropoff: string }>({
+    pickup: "",
+    dropoff: "",
+  });
   const [step, setStep] = useState<WizardStep>(0);
   const [maxStepVisited, setMaxStepVisited] = useState<number>(0);
   const lastQuoteKeyRef = useRef<string>("");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
+  const [isHydrated, setIsHydrated] = useState(false);
   const form = useForm<BookingEstimateInput>({
     resolver: zodResolver(bookingEstimateSchema),
     mode: "onChange",
@@ -131,6 +172,88 @@ export function ReservationWizard({
 
   const pickupAddress = useWatch({ control: form.control, name: "pickup" }) as AddressData;
   const dropoffAddress = useWatch({ control: form.control, name: "dropoff" }) as AddressData;
+
+  const saveLabelMissing =
+    (shouldSaveAddress.pickup && saveLabels.pickup.trim().length < 2) ||
+    (shouldSaveAddress.dropoff && saveLabels.dropoff.trim().length < 2);
+
+  const formatZodError = (issues: ZodIssue[]) => {
+    const issue = issues[0];
+    if (!issue) return "Certains champs sont incomplets.";
+    const field = Array.isArray(issue.path) && issue.path.length ? issue.path.join(".") : "champ";
+    return `${field}: ${issue.message}`;
+  };
+
+  const validateStepAddress = useCallback(
+    (kind: "pickup" | "dropoff") => {
+      const addr = form.getValues(kind) as AddressData;
+      const parsed = addressStepSchema.safeParse(addr);
+      if (!parsed.success) {
+        setError(formatZodError(parsed.error.issues));
+        return false;
+      }
+      return true;
+    },
+    [form]
+  );
+
+  const isAddressReady = useCallback((addr?: AddressData) => {
+    if (!addr) return false;
+    return (
+      Boolean(addr.label?.trim()) &&
+      Number.isFinite(addr.lat) &&
+      Number.isFinite(addr.lng) &&
+      Boolean(addr.postcode?.trim()) &&
+      Boolean(addr.street?.trim()) &&
+      Boolean(addr.city?.trim()) &&
+      Boolean(addr.country?.trim())
+    );
+  }, []);
+
+  const pickupReady = useMemo(() => isAddressReady(pickupAddress), [isAddressReady, pickupAddress]);
+  const dropoffReady = useMemo(
+    () => isAddressReady(dropoffAddress),
+    [isAddressReady, dropoffAddress]
+  );
+
+  const renderSaveCheckbox = (kind: "pickup" | "dropoff") => {
+    const ready = kind === "pickup" ? pickupReady : dropoffReady;
+    if (addressMode[kind] !== "manual" || !ready) return null;
+    const toneClass =
+      kind === "pickup" ? "border-amber-200/80 bg-amber-50/70" : "border-sky-200/80 bg-sky-50/70";
+    return (
+      <div className={cn("space-y-2 rounded-xl p-3", toneClass)}>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            checked={shouldSaveAddress[kind]}
+            onCheckedChange={(checked) => {
+              const next = Boolean(checked);
+              setShouldSaveAddress((prev) => ({ ...prev, [kind]: next }));
+              if (!next) {
+                setSaveLabels((prev) => ({ ...prev, [kind]: "" }));
+              }
+            }}
+            className="mt-0.5 h-5 w-5 cursor-pointer border-2 border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+          />
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold text-foreground">Enregistrer cette adresse</p>
+            <p className="text-xs text-muted-foreground">
+              Ajoutez-la à vos adresses favorites pour vos prochains trajets.
+            </p>
+          </div>
+        </div>
+        {shouldSaveAddress[kind] ? (
+          <Input
+            value={saveLabels[kind]}
+            aria-label="Nom pour cette adresse"
+            onChange={(e) => setSaveLabels((prev) => ({ ...prev, [kind]: e.target.value }))}
+            placeholder="Nom pour cette adresse (ex. Maison, École)"
+            className="bg-white"
+          />
+        ) : null}
+      </div>
+    );
+  };
 
   useEffect(() => {
     form.reset(defaultValues);
@@ -149,6 +272,10 @@ export function ReservationWizard({
   }, [step]);
 
   useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
     const loadConfig = async () => {
       try {
         const res = await fetch("/api/tarifs/config", { cache: "no-store" });
@@ -164,20 +291,70 @@ export function ReservationWizard({
 
   const applyAddress = useCallback(
     (kind: "pickup" | "dropoff", addr: AddressData) => {
-      form.setValue(kind, addr, { shouldValidate: true, shouldDirty: true });
+      const sanitized: AddressData = {
+        ...addr,
+        label: addr.label ?? "",
+        street: addr.street ?? "",
+        streetNumber: addr.streetNumber ?? "",
+        postcode: addr.postcode ?? "",
+        city: addr.city ?? "",
+        country: addr.country ?? "",
+        name: addr.name ?? undefined,
+        lat: typeof addr.lat === "number" && Number.isFinite(addr.lat) ? addr.lat : NaN,
+        lng: typeof addr.lng === "number" && Number.isFinite(addr.lng) ? addr.lng : NaN,
+      };
+      form.setValue(kind, sanitized, { shouldValidate: true, shouldDirty: true });
     },
     [form]
   );
 
+  const clearAddress = useCallback(
+    (kind: "pickup" | "dropoff") => {
+      const empty: AddressData = {
+        label: "",
+        lat: NaN,
+        lng: NaN,
+        street: "",
+        streetNumber: "",
+        postcode: "",
+        city: "",
+        country: "",
+      };
+      savedSelectionRef.current[kind] = false;
+      setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
+      setSaveLabels((prev) => ({ ...prev, [kind]: "" }));
+      applyAddress(kind, empty);
+    },
+    [applyAddress]
+  );
+
   const handleAddressInput = (kind: "pickup" | "dropoff", value: string) => {
     const current = form.getValues(kind) as AddressData;
-    const next: AddressData = { ...current, label: value, lat: NaN, lng: NaN };
+    const next: AddressData = {
+      ...current,
+      label: value,
+      lat: NaN,
+      lng: NaN,
+      street: "",
+      streetNumber: "",
+      postcode: "",
+      city: "",
+      country: "",
+    };
+    savedSelectionRef.current[kind] = false;
+    setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
     form.setValue(kind, next, { shouldValidate: false, shouldDirty: true });
   };
 
   const ensureAddress = useCallback(
     async (kind: "pickup" | "dropoff"): Promise<AddressData> => {
       const current = form.getValues(kind) as AddressData;
+      if (savedSelectionRef.current[kind]) {
+        if (!Number.isFinite(current.lat) || !Number.isFinite(current.lng)) {
+          throw new Error("Adresse sauvegardée invalide. Vérifiez vos coordonnées.");
+        }
+        return current;
+      }
       if (Number.isFinite(current.lat) && Number.isFinite(current.lng)) {
         return current;
       }
@@ -194,8 +371,83 @@ export function ReservationWizard({
 
   const pickSuggestion = (s: AddressData, kind: "pickup" | "dropoff") => {
     const addr = normalizeAddressSuggestion(s);
+    savedSelectionRef.current[kind] = false;
+    setShouldSaveAddress((prev) => ({ ...prev, [kind]: addressMode[kind] === "manual" }));
     applyAddress(kind, addr);
   };
+
+  const handleSavedAddressSelect = (kind: "pickup" | "dropoff", id: string) => {
+    const option = savedAddresses?.find((opt) => opt.id === id);
+    if (!option) return;
+    const addr: AddressData = {
+      ...option.address,
+      label: option.addressLine,
+    };
+    savedSelectionRef.current[kind] = true;
+    setSuppressTokens((prev) => ({ ...prev, [kind]: prev[kind] + 1 }));
+    setAddressMode((prev) => ({ ...prev, [kind]: "saved" }));
+    setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
+    setSaveLabels((prev) => ({ ...prev, [kind]: "" }));
+    applyAddress(kind, addr);
+  };
+
+  const saveAddressIfNeeded = useCallback(
+    async (kind: "pickup" | "dropoff", addr: AddressData) => {
+      if (!shouldSaveAddress[kind] || savedSelectionRef.current[kind]) return;
+      if (sessionStatus !== "authenticated") return;
+      if (!isAddressReady(addr)) return;
+
+      const userLabel = saveLabels[kind]?.trim();
+      const cleanLabel = addr.label?.trim();
+      const cleanName = addr.name?.toString().trim();
+      const payload = {
+        label:
+          userLabel && userLabel.length >= 2
+            ? userLabel.slice(0, 50)
+            : cleanLabel && cleanLabel.length > 0
+              ? cleanLabel.slice(0, 50)
+              : kind === "pickup"
+                ? "Adresse de départ"
+                : "Adresse d'arrivée",
+        streetNumber: addr.streetNumber ?? "",
+        street: addr.street ?? "",
+        postalCode: addr.postcode ?? "",
+        city: addr.city ?? "",
+        country: addr.country ?? "",
+        latitude: addr.lat ?? null,
+        longitude: addr.lng ?? null,
+        setDefault: false,
+      };
+
+      if (cleanName && cleanName.length > 0) {
+        (payload as { name?: string }).name = cleanName;
+      }
+      // éviter d'envoyer name null/undefined
+      if ((payload as { name?: unknown }).name == null) {
+        delete (payload as { name?: unknown }).name;
+      }
+
+      const clientValidation = userAddressSchema
+        .extend({ setDefault: z.boolean().optional() })
+        .safeParse(payload);
+      if (!clientValidation.success) {
+        throw new Error(formatZodError(clientValidation.error.issues));
+      }
+
+      const res = await fetch("/api/profile/addresses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clientValidation.data),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const message = (data as { error?: string }).error;
+        throw new Error(message ?? "Impossible d'enregistrer cette adresse.");
+      }
+    },
+    [isAddressReady, saveLabels, sessionStatus, shouldSaveAddress]
+  );
 
   const createBooking = useCallback(
     async (payload: BookingEstimateInput, estimatedPrice: number | null) => {
@@ -358,9 +610,31 @@ export function ReservationWizard({
   ]);
 
   const onSubmit = form.handleSubmit(async (data: BookingEstimateInput) => {
+    const parsedAll = bookingEstimateSchema.safeParse(data);
+    if (!parsedAll.success) {
+      setError(formatZodError(parsedAll.error.issues));
+      return;
+    }
+    if (saveLabelMissing) {
+      setError("Ajoutez un nom pour l'adresse à enregistrer.");
+      return;
+    }
     const priceToUse = quotePrice ?? storePrice ?? 0;
-    const pickup = await ensureAddress("pickup");
-    const dropoff = await ensureAddress("dropoff");
+    let pickup: AddressData | null = null;
+    let dropoff: AddressData | null = null;
+
+    try {
+      pickup = await ensureAddress("pickup");
+      dropoff = await ensureAddress("dropoff");
+      await Promise.all([
+        saveAddressIfNeeded("pickup", pickup),
+        saveAddressIfNeeded("dropoff", dropoff),
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Impossible d'enregistrer l'adresse.");
+      return;
+    }
+
     const payload: BookingEstimateInput = { ...data, pickup, dropoff };
     if (useStore) setBookingEstimate(payload, priceToUse);
 
@@ -385,6 +659,10 @@ export function ReservationWizard({
         setError(parsed.error.issues[0]?.message ?? "Adresse de départ invalide.");
         return;
       }
+      if (!validateStepAddress("pickup")) {
+        setError("Adresse de départ invalide.");
+        return;
+      }
       updateStep(2);
       return;
     }
@@ -393,6 +671,10 @@ export function ReservationWizard({
       const parsed = addressStepSchema.safeParse(drop);
       if (!parsed.success) {
         setError(parsed.error.issues[0]?.message ?? "Adresse d'arrivée invalide.");
+        return;
+      }
+      if (!validateStepAddress("dropoff")) {
+        setError("Adresse d'arrivée invalide.");
         return;
       }
       updateStep(3);
@@ -431,6 +713,7 @@ export function ReservationWizard({
   }, [sessionStatus, session.data, step]);
 
   const steps = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+  const priceDisplay = quotePrice ?? (isHydrated ? storePrice : null) ?? initialPrice ?? "—";
 
   const updateStep = (target: WizardStep) => {
     setStep(target);
@@ -464,9 +747,7 @@ export function ReservationWizard({
             </div>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white">
-                <p className="text-xl font-semibold">
-                  {quotePrice ?? storePrice ?? initialPrice ?? "—"} €
-                </p>
+                <p className="text-xl font-semibold">{priceDisplay} €</p>
                 <p className="text-[11px] uppercase tracking-[0.3em] text-white/70">Tarif estimé</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-white">
@@ -559,48 +840,125 @@ export function ReservationWizard({
                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                       Adresse de départ
                     </p>
-                    <FormField
-                      control={form.control}
-                      name="pickup.label"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <AddressAutocomplete
-                              value={field.value ?? ""}
-                              placeholder="Ex: 114B route de Crémieu, Tignieu"
-                              onChange={(val) => {
-                                field.onChange(val);
-                                handleAddressInput("pickup", val);
-                              }}
-                              onSelect={(addr) => pickSuggestion(addr, "pickup")}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                      <Input
-                        readOnly
-                        value={pickupAddress?.street || pickupAddress?.streetNumber || "Auto"}
-                        className="bg-muted/50 text-sm"
+                    {savedAddresses.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 text-xs font-semibold text-amber-800">
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-full px-3 py-1 transition",
+                            addressMode.pickup === "saved"
+                              ? "bg-amber-600 text-white shadow-sm"
+                              : "bg-white/80 text-amber-800 border border-amber-200"
+                          )}
+                          onClick={() => {
+                            setAddressMode((prev) => ({ ...prev, pickup: "saved" }));
+                            setShouldSaveAddress((prev) => ({ ...prev, pickup: false }));
+                            setSuppressTokens((prev) => ({ ...prev, pickup: prev.pickup + 1 }));
+                          }}
+                        >
+                          Mes adresses
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-full px-3 py-1 transition",
+                            addressMode.pickup === "manual"
+                              ? "bg-amber-600 text-white shadow-sm"
+                              : "bg-white/80 text-amber-800 border border-amber-200"
+                          )}
+                          onClick={() => {
+                            setAddressMode((prev) => ({ ...prev, pickup: "manual" }));
+                            savedSelectionRef.current.pickup = false;
+                            setShouldSaveAddress((prev) => ({ ...prev, pickup: false }));
+                            clearAddress("pickup");
+                          }}
+                        >
+                          Saisir une adresse
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {addressMode.pickup === "saved" && savedAddresses.length > 0 ? (
+                      <div className="space-y-2 rounded-xl border border-amber-200/80 bg-white/70 p-3">
+                        <Select
+                          onValueChange={(value) => handleSavedAddressSelect("pickup", value)}
+                        >
+                          <SelectTrigger
+                            className="cursor-pointer"
+                            aria-label="Choisir une adresse sauvegardée"
+                          >
+                            <SelectValue placeholder="Choisir une de mes adresses favorites" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {savedAddresses.map((addr) => (
+                              <SelectItem
+                                key={addr.id}
+                                value={addr.id}
+                                className="cursor-pointer data-[state=checked]:bg-primary/15 data-[state=checked]:text-foreground"
+                              >
+                                <div className="flex flex-col text-left">
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {addr.label}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {addr.addressLine}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name="pickup.label"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <AddressAutocomplete
+                                value={field.value ?? ""}
+                                placeholder="Ex: 114B route de Crémieu, Tignieu"
+                                onChange={(val) => {
+                                  field.onChange(val);
+                                  handleAddressInput("pickup", val);
+                                }}
+                                onSelect={(addr) => pickSuggestion(addr, "pickup")}
+                                suppressToken={suppressTokens.pickup}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <Input
-                        readOnly
-                        value={pickupAddress?.postcode || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                      <Input
-                        readOnly
-                        value={pickupAddress?.city || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                      <Input
-                        readOnly
-                        value={pickupAddress?.country || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                    </div>
+                    )}
+                    {addressMode.pickup === "manual" ? (
+                      <>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                          <Input
+                            readOnly
+                            value={pickupAddress?.street || pickupAddress?.streetNumber || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={pickupAddress?.postcode || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={pickupAddress?.city || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={pickupAddress?.country || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                        </div>
+                        {renderSaveCheckbox("pickup")}
+                      </>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -612,48 +970,125 @@ export function ReservationWizard({
                     <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                       Adresse d&apos;arrivée
                     </p>
-                    <FormField
-                      control={form.control}
-                      name="dropoff.label"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <AddressAutocomplete
-                              value={field.value ?? ""}
-                              placeholder="Ex: Aéroport de Lyon"
-                              onChange={(val) => {
-                                field.onChange(val);
-                                handleAddressInput("dropoff", val);
-                              }}
-                              onSelect={(addr) => pickSuggestion(addr, "dropoff")}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                      <Input
-                        readOnly
-                        value={dropoffAddress?.street || dropoffAddress?.streetNumber || "Auto"}
-                        className="bg-muted/50 text-sm"
+                    {savedAddresses.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 text-xs font-semibold text-sky-800">
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-full px-3 py-1 transition",
+                            addressMode.dropoff === "saved"
+                              ? "bg-sky-600 text-white shadow-sm"
+                              : "bg-white/80 text-sky-800 border border-sky-200"
+                          )}
+                          onClick={() => {
+                            setAddressMode((prev) => ({ ...prev, dropoff: "saved" }));
+                            setShouldSaveAddress((prev) => ({ ...prev, dropoff: false }));
+                            setSuppressTokens((prev) => ({ ...prev, dropoff: prev.dropoff + 1 }));
+                          }}
+                        >
+                          Mes adresses
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-full px-3 py-1 transition",
+                            addressMode.dropoff === "manual"
+                              ? "bg-sky-600 text-white shadow-sm"
+                              : "bg-white/80 text-sky-800 border border-sky-200"
+                          )}
+                          onClick={() => {
+                            setAddressMode((prev) => ({ ...prev, dropoff: "manual" }));
+                            savedSelectionRef.current.dropoff = false;
+                            setShouldSaveAddress((prev) => ({ ...prev, dropoff: false }));
+                            clearAddress("dropoff");
+                          }}
+                        >
+                          Saisir une adresse
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {addressMode.dropoff === "saved" && savedAddresses.length > 0 ? (
+                      <div className="space-y-2 rounded-xl border border-sky-200/80 bg-white/70 p-3">
+                        <Select
+                          onValueChange={(value) => handleSavedAddressSelect("dropoff", value)}
+                        >
+                          <SelectTrigger
+                            className="cursor-pointer"
+                            aria-label="Choisir une adresse sauvegardée"
+                          >
+                            <SelectValue placeholder="Choisir une de mes adresses favorites" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {savedAddresses.map((addr) => (
+                              <SelectItem
+                                key={addr.id}
+                                value={addr.id}
+                                className="cursor-pointer data-[state=checked]:bg-primary/15 data-[state=checked]:text-foreground"
+                              >
+                                <div className="flex flex-col text-left">
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {addr.label}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {addr.addressLine}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name="dropoff.label"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <AddressAutocomplete
+                                value={field.value ?? ""}
+                                placeholder="Ex: Aéroport de Lyon"
+                                onChange={(val) => {
+                                  field.onChange(val);
+                                  handleAddressInput("dropoff", val);
+                                }}
+                                onSelect={(addr) => pickSuggestion(addr, "dropoff")}
+                                suppressToken={suppressTokens.dropoff}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <Input
-                        readOnly
-                        value={dropoffAddress?.postcode || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                      <Input
-                        readOnly
-                        value={dropoffAddress?.city || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                      <Input
-                        readOnly
-                        value={dropoffAddress?.country || "Auto"}
-                        className="bg-muted/50 text-sm"
-                      />
-                    </div>
+                    )}
+                    {addressMode.dropoff === "manual" ? (
+                      <>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                          <Input
+                            readOnly
+                            value={dropoffAddress?.street || dropoffAddress?.streetNumber || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={dropoffAddress?.postcode || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={dropoffAddress?.city || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                          <Input
+                            readOnly
+                            value={dropoffAddress?.country || "Auto"}
+                            className="bg-muted/50 text-sm"
+                          />
+                        </div>
+                        {renderSaveCheckbox("dropoff")}
+                      </>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -781,7 +1216,7 @@ export function ReservationWizard({
                         Tarif estimé
                       </span>
                       <span className="text-lg font-semibold text-foreground">
-                        {quotePrice ?? storePrice ?? initialPrice ?? "—"} €
+                        {priceDisplay} €
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {quoteDistance ? `${quoteDistance} km` : ""}
@@ -861,7 +1296,8 @@ export function ReservationWizard({
                     disabled={
                       isPostingRef.current ||
                       sessionStatus !== "authenticated" ||
-                      !form.watch("policiesAccepted")
+                      !form.watch("policiesAccepted") ||
+                      saveLabelMissing
                     }
                   >
                     {isPostingRef.current

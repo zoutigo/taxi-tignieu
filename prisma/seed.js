@@ -116,11 +116,16 @@ async function seedBookings(drivers, customers) {
         pax: Math.floor(Math.random() * 3) + 1,
         luggage: Math.floor(Math.random() * 4),
         babySeat: Math.random() < 0.2,
-        notes: "Course de démonstration (seed)",
         priceCents: Math.random() < 0.1 ? null : Math.floor(25 + Math.random() * 120) * 100,
         status,
         userId: customer.id,
         driverId: driver ? driver.id : null,
+        bookingNotes: {
+          create: {
+            content: "Course de démonstration (seed)",
+            authorId: customer.id,
+          },
+        },
       },
     });
   }

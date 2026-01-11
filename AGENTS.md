@@ -5,6 +5,7 @@
 - Next.js 16.0.1 App Router
 - Server components by default
 - Auth / Prisma / CI must not break
+- All Prisma models must use UUID primary keys (no auto-increment IDs)
 - No secrets or env changes
 - Build, lint, type-check, tests must pass
 - Prefer UUID primary keys on models

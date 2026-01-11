@@ -36,7 +36,7 @@ export default async function ClientBookingsPage(props: PageProps) {
       phone: true,
       image: true,
       bookings: {
-        orderBy: { createdAt: "desc" },
+        orderBy: { updatedAt: "desc" },
         select: {
           id: true,
           pickup: true,
@@ -44,10 +44,21 @@ export default async function ClientBookingsPage(props: PageProps) {
           dateTime: true,
           pax: true,
           luggage: true,
-          notes: true,
           priceCents: true,
           status: true,
+          driverId: true,
+          driver: { select: { name: true, phone: true } },
           createdAt: true,
+          updatedAt: true,
+          bookingNotes: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              author: { select: { name: true } },
+            },
+          },
         },
       },
     },
@@ -80,7 +91,11 @@ export default async function ClientBookingsPage(props: PageProps) {
 
       <BookingsManager
         initialBookings={
-          user.bookings as unknown as Parameters<typeof BookingsManager>[0]["initialBookings"]
+          user.bookings.map(({ driver, ...rest }) => ({
+            ...rest,
+            driverName: driver?.name ?? null,
+            driverPhone: driver?.phone ?? null,
+          })) as unknown as Parameters<typeof BookingsManager>[0]["initialBookings"]
         }
       />
     </div>

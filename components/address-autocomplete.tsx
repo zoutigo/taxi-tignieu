@@ -14,6 +14,8 @@ type Props = {
   onSelect: (addr: AddressData) => void;
   disabled?: boolean;
   className?: string;
+  suppressToken?: number;
+  suppressInitial?: boolean;
 };
 
 export function AddressAutocomplete({
@@ -23,14 +25,32 @@ export function AddressAutocomplete({
   onSelect,
   disabled = false,
   className,
+  suppressToken,
+  suppressInitial = false,
 }: Props) {
   const [suggestions, setSuggestions] = useState<AddressData[]>([]);
   const [loading, setLoading] = useState(false);
   const suppressNextFetchRef = useRef(false);
+  const prevSuppressToken = useRef<number | undefined>(undefined);
+  const firstRunRef = useRef(true);
+  const [hasTyped, setHasTyped] = useState(false);
 
   useEffect(() => {
+    if (suppressInitial && firstRunRef.current) {
+      suppressNextFetchRef.current = true;
+      firstRunRef.current = false;
+      prevSuppressToken.current = suppressToken;
+    } else if (suppressToken !== prevSuppressToken.current) {
+      suppressNextFetchRef.current = true;
+      prevSuppressToken.current = suppressToken;
+    }
     let active = true;
     const run = async () => {
+      if (suppressInitial && !hasTyped) {
+        setSuggestions([]);
+        setLoading(false);
+        return;
+      }
       if (suppressNextFetchRef.current) {
         suppressNextFetchRef.current = false;
         setSuggestions([]);
@@ -50,7 +70,7 @@ export function AddressAutocomplete({
     return () => {
       active = false;
     };
-  }, [value, disabled]);
+  }, [value, disabled, suppressToken, suppressInitial, hasTyped]);
 
   const handleSelect = (addr: AddressData) => {
     const normalized = normalizeAddressSuggestion(addr);
@@ -65,7 +85,10 @@ export function AddressAutocomplete({
       <Input
         placeholder={placeholder}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          setHasTyped(true);
+          onChange(e.target.value);
+        }}
         autoComplete="street-address"
         className="text-base"
       />
@@ -77,7 +100,10 @@ export function AddressAutocomplete({
               type="button"
               key={`${s.label}-${s.lat}-${s.lng}-${idx}`}
               className="flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left transition hover:bg-muted/60"
-              onClick={() => handleSelect(s)}
+              onClick={() => {
+                handleSelect(s);
+                setHasTyped(false);
+              }}
             >
               <span className="mt-0.5 text-primary">
                 <MapPin className="h-4 w-4" />

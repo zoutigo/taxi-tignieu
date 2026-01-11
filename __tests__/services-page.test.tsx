@@ -4,9 +4,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import ServicesPage from "@/app/services/page";
 import { getSiteContact } from "@/lib/site-config";
-
 jest.mock("@/lib/site-config", () => ({
   getSiteContact: jest.fn(),
+}));
+jest.mock("@/lib/prisma", () => ({
+  prisma: {
+    sCategory: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
 }));
 
 const mockedContact = getSiteContact as jest.MockedFunction<typeof getSiteContact>;

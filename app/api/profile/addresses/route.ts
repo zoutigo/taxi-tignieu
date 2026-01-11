@@ -42,32 +42,50 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const parsed = createAddressSchema.safeParse(body);
+  const raw = await req.json().catch(() => ({}));
+  // Nettoyage des valeurs nulles pour coller au schema (name non demandé en front)
+  if (raw && typeof raw === "object" && raw.name === null) {
+    delete raw.name;
+  }
+  const parsed = createAddressSchema.safeParse(raw);
   if (!parsed.success) {
-    const firstIssue =
-      parsed.error.issues?.[0]?.message ?? "Impossible d'enregistrer cette adresse pour le moment.";
+    const firstIssue = parsed.error.issues?.[0]
+      ? `${parsed.error.issues[0].path.join(".") || "champ"}: ${parsed.error.issues[0].message}`
+      : "Impossible d'enregistrer cette adresse pour le moment.";
     return NextResponse.json({ error: firstIssue }, { status: 400 });
   }
 
   try {
+    const {
+      label,
+      name,
+      street,
+      streetNumber,
+      postalCode,
+      city,
+      country,
+      latitude,
+      longitude,
+      setDefault,
+    } = parsed.data;
+
     const { address, userAddress, defaultAddressId } = await prisma.$transaction(async (tx) => {
       const address = await tx.address.create({
         data: {
-          name: parsed.data.name,
-          street: parsed.data.street,
-          streetNumber: parsed.data.streetNumber,
-          postalCode: parsed.data.postalCode,
-          city: parsed.data.city,
-          country: parsed.data.country,
-          latitude: parsed.data.latitude,
-          longitude: parsed.data.longitude,
+          name: name ?? undefined,
+          street,
+          streetNumber,
+          postalCode,
+          city,
+          country,
+          latitude,
+          longitude,
         },
       });
 
       const userAddress = await tx.userAddress.create({
         data: {
-          label: parsed.data.label,
+          label,
           userId: session.user!.id,
           addressId: address.id,
         },
@@ -79,7 +97,7 @@ export async function POST(req: Request) {
         select: { defaultAddressId: true },
       });
 
-      const shouldSetDefault = Boolean(parsed.data.setDefault) || !user?.defaultAddressId;
+      const shouldSetDefault = Boolean(setDefault) || !user?.defaultAddressId;
       const nextDefaultId = shouldSetDefault ? userAddress.id : (user?.defaultAddressId ?? null);
 
       if (shouldSetDefault) {
