@@ -29,10 +29,10 @@ describe("BookingsManager", () => {
         initialBookings={[
           {
             ...(baseBooking as Booking),
-            id: 1,
+            id: "b1",
             dateTime: new Date("2025-01-01T10:00:00Z"),
             pickup: {
-              id: 1,
+              id: "a1",
               name: null,
               street: "rue A",
               streetNumber: "10",
@@ -45,8 +45,8 @@ describe("BookingsManager", () => {
               updatedAt: new Date(),
             },
             dropoff: null,
-            dropoffId: 1,
-            pickupId: 1,
+            dropoffId: "a2",
+            pickupId: "a1",
             createdAt: new Date(),
             updatedAt: new Date(),
             userId: null,
@@ -64,12 +64,12 @@ describe("BookingsManager", () => {
   it("pagine les réservations et change la page", () => {
     const many: BookingRow[] = Array.from({ length: 12 }).map((_, idx) => ({
       ...(baseBooking as Booking),
-      id: idx + 1,
+      id: `b${idx + 1}`,
       dateTime: new Date("2025-01-01T10:00:00Z"),
       pickup: null as Address | null,
       dropoff: null as Address | null,
-      pickupId: 1,
-      dropoffId: 2,
+      pickupId: "a1",
+      dropoffId: "a2",
       createdAt: new Date(),
       updatedAt: new Date(),
       userId: null,

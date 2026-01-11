@@ -5,7 +5,7 @@ import { ReviewsPublicList } from "@/components/reviews-public-list";
 
 const reviews = [
   {
-    id: 1,
+    id: "r1",
     userId: "u1",
     bookingId: null,
     rating: 5,
@@ -16,7 +16,7 @@ const reviews = [
     user: { name: "Alice", image: "https://api.dicebear.com/7.x/thumbs/svg?seed=test" },
   },
   {
-    id: 2,
+    id: "r2",
     userId: "u2",
     bookingId: null,
     rating: 4,
@@ -75,7 +75,7 @@ describe("ReviewsPublicList", () => {
   it("pagine la liste", () => {
     const many = Array.from({ length: 12 }).map((_, idx) => ({
       ...reviews[0],
-      id: idx + 1,
+      id: `r${idx + 1}`,
       comment: `Avis ${idx + 1}`,
     }));
     let tree: renderer.ReactTestRenderer;

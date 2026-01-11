@@ -10,7 +10,7 @@ const isAdminLike = (session: unknown): boolean => {
 };
 
 const createSchema = z.object({
-  categoryId: z.number(),
+  categoryId: z.string(),
   slug: z.string().trim().min(2).max(80),
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().min(1).max(4000),
@@ -19,13 +19,13 @@ const createSchema = z.object({
 });
 
 const updateSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   slug: z.string().trim().min(2).max(80).optional(),
   title: z.string().trim().min(2).max(160).optional(),
   description: z.string().trim().min(1).max(4000).optional(),
   position: z.number().int().min(0).optional(),
   isEnabled: z.boolean().optional(),
-  categoryId: z.number().optional(),
+  categoryId: z.string().optional(),
 });
 
 const revalidateAll = (slug?: string | null) => {
@@ -120,8 +120,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" ? body.id : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
   const service = await prisma.service.findUnique({

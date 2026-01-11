@@ -117,12 +117,12 @@ describe("POST /api/bookings", () => {
     mockedAuth.mockResolvedValue({
       user: { id: "u1", email: "user@test.fr", name: "User" },
     } as { user: { id: string; email: string; name: string } });
-    mockedAddressCreate.mockResolvedValue({ id: 10 });
-    mockedAddressCreate.mockResolvedValueOnce({ id: 10 });
-    mockedAddressCreate.mockResolvedValueOnce({ id: 11 });
+    mockedAddressCreate.mockResolvedValue({ id: "a10" });
+    mockedAddressCreate.mockResolvedValueOnce({ id: "a10" });
+    mockedAddressCreate.mockResolvedValueOnce({ id: "a11" });
     mockedBookingNoteCreate.mockResolvedValue({ id: 99 });
     mockedCreate.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: new Date(),
       userId: "u1",
       dateTime: new Date(),
@@ -133,8 +133,8 @@ describe("POST /api/bookings", () => {
       status: "PENDING",
       updatedAt: new Date(),
       customerId: null,
-      pickupId: 10,
-      dropoffId: 11,
+      pickupId: "a10",
+      dropoffId: "a11",
     });
 
     const payload = {
@@ -155,8 +155,8 @@ describe("POST /api/bookings", () => {
     expect(mockedCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          pickupId: 10,
-          dropoffId: 11,
+          pickupId: "a10",
+          dropoffId: "a11",
           pax: payload.passengers,
           luggage: payload.luggage,
           priceCents: 4200,
@@ -167,7 +167,7 @@ describe("POST /api/bookings", () => {
     expect(mockedBookingNoteCreate).toHaveBeenCalledWith({
       data: {
         content: payload.notes,
-        bookingId: 1,
+        bookingId: "b1",
         authorId: "u1",
       },
     });
@@ -177,10 +177,10 @@ describe("POST /api/bookings", () => {
 
   it("calcule dateTime et priceCents, même sans notes", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
-    mockedAddressCreate.mockResolvedValueOnce({ id: 10 });
-    mockedAddressCreate.mockResolvedValueOnce({ id: 11 });
+    mockedAddressCreate.mockResolvedValueOnce({ id: "a10" });
+    mockedAddressCreate.mockResolvedValueOnce({ id: "a11" });
     mockedCreate.mockResolvedValue({
-      id: 2,
+      id: "b2",
       createdAt: new Date(),
       userId: "u1",
       dateTime: new Date("2025-01-01T10:30:00Z"),
@@ -210,12 +210,12 @@ describe("POST /api/bookings", () => {
 
     expect(res.status).toBe(201);
     const called = mockedCreate.mock.calls[0]?.[0] as {
-      data?: { dateTime?: unknown; priceCents?: unknown; pickupId?: number; dropoffId?: number };
+      data?: { dateTime?: unknown; priceCents?: unknown; pickupId?: string; dropoffId?: string };
     };
     expect(called?.data?.dateTime).toBeInstanceOf(Date);
     expect(called?.data?.priceCents).toBeNull();
-    expect(called?.data?.pickupId).toBe(10);
-    expect(called?.data?.dropoffId).toBe(11);
+    expect(called?.data?.pickupId).toBe("a10");
+    expect(called?.data?.dropoffId).toBe("a11");
   });
 });
 
@@ -224,22 +224,22 @@ describe("GET /api/bookings", () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
     mockedFindMany.mockResolvedValue([
       {
-        id: 1,
+        id: "b1",
         createdAt: new Date(),
         userId: "u1",
-        pickupId: 1,
-        dropoffId: 2,
-        pickup: { id: 1 },
-        dropoff: { id: 2 },
+        pickupId: "a1",
+        dropoffId: "a2",
+        pickup: { id: "a1" },
+        dropoff: { id: "a2" },
         dateTime: new Date(),
         pax: 1,
         luggage: 0,
         babySeat: false,
-        notes: null,
         priceCents: null,
         status: "PENDING",
         updatedAt: new Date(),
         customerId: null,
+        bookingNotes: [],
       },
     ]);
 
@@ -258,11 +258,11 @@ describe("PATCH /api/bookings", () => {
   it("interdit si pas propriétaire", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u2" } } as { user: { id: string } });
     mockedFindUnique.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: new Date(),
       userId: "other",
-      pickupId: 1,
-      dropoffId: 2,
+      pickupId: "a1",
+      dropoffId: "a2",
       dateTime: new Date(),
       pax: 1,
       luggage: 0,
@@ -276,7 +276,7 @@ describe("PATCH /api/bookings", () => {
 
     const res = await (
       await import("@/app/api/bookings/route")
-    ).PATCH(makeRequest({ id: 1, pickup: { label: "New", lat: 1, lng: 1 } }));
+    ).PATCH(makeRequest({ id: "b1", pickup: { label: "New", lat: 1, lng: 1 } }));
 
     expect(res.status).toBe(403);
     expect(mockedUpdate).not.toHaveBeenCalled();
@@ -288,23 +288,23 @@ describe("PATCH /api/bookings", () => {
     });
     mockedBookingNoteCreate.mockResolvedValue({ id: 2 });
     mockedFindUnique.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: new Date(),
       userId: "u1",
-      pickupId: 1,
-      dropoffId: 2,
+      pickupId: "a1",
+      dropoffId: "a2",
       dateTime: new Date(),
       pax: 1,
       luggage: 0,
       babySeat: false,
-      notes: null,
       priceCents: null,
       status: "PENDING",
       updatedAt: new Date(),
       customerId: null,
+      bookingNotes: [],
     });
     mockedUpdate.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: new Date(),
       userId: "u1",
       pickup: "New",
@@ -324,7 +324,7 @@ describe("PATCH /api/bookings", () => {
       await import("@/app/api/bookings/route")
     ).PATCH(
       makeRequest({
-        id: 1,
+        id: "b1",
         pickup: { label: "New", lat: 1, lng: 1 },
         dropoff: { label: "Dest", lat: 2, lng: 2 },
         date: "2025-01-01",
@@ -340,7 +340,7 @@ describe("PATCH /api/bookings", () => {
     expect(mockedUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          pickupId: expect.any(Number),
+          pickupId: expect.any(String),
           priceCents: 5550,
         }),
       })
@@ -348,7 +348,7 @@ describe("PATCH /api/bookings", () => {
     expect(mockedBookingNoteCreate).toHaveBeenCalledWith({
       data: {
         content: "Note",
-        bookingId: 1,
+        bookingId: "b1",
         authorId: "u1",
       },
     });
@@ -362,7 +362,7 @@ describe("PATCH /api/bookings", () => {
     const oldDate = new Date("2025-01-01T10:00:00Z");
     const newDate = new Date("2025-01-02T11:00:00Z");
     mockedFindUnique.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: oldDate,
       userId: "u1",
       pickup: { name: "Ancien dep", street: "Rue A", postalCode: "11111", city: "Old" },
@@ -378,7 +378,7 @@ describe("PATCH /api/bookings", () => {
       customerId: null,
     });
     mockedUpdate.mockResolvedValue({
-      id: 1,
+      id: "b1",
       createdAt: newDate,
       userId: "u1",
       pickup: { name: "Nouveau dep", street: "Rue C", postalCode: "33333", city: "New" },
@@ -398,7 +398,7 @@ describe("PATCH /api/bookings", () => {
       await import("@/app/api/bookings/route")
     ).PATCH(
       makeRequest({
-        id: 1,
+        id: "b1",
         pickup: { label: "Nouveau dep", lat: 1, lng: 1 },
         dropoff: { label: "Nouvelle arr", lat: 2, lng: 2 },
         date: "2025-01-02",
@@ -422,26 +422,28 @@ describe("DELETE /api/bookings", () => {
       user: { id: string; email: string };
     });
     mockedFindUnique.mockResolvedValue({
-      id: 1,
+      id: "bDel",
       createdAt: new Date(),
       userId: "other",
-      pickupId: 1,
-      dropoffId: 2,
+      pickupId: "a1",
+      dropoffId: "a2",
       dateTime: new Date(),
       pax: 1,
       luggage: 0,
       babySeat: false,
-      notes: null,
       priceCents: null,
       status: "PENDING",
       updatedAt: new Date(),
       customerId: null,
+      bookingNotes: [],
     });
     mockedDelete.mockResolvedValue({ ok: true });
 
-    const res = await (await import("@/app/api/bookings/route")).DELETE(makeRequest({ id: 1 }));
+    const res = await (
+      await import("@/app/api/bookings/route")
+    ).DELETE(makeRequest({ id: "bDel" }));
 
     expect(res.status).toBe(200);
-    expect(mockedDelete).toHaveBeenCalledWith({ where: { id: 1 } });
+    expect(mockedDelete).toHaveBeenCalledWith({ where: { id: "bDel" } });
   });
 });

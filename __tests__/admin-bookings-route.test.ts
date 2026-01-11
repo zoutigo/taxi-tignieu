@@ -170,11 +170,11 @@ describe("api/admin/bookings", () => {
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "PATCH",
-      body: JSON.stringify({ id: 1, driverId: "d1", status: "CONFIRMED" }),
+      body: JSON.stringify({ id: "1", driverId: "d1", status: "CONFIRMED" }),
     });
     const res = await mod.PATCH(req);
     expect(res.status).toBe(200);
-    expect(mockedUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 1 } }));
+    expect(mockedUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "1" } }));
   });
 
   it("refuse qu'un driver modifie des champs interdits", async () => {

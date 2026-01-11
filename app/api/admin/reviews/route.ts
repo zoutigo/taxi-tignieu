@@ -9,12 +9,14 @@ const isAdminLike = (session: unknown): boolean => {
   return Boolean(s?.user && (s.user.isAdmin || s.user.isManager));
 };
 
-const patchSchema = z.object({
-  id: z.number(),
-  rating: z.number().min(1).max(5).optional(),
-  comment: z.string().min(1).max(500).optional(),
-  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-});
+const patchSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    rating: z.number().min(1).max(5).optional(),
+    comment: z.string().min(1).max(500).optional(),
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  })
+  .required({ id: true });
 
 export async function GET() {
   const session = await auth();
@@ -40,6 +42,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Données invalides" }, { status: 400 });
   }
   const { id, rating, comment, status } = parsed.data;
+  const reviewId = String(id);
 
   const data: Record<string, unknown> = {};
   if (rating !== undefined) data.rating = rating;
@@ -47,7 +50,7 @@ export async function PATCH(req: Request) {
   if (status !== undefined) data.status = status;
 
   const review = await prisma.review.update({
-    where: { id },
+    where: { id: reviewId },
     data,
   });
   // revalidation est ignorée en test; en prod, Next la gère via tags/ISR
@@ -66,8 +69,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
   await prisma.review.delete({ where: { id } });

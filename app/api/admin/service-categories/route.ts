@@ -16,9 +16,12 @@ const createSchema = z.object({
   position: z.number().int().min(0).optional(),
 });
 
-const updateSchema = createSchema.partial().extend({
-  id: z.number(),
-});
+const updateSchema = createSchema
+  .partial()
+  .extend({
+    id: z.string(),
+  })
+  .required({ id: true });
 
 const revalidateAll = (slug?: string | null) => {
   try {
@@ -121,8 +124,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
   }
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" ? body.id : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
   const cat = await prisma.sCategory.findUnique({ where: { id }, select: { slug: true } });

@@ -79,7 +79,7 @@ type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 type Props = {
   mode?: "create" | "edit";
-  bookingId?: number;
+  bookingId?: string;
   initialValues?: Partial<BookingEstimateInput>;
   initialPrice?: number | null;
   successRedirect?: string;

@@ -17,7 +17,7 @@ const suggestion = {
 };
 
 const buildAddress = (overrides?: Partial<Address>): Address => ({
-  id: 1,
+  id: "addr-1",
   name: null,
   street: "Rue 1",
   streetNumber: "10",
@@ -36,7 +36,7 @@ const buildUserAddress = (id: string, label: string, overrides?: Partial<UserAdd
     id,
     label,
     userId: "user-1",
-    addressId: Number(id),
+    addressId: id,
     createdAt: new Date(),
     updatedAt: new Date(),
     defaultFor: null,
@@ -63,7 +63,7 @@ describe("UserAddressesManager flows", () => {
               savedAddress: {
                 ...buildUserAddress("addr-new", "Maison"),
                 address: buildAddress({
-                  id: 99,
+                  id: "addr-new-phys",
                   street: suggestion.street,
                   streetNumber: suggestion.streetNumber,
                   postalCode: suggestion.postcode,
@@ -83,8 +83,8 @@ describe("UserAddressesManager flows", () => {
           json: () =>
             Promise.resolve({
               address: {
-                ...buildUserAddress("2", "Bureau"),
-                address: buildAddress({ id: 2 }),
+                ...buildUserAddress("addr-2", "Bureau"),
+                address: buildAddress({ id: "addr-2" }),
                 isDefault: true,
               },
             }),
@@ -159,8 +159,16 @@ describe("UserAddressesManager flows", () => {
 
   it("sets an address as default", async () => {
     const initial: SavedAddressTest[] = [
-      { ...buildUserAddress("1", "Maison"), address: buildAddress({ id: 1 }), isDefault: false },
-      { ...buildUserAddress("2", "Bureau"), address: buildAddress({ id: 2 }), isDefault: false },
+      {
+        ...buildUserAddress("addr-1", "Maison"),
+        address: buildAddress({ id: "addr-1" }),
+        isDefault: false,
+      },
+      {
+        ...buildUserAddress("addr-2", "Bureau"),
+        address: buildAddress({ id: "addr-2" }),
+        isDefault: false,
+      },
     ];
     render(<UserAddressesManager initialAddresses={initial} />);
 
@@ -169,7 +177,7 @@ describe("UserAddressesManager flows", () => {
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/profile/addresses/2"),
+        expect.stringContaining("/api/profile/addresses/addr-2"),
         expect.objectContaining({ method: "PATCH" })
       )
     );
@@ -178,8 +186,16 @@ describe("UserAddressesManager flows", () => {
 
   it("deletes an address after confirmation", async () => {
     const initial: SavedAddressTest[] = [
-      { ...buildUserAddress("1", "Maison"), address: buildAddress({ id: 1 }), isDefault: true },
-      { ...buildUserAddress("2", "Bureau"), address: buildAddress({ id: 2 }), isDefault: false },
+      {
+        ...buildUserAddress("addr-1", "Maison"),
+        address: buildAddress({ id: "addr-1" }),
+        isDefault: true,
+      },
+      {
+        ...buildUserAddress("addr-2", "Bureau"),
+        address: buildAddress({ id: "addr-2" }),
+        isDefault: false,
+      },
     ];
     render(<UserAddressesManager initialAddresses={initial} />);
 
@@ -191,7 +207,7 @@ describe("UserAddressesManager flows", () => {
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/profile/addresses/2"),
+        expect.stringContaining("/api/profile/addresses/addr-2"),
         expect.objectContaining({ method: "DELETE" })
       )
     );

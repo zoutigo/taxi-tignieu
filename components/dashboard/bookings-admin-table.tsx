@@ -88,18 +88,18 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [bookings, setBookings] = useState<BookingRow[]>(initialBookings);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [savingId, setSavingId] = useState<number | null>(null);
-  const [transferTarget, setTransferTarget] = useState<Record<number, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">("ALL");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
-  const [pendingInvoiceId, setPendingInvoiceId] = useState<number | null>(null);
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
-  const [confirmDriver, setConfirmDriver] = useState<Record<number, string>>({});
-  const [finishingId, setFinishingId] = useState<number | null>(null);
-  const [finishNote, setFinishNote] = useState<Record<number, string>>({});
-  const [finishInvoice, setFinishInvoice] = useState<Record<number, boolean>>({});
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmDriver, setConfirmDriver] = useState<Record<string, string>>({});
+  const [finishingId, setFinishingId] = useState<string | null>(null);
+  const [finishNote, setFinishNote] = useState<Record<string, string>>({});
+  const [finishInvoice, setFinishInvoice] = useState<Record<string, boolean>>({});
 
   const adminLike = Boolean(currentUser?.isAdmin || currentUser?.isManager);
   const driverLike = Boolean(currentUser?.isDriver);
@@ -136,7 +136,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
   };
 
-  const patchBooking = async (payload: Partial<BookingRow> & { id: number }) => {
+  const patchBooking = async (payload: Partial<BookingRow> & { id: string }) => {
     setError(null);
     const res = await fetch("/api/admin/bookings", {
       method: "PATCH",
@@ -274,7 +274,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
         id: b.id,
         status: "COMPLETED",
         generateInvoice,
-      } as Partial<BookingRow> & { id: number } & { completionNotes?: string });
+      } as Partial<BookingRow> & { id: string } & { completionNotes?: string });
       if (note) {
         updated.notes = note;
       }

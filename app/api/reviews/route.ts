@@ -6,7 +6,7 @@ import { z } from "zod";
 const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().min(3).max(500),
-  bookingId: z.number().optional(),
+  bookingId: z.string().optional(),
 });
 
 export async function GET() {
@@ -55,10 +55,13 @@ export async function POST(req: Request) {
   return NextResponse.json({ review }, { status: 201 });
 }
 
-const patchSchema = reviewSchema.partial().extend({
-  id: z.number(),
-  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-});
+const patchSchema = reviewSchema
+  .partial()
+  .extend({
+    id: z.string(),
+    status: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  })
+  .required({ id: true });
 
 export async function PATCH(req: Request) {
   const session = await auth();
@@ -115,8 +118,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" ? body.id : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
 

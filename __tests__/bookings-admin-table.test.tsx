@@ -32,9 +32,9 @@ jest.mock("@/components/ui/select", () => ({
 type BookingRow = Parameters<typeof BookingsAdminTable>[0]["initialBookings"][number];
 
 const baseBooking: BookingRow = {
-  id: 1,
-  pickupId: 1,
-  dropoffId: 2,
+  id: "b1",
+  pickupId: "a1",
+  dropoffId: "a2",
   pickupLabel: "Départ A",
   dropoffLabel: "Arrivée B",
   dateTime: new Date("2025-01-01T10:00:00Z"),
@@ -144,7 +144,7 @@ describe("BookingsAdminTable UI", () => {
   it("filtre par statut et pagine", () => {
     const many = Array.from({ length: 12 }).map((_, idx) => ({
       ...baseBooking,
-      id: idx + 1,
+      id: `b${idx + 1}`,
       status: "CONFIRMED" as const,
     }));
     let tree: renderer.ReactTestRenderer;
@@ -292,7 +292,7 @@ describe("BookingsAdminTable UI", () => {
             status: "COMPLETED",
             bookingNotes: [
               {
-                id: 1,
+                id: "b1",
                 content: "fin note",
                 bookingId: baseBooking.id,
                 authorId: "u1",
@@ -362,10 +362,10 @@ describe("BookingsAdminTable UI", () => {
 
   it("applique une classe de tonalité selon le statut", () => {
     const styled = [
-      { ...baseBooking, id: 1, status: "PENDING" as BookingStatus },
-      { ...baseBooking, id: 2, status: "CONFIRMED" as BookingStatus },
-      { ...baseBooking, id: 3, status: "COMPLETED" as BookingStatus },
-      { ...baseBooking, id: 4, status: "CANCELLED" as BookingStatus },
+      { ...baseBooking, id: "b1", status: "PENDING" as BookingStatus },
+      { ...baseBooking, id: "b2", status: "CONFIRMED" as BookingStatus },
+      { ...baseBooking, id: "b3", status: "COMPLETED" as BookingStatus },
+      { ...baseBooking, id: "b4", status: "CANCELLED" as BookingStatus },
     ];
     let tree: renderer.ReactTestRenderer;
     act(() => {

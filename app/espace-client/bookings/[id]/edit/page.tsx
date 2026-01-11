@@ -15,10 +15,7 @@ const formatAddressLine = (address: Address) =>
 
 export default async function EditBookingPage(props: PageProps) {
   const params = await Promise.resolve(props.params);
-  const id = Number(params.id);
-  if (!Number.isFinite(id)) {
-    notFound();
-  }
+  const id = params.id;
 
   const session = await auth();
   if (!session?.user?.id) {

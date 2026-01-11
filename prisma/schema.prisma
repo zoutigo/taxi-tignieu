@@ -70,7 +70,7 @@ model VerificationToken {
 }
 
 model Booking {
-  id         Int           @id @default(autoincrement())
+  id         String        @id @default(cuid())
   dateTime   DateTime
   pax        Int           @default(1)
   luggage    Int           @default(0)
@@ -84,10 +84,10 @@ model Booking {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   customer   Customer?     @relation(fields: [customerId], references: [id])
-  customerId Int?
+  customerId String?
   reviews    Review[]
-  pickupId   Int
-  dropoffId  Int
+  pickupId   String
+  dropoffId  String
   pickup     Address       @relation("PickupAddress", fields: [pickupId], references: [id])
   dropoff    Address       @relation("DropoffAddress", fields: [dropoffId], references: [id])
   invoice    Invoice?
@@ -102,7 +102,7 @@ enum BookingStatus {
 }
 
 model Customer {
-  id        Int       @id @default(autoincrement())
+  id        String    @id @default(cuid())
   fullName  String
   phone     String
   email     String?   @unique
@@ -117,10 +117,10 @@ enum ReviewStatus {
 }
 
 model Review {
-  id        Int          @id @default(autoincrement())
+  id        String       @id @default(cuid())
   userId    String
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookingId Int?
+  bookingId String?
   booking   Booking?     @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   rating    Int
   comment   String
@@ -130,7 +130,7 @@ model Review {
 }
 
 model Address {
-  id              Int         @id @default(autoincrement())
+  id              String      @id @default(cuid())
   name            String?
   street          String?
   streetNumber    String?
@@ -148,10 +148,10 @@ model Address {
 }
 
 model BookingNote {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   content   String
   booking   Booking  @relation(fields: [bookingId], references: [id])
-  bookingId Int
+  bookingId String
   author    User?    @relation("BookingNoteAuthor", fields: [authorId], references: [id])
   authorId  String?
   createdAt DateTime @default(now())
@@ -159,21 +159,21 @@ model BookingNote {
 }
 
 model SiteConfig {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   name      String?
   ownerName String?
   siret     String?
   ape       String?
   phone     String
   email     String
-  addressId Int      @unique
+  addressId String   @unique
   address   Address  @relation(fields: [addressId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model TariffConfig {
-  id                  Int      @id @default(autoincrement())
+  id                  String   @id @default(cuid())
   baseChargeCents     Int      @default(280)
   kmCentsA            Int      @default(98)
   kmCentsB            Int      @default(123)
@@ -187,9 +187,9 @@ model TariffConfig {
 }
 
 model Invoice {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(cuid())
   booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  bookingId   Int      @unique
+  bookingId   String   @unique
   amountCents Int
   pdfPath     String
   issuedAt    DateTime @default(now())
@@ -198,7 +198,7 @@ model Invoice {
 }
 
 model ContactMessage {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category  String
@@ -211,7 +211,7 @@ model UserAddress {
   id        String   @id @default(uuid())
   label     String
   userId    String
-  addressId Int
+  addressId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -223,7 +223,7 @@ model UserAddress {
 }
 
 model SCategory {
-  id        Int       @id @default(autoincrement())
+  id        String    @id @default(cuid())
   slug      String    @unique
   title     String
   summary   String
@@ -234,25 +234,25 @@ model SCategory {
 }
 
 model Service {
-  id          Int           @id @default(autoincrement())
+  id          String        @id @default(cuid())
   slug        String        @unique
   title       String
   description String        @db.Text
   isEnabled   Boolean       @default(true)
   position    Int           @default(0)
   category    SCategory     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  categoryId  Int
+  categoryId  String
   highlights  SHighlight[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
 
 model SHighlight {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   label     String
   position  Int      @default(0)
   service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  serviceId Int
+  serviceId String
 }
 
 model FaqCategory {

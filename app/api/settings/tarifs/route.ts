@@ -75,12 +75,10 @@ export async function PATCH(req: Request) {
   };
 
   const existing = await prisma.tariffConfig.findFirst({ orderBy: { updatedAt: "desc" } });
-  const id = existing?.id ?? 1;
-
   const updated = await prisma.tariffConfig.upsert({
-    where: { id },
+    where: { id: existing?.id ?? "" },
     update: centsPayload,
-    create: { id, ...centsPayload },
+    create: { ...centsPayload },
   });
 
   (revalidateTag as unknown as (tag: string) => void)("tariff-config");

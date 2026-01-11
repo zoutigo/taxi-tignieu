@@ -11,7 +11,7 @@ const isAdminLike = (session: unknown): boolean => {
 };
 
 const updateSchema = z.object({
-  id: z.number(),
+  id: z.union([z.string(), z.number()]),
   pickup: z.string().optional(),
   dropoff: z.string().optional(),
   date: z.string().optional(),
@@ -80,9 +80,10 @@ export async function PATCH(req: Request) {
     priceCents,
     driverId,
   } = parsed.data;
+  const bookingId = String(id);
 
   const existing = await prisma.booking.findUnique({
-    where: { id },
+    where: { id: bookingId },
     include: {
       user: { select: { name: true, email: true, phone: true } },
       customer: { select: { fullName: true, phone: true, email: true } },
@@ -144,7 +145,7 @@ export async function PATCH(req: Request) {
 
   const updateWithNotes = async (tx: typeof prisma) => {
     const updated = await tx.booking.update({
-      where: { id },
+      where: { id: bookingId },
       data,
       include: {
         user: { select: { name: true, email: true, phone: true } },
@@ -323,8 +324,8 @@ export async function DELETE(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const id = Number(body?.id);
-  if (!Number.isFinite(id)) {
+  const id = typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
+  if (!id) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
 

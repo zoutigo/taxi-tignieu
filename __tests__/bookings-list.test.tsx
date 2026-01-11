@@ -7,11 +7,11 @@ type FetchResponse = { ok: boolean; json: () => Promise<unknown> };
 const mockFetch = jest.fn<Promise<FetchResponse>, [RequestInfo | URL, RequestInit?]>();
 
 const booking = {
-  id: 1,
-  pickupId: 1,
-  dropoffId: 2,
+  id: "b1",
+  pickupId: "a1",
+  dropoffId: "a2",
   pickup: {
-    id: 1,
+    id: "a1",
     name: "A",
     street: "A",
     streetNumber: "1",
@@ -24,7 +24,7 @@ const booking = {
     updatedAt: new Date(),
   },
   dropoff: {
-    id: 2,
+    id: "a2",
     name: "B",
     street: "B",
     streetNumber: "2",

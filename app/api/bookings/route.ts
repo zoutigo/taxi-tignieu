@@ -178,10 +178,7 @@ export async function PATCH(req: Request) {
 
   const { id, pickup, dropoff, date, time, passengers, luggage, notes, estimatedPrice } =
     parsed.data;
-  const bookingId = typeof id === "number" ? id : Number(id);
-  if (!Number.isFinite(bookingId)) {
-    return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
-  }
+  const bookingId = String(id);
 
   const existing = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -354,8 +351,9 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
-  const bookingId = typeof body?.id === "number" ? body.id : Number(body?.id);
-  if (!Number.isFinite(bookingId)) {
+  const bookingId =
+    typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
+  if (!bookingId) {
     return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
   }
 

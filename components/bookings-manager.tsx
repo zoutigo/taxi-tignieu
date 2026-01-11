@@ -83,7 +83,7 @@ const cardBorderTone = (status: Booking["status"]) => {
 export function BookingsManager({ initialBookings }: { initialBookings: BookingWithPrice[] }) {
   const router = useRouter();
   const [bookings, setBookings] = useState(initialBookings);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BookingWithPrice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);

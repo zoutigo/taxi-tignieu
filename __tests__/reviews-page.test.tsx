@@ -43,7 +43,7 @@ const mockedFindMany = prisma.review.findMany as unknown as jest.MockedFunction<
 >;
 
 const makeReview = (overrides: Partial<ReviewWithUser> = {}): ReviewWithUser => ({
-  id: overrides.id ?? 1,
+  id: overrides.id ?? "r1",
   userId: overrides.userId ?? "u1",
   bookingId: overrides.bookingId ?? null,
   rating: overrides.rating ?? 5,
@@ -65,7 +65,10 @@ describe("AvisPage", () => {
   it("affiche la moyenne, le total, les étoiles, le CTA et le formulaire pour un utilisateur sans avis", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" }, expires: "" } as Session);
     mockedFindFirst.mockResolvedValue(null);
-    mockedFindMany.mockResolvedValue([makeReview({ rating: 5 }), makeReview({ id: 2, rating: 4 })]);
+    mockedFindMany.mockResolvedValue([
+      makeReview({ rating: 5 }),
+      makeReview({ id: "r2", rating: 4 }),
+    ]);
 
     const html = renderToStaticMarkup(await AvisPage());
 

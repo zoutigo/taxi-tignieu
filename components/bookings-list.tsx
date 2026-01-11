@@ -101,10 +101,10 @@ type Props = {
 
 export function BookingsList({ initialBookings }: Props) {
   const [bookings, setBookings] = useState(initialBookings);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BookingWithPrice | null>(null);
 
   const handleEdit = useCallback((booking: BookingWithPrice) => {

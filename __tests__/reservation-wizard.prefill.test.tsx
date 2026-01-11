@@ -107,7 +107,7 @@ describe("ReservationWizard prefill in edit mode", () => {
     const { getAllByTestId } = render(
       <ReservationWizard
         mode="edit"
-        bookingId={123}
+        bookingId="booking-123"
         useStore={false}
         initialValues={{
           pickup: {
