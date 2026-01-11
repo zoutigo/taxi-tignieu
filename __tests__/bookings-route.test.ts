@@ -69,7 +69,6 @@ const mockedFindUnique = prisma.booking.findUnique as jest.MockedFunction<
   typeof prisma.booking.findUnique
 >;
 const mockedUpdate = prisma.booking.update as jest.MockedFunction<typeof prisma.booking.update>;
-const mockedDelete = prisma.booking.delete as jest.MockedFunction<typeof prisma.booking.delete>;
 const mockedBookingNoteCreate = prisma.bookingNote.create as jest.MockedFunction<
   typeof prisma.bookingNote.create
 >;
@@ -216,6 +215,72 @@ describe("POST /api/bookings", () => {
     expect(called?.data?.priceCents).toBeNull();
     expect(called?.data?.pickupId).toBe("a10");
     expect(called?.data?.dropoffId).toBe("a11");
+  });
+
+  it("refuse la modification d'une réservation annulée", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
+    mockedFindUnique.mockResolvedValue({
+      id: "b-cancel",
+      userId: "u1",
+      status: "CANCELLED",
+      pickup: null,
+      dropoff: null,
+      dateTime: new Date(),
+      bookingNotes: [],
+      invoice: null,
+    });
+
+    const res = await (
+      await import("@/app/api/bookings/route")
+    ).PATCH(
+      makeRequest({
+        id: "b-cancel",
+        pickup: { label: "dep", lat: 1, lng: 1 },
+        dropoff: { label: "arr", lat: 2, lng: 2 },
+        date: "2025-01-01",
+        time: "10:00",
+        passengers: 1,
+        luggage: 0,
+        estimatedPrice: 10,
+        notes: "",
+      })
+    );
+
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuse la modification d'une réservation terminée", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as { user: { id: string } });
+    mockedFindUnique.mockResolvedValue({
+      id: "b-done",
+      userId: "u1",
+      status: "COMPLETED",
+      pickup: null,
+      dropoff: null,
+      dateTime: new Date(),
+      bookingNotes: [],
+      invoice: null,
+    });
+
+    const res = await (
+      await import("@/app/api/bookings/route")
+    ).PATCH(
+      makeRequest({
+        id: "b-done",
+        pickup: { label: "dep", lat: 1, lng: 1 },
+        dropoff: { label: "arr", lat: 2, lng: 2 },
+        date: "2025-01-01",
+        time: "10:00",
+        passengers: 1,
+        luggage: 0,
+        estimatedPrice: 10,
+        notes: "",
+      })
+    );
+
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -436,14 +501,114 @@ describe("DELETE /api/bookings", () => {
       updatedAt: new Date(),
       customerId: null,
       bookingNotes: [],
+      invoice: null,
     });
-    mockedDelete.mockResolvedValue({ ok: true });
+    const cancelledAt = new Date();
+    mockedUpdate.mockResolvedValue({
+      id: "bDel",
+      status: "CANCELLED",
+      createdAt: cancelledAt,
+      updatedAt: cancelledAt,
+      userId: "u1",
+      pickupId: "a1",
+      dropoffId: "a2",
+      pickup: {
+        street: "Rue A",
+        streetNumber: "1",
+        postalCode: "11111",
+        city: "Ville A",
+        country: "France",
+        name: "Dep",
+      },
+      dropoff: {
+        street: "Rue B",
+        streetNumber: "2",
+        postalCode: "22222",
+        city: "Ville B",
+        country: "France",
+        name: "Arr",
+      },
+      dateTime: cancelledAt,
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: null,
+      customerId: null,
+      bookingNotes: [],
+      invoice: null,
+    });
 
     const res = await (
       await import("@/app/api/bookings/route")
-    ).DELETE(makeRequest({ id: "bDel" }));
+    ).DELETE(makeRequest({ id: "bDel", note: "annulation" }));
 
     expect(res.status).toBe(200);
-    expect(mockedDelete).toHaveBeenCalledWith({ where: { id: "bDel" } });
+    expect(mockedUpdate).toHaveBeenCalled();
+    expect(mockedBuildBookingEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "cancelled",
+        changes: expect.arrayContaining([expect.stringContaining("Motif")]),
+      })
+    );
+  });
+
+  it("refuse la suppression si la réservation est terminée ou facturée", async () => {
+    process.env.ADMIN_EMAILS = "admin@test.com";
+    mockedAuth.mockResolvedValue({ user: { id: "uX", email: "admin@test.com" } } as {
+      user: { id: string; email: string };
+    });
+    mockedFindUnique.mockResolvedValue({
+      id: "bInv",
+      createdAt: new Date(),
+      userId: "uX",
+      pickupId: "a1",
+      dropoffId: "a2",
+      dateTime: new Date(),
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: null,
+      status: "COMPLETED",
+      updatedAt: new Date(),
+      customerId: null,
+      bookingNotes: [],
+      invoice: { id: "inv1" },
+    });
+    const res = await (
+      await import("@/app/api/bookings/route")
+    ).DELETE(makeRequest({ id: "bInv", note: "annulation" }));
+
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuse la suppression si la réservation est déjà annulée", async () => {
+    process.env.ADMIN_EMAILS = "admin@test.com";
+    mockedAuth.mockResolvedValue({ user: { id: "uX", email: "admin@test.com" } } as {
+      user: { id: string; email: string };
+    });
+    mockedFindUnique.mockResolvedValue({
+      id: "bCanc",
+      createdAt: new Date(),
+      userId: "uX",
+      pickupId: "a1",
+      dropoffId: "a2",
+      dateTime: new Date(),
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: null,
+      status: "CANCELLED",
+      updatedAt: new Date(),
+      customerId: null,
+      bookingNotes: [],
+      invoice: null,
+    });
+    const resCanc = await (
+      await import("@/app/api/bookings/route")
+    ).DELETE(makeRequest({ id: "bCanc", note: "annulation" }));
+
+    expect(resCanc.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
   });
 });

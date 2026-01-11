@@ -124,4 +124,19 @@ describe("BookingsList actions", () => {
       expect.objectContaining({ method: "PATCH" })
     );
   });
+
+  it("n'affiche pas le bouton supprimer pour une réservation terminée ou facturée", async () => {
+    const completed = { ...booking, id: "b-completed", status: "COMPLETED" as const };
+    const invoiced = { ...booking, id: "b-inv", invoice: { id: "inv1" } };
+
+    let tree: renderer.ReactTestRenderer;
+    await act(async () => {
+      tree = renderer.create(<BookingsList initialBookings={[completed, invoiced]} />);
+    });
+
+    const buttons = tree!.root.findAll(
+      (node) => node.type === "button" && node.props.children === "Supprimer"
+    );
+    expect(buttons.length).toBe(0);
+  });
 });

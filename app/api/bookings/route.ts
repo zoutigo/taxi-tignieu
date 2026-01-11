@@ -182,7 +182,12 @@ export async function PATCH(req: Request) {
 
   const existing = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
+    include: {
+      pickup: true,
+      dropoff: true,
+      bookingNotes: { orderBy: { createdAt: "asc" } },
+      invoice: true,
+    },
   });
   const isOwner = existing?.userId === userId;
   const adminList =
@@ -193,6 +198,12 @@ export async function PATCH(req: Request) {
 
   if (!existing || (!isOwner && !isAdmin)) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
+  }
+  if (existing.status === "COMPLETED" || existing.status === "CANCELLED" || existing.invoice) {
+    return NextResponse.json(
+      { error: "Impossible de modifier une réservation terminée, annulée ou facturée." },
+      { status: 409 }
+    );
   }
 
   const data: Record<string, unknown> = {};
@@ -351,13 +362,16 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
   const body = await req.json().catch(() => ({}));
-  const bookingId =
-    typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
-  if (!bookingId) {
-    return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
+  const id = typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
+  const note = typeof body?.note === "string" ? body.note.trim() : "";
+  if (!id || !note) {
+    return NextResponse.json({ error: "Identifiant ou note manquants" }, { status: 400 });
   }
 
-  const existing = await prisma.booking.findUnique({ where: { id: bookingId } });
+  const existing = await prisma.booking.findUnique({
+    where: { id },
+    include: { invoice: true, driver: { select: { email: true, name: true, phone: true } } },
+  });
   const isOwner = existing?.userId === session.user.id;
   const adminList =
     process.env.ADMIN_EMAILS?.split(",").map((email) => email.trim().toLowerCase()) ?? [];
@@ -368,7 +382,80 @@ export async function DELETE(req: Request) {
   if (!existing || (!isOwner && !isAdmin)) {
     return NextResponse.json({ error: "Interdit" }, { status: 403 });
   }
+  if (existing.status === "COMPLETED" || existing.status === "CANCELLED" || existing.invoice) {
+    return NextResponse.json(
+      { error: "Impossible d'annuler une réservation terminée, annulée ou facturée." },
+      { status: 409 }
+    );
+  }
 
-  await prisma.booking.delete({ where: { id: bookingId } });
-  return NextResponse.json({ ok: true }, { status: 200 });
+  await prisma.bookingNote.create({
+    data: { content: note, bookingId: id, authorId: session.user.id },
+  });
+  const booking = await prisma.booking.update({
+    where: { id },
+    data: { status: "CANCELLED" },
+    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
+  });
+
+  const userEmail = session.user.email;
+  const driverEmail = existing.driver?.email;
+  const when = booking.dateTime.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
+  const formatAddr = (addr?: {
+    name?: string | null;
+    street?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+  }) =>
+    `${addr?.name ?? ""} ${addr?.street ?? ""} ${addr?.postalCode ?? ""} ${addr?.city ?? ""}`.trim();
+  const site = await getSiteContact().catch(() => ({
+    phone: "",
+    email: "",
+    address: { city: "Tignieu-Jameyzieu" },
+  }));
+
+  const buildMail = (to: string | null | undefined, title: string, intro: string) =>
+    to
+      ? buildBookingEmail({
+          status: "cancelled",
+          to,
+          badgeLabel: "Réservation annulée",
+          statusLabel: "Annulée",
+          title,
+          intro,
+          bookingRef: `CMD-${booking.id}`,
+          pickupDateTime: when,
+          pickupAddress: formatAddr(booking.pickup),
+          dropoffAddress: formatAddr(booking.dropoff),
+          passengers: `${booking.pax}`,
+          luggage: `${booking.luggage ?? 0}`,
+          paymentMethod: booking.priceCents ? `${(booking.priceCents / 100).toFixed(2)} €` : "—",
+          manageUrl: "/espace-client/bookings",
+          changes: [`Motif : ${note}`],
+          phone: site.phone,
+          email: site.email,
+          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+          preheader: "Votre réservation a été annulée",
+          siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
+          privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
+          legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+        })
+      : null;
+
+  const mailUser = buildMail(
+    userEmail,
+    "Votre réservation a été annulée",
+    "Votre demande est annulée. Détails ci-dessous."
+  );
+  const mailDriver = driverEmail
+    ? buildMail(
+        driverEmail,
+        "Course annulée",
+        "La course qui vous était assignée a été annulée par le client."
+      )
+    : null;
+  if (mailUser) sendMail(mailUser).catch(() => {});
+  if (mailDriver) sendMail(mailDriver).catch(() => {});
+
+  return NextResponse.json({ booking }, { status: 200 });
 }

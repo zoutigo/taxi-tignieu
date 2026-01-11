@@ -61,7 +61,6 @@ const mockedFindUnique = prisma.booking.findUnique as jest.MockedFunction<
   typeof prisma.booking.findUnique
 >;
 const mockedUpdate = prisma.booking.update as jest.MockedFunction<typeof prisma.booking.update>;
-const mockedDelete = prisma.booking.delete as jest.MockedFunction<typeof prisma.booking.delete>;
 const mockedFindUser = prisma.user.findUnique as jest.MockedFunction<typeof prisma.user.findUnique>;
 (prisma as unknown as { $transaction: typeof prisma.$transaction }).$transaction = (
   cb: (tx: typeof prisma) => unknown
@@ -142,15 +141,59 @@ describe("api/admin/bookings", () => {
 
   it("supprime une réservation", async () => {
     mockedAuth.mockResolvedValue({ user: { isManager: true } });
-    mockedDelete.mockResolvedValue({ ...bookingStub });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, status: "PENDING", invoice: null });
+    mockedUpdate.mockResolvedValue({ ...bookingStub, status: "CANCELLED" });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "DELETE",
-      body: JSON.stringify({ id: 1 }),
+      body: JSON.stringify({ id: 1, note: "annulation" }),
     });
     const res = await mod.DELETE(req);
     expect(res.status).toBe(200);
-    expect(mockedDelete).toHaveBeenCalled();
+    expect(mockedUpdate).toHaveBeenCalled();
+  });
+
+  it("refuse de supprimer une réservation terminée ou facturée", async () => {
+    mockedAuth.mockResolvedValue({ user: { isManager: true } });
+    mockedFindUnique.mockResolvedValue({
+      ...bookingStub,
+      status: "COMPLETED",
+      invoice: { id: "inv1" },
+    });
+    const mod = await import("@/app/api/admin/bookings/route");
+    const req = new Request("http://localhost/api/admin/bookings", {
+      method: "DELETE",
+      body: JSON.stringify({ id: "b1", note: "annulation" }),
+    });
+    const res = await mod.DELETE(req);
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuse de supprimer une réservation déjà annulée", async () => {
+    mockedAuth.mockResolvedValue({ user: { isManager: true } });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, status: "CANCELLED", invoice: null });
+    const mod = await import("@/app/api/admin/bookings/route");
+    const req = new Request("http://localhost/api/admin/bookings", {
+      method: "DELETE",
+      body: JSON.stringify({ id: "b1", note: "annulation" }),
+    });
+    const res = await mod.DELETE(req);
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuse de modifier une réservation déjà annulée", async () => {
+    mockedAuth.mockResolvedValue({ user: { isAdmin: true } });
+    mockedFindUnique.mockResolvedValue({ ...bookingStub, status: "CANCELLED" });
+    const mod = await import("@/app/api/admin/bookings/route");
+    const req = new Request("http://localhost/api/admin/bookings", {
+      method: "PATCH",
+      body: JSON.stringify({ id: 1, status: "CONFIRMED" }),
+    });
+    const res = await mod.PATCH(req);
+    expect(res.status).toBe(409);
+    expect(mockedUpdate).not.toHaveBeenCalled();
   });
 
   it("autorise un driver à consulter les réservations", async () => {

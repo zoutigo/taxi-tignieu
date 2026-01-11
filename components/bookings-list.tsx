@@ -12,6 +12,7 @@ type BookingWithPrice = Omit<Booking, "dateTime"> & {
   pickup: Address | string | null;
   dropoff: Address | string | null;
   bookingNotes?: BookingNote[];
+  invoice?: { id: string } | null;
 };
 
 type EditForm = {
@@ -315,15 +316,17 @@ export function BookingsList({ initialBookings }: Props) {
                 >
                   Modifier
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPendingDelete(booking)}
-                  disabled={loadingId === booking.id}
-                >
-                  Supprimer
-                </Button>
+                {booking.status !== "COMPLETED" && !booking.invoice ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPendingDelete(booking)}
+                    disabled={loadingId === booking.id}
+                  >
+                    Supprimer
+                  </Button>
+                ) : null}
               </div>
             )}
           </div>

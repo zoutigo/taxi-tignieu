@@ -4,8 +4,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import ServicesPage from "@/app/services/page";
 import { getSiteContact } from "@/lib/site-config";
-import { prisma } from "@/lib/prisma";
-
 jest.mock("@/lib/site-config", () => ({
   getSiteContact: jest.fn(),
 }));

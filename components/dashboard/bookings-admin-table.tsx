@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Booking, BookingNote, BookingStatus, User } from "@prisma/client";
+import type { Booking, BookingNote, BookingStatus, User, Invoice } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { loadPaginationSettings, paginateArray, savePaginationSettings } from "@/lib/pagination";
+import {
+  loadPaginationSettings,
+  paginateArray,
+  savePaginationSettings,
+  paginationDefaults,
+} from "@/lib/pagination";
 import { AppMessage } from "@/components/app-message";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +35,7 @@ type BookingRow = Booking & {
   distanceKm?: number | null;
   bookingNotes?: BookingNote[];
   notes?: string | null;
+  invoice?: Invoice | null;
 };
 
 type CurrentUser = {
@@ -93,7 +99,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [transferTarget, setTransferTarget] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<BookingStatus | "ALL">("ALL");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(() => loadPaginationSettings().bookings);
+  const [pageSize, setPageSize] = useState(paginationDefaults.bookings);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmDriver, setConfirmDriver] = useState<Record<string, string>>({});
@@ -122,6 +128,11 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     totalPages,
     currentPage,
   } = useMemo(() => paginateArray(filtered, page, pageSize), [filtered, page, pageSize]);
+  useEffect(() => {
+    const saved = loadPaginationSettings();
+    setPageSize(saved.bookings);
+    setPage(1);
+  }, []);
   useEffect(() => {
     setPage(currentPage);
   }, [currentPage]);
@@ -291,6 +302,10 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   };
 
   const handleCancel = async (b: BookingRow) => {
+    if (b.status === "COMPLETED" || b.invoice) {
+      setError("Impossible d'annuler une réservation terminée ou facturée.");
+      return;
+    }
     setSavingId(b.id);
     try {
       const updated = await patchBooking({ id: b.id, status: "CANCELLED" });
@@ -511,7 +526,10 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                       {b.status === "PENDING" ? "Confirmer" : "Terminer"}
                     </Button>
                   ) : null}
-                  {adminLike ? (
+                  {adminLike &&
+                  b.status !== "COMPLETED" &&
+                  b.status !== "CANCELLED" &&
+                  !b.invoice ? (
                     <Button
                       size="sm"
                       variant="ghost"

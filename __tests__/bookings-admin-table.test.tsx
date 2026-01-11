@@ -394,4 +394,44 @@ describe("BookingsAdminTable UI", () => {
       classList.some((c) => c.includes("border-rose-300") && c.includes("bg-rose-50/60"))
     ).toBe(true);
   });
+
+  it("n'affiche pas le bouton d'annulation pour une réservation terminée ou facturée", () => {
+    const completed = { ...baseBooking, id: "b3", status: "COMPLETED" as BookingStatus };
+    const invoiced = {
+      ...baseBooking,
+      id: "b4",
+      invoice: {
+        id: "inv1",
+        bookingId: "b4",
+        amountCents: 1000,
+        pdfPath: "inv.pdf",
+        issuedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as {
+        id: string;
+        bookingId: string;
+        amountCents: number;
+        pdfPath: string;
+        issuedAt: Date;
+        createdAt: Date;
+        updatedAt: Date;
+      },
+    };
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <BookingsAdminTable
+          initialBookings={[completed, invoiced]}
+          drivers={drivers}
+          currentUser={{ isAdmin: true }}
+        />
+      );
+    });
+    const root = tree!.root;
+    const cancelButtons = root.findAll(
+      (n) => n.type === "button" && n.props["aria-label"] === "Annuler la réservation"
+    );
+    expect(cancelButtons.length).toBe(0);
+  });
 });

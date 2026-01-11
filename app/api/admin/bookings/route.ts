@@ -95,6 +95,12 @@ export async function PATCH(req: Request) {
   if (!existing) {
     return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
   }
+  if (existing.status === "CANCELLED") {
+    return NextResponse.json(
+      { error: "Impossible de modifier une réservation déjà annulée." },
+      { status: 409 }
+    );
+  }
 
   if (!adminLike) {
     const providedKeys = Object.keys(parsed.data).filter((k) => k !== "id");
@@ -325,10 +331,120 @@ export async function DELETE(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const id = typeof body?.id === "string" || typeof body?.id === "number" ? String(body.id) : null;
-  if (!id) {
-    return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
+  const note = typeof body?.note === "string" ? body.note.trim() : "";
+  if (!id || !note) {
+    return NextResponse.json({ error: "Identifiant ou note manquants" }, { status: 400 });
   }
 
-  await prisma.booking.delete({ where: { id } });
-  return NextResponse.json({ ok: true }, { status: 200 });
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: {
+      invoice: true,
+      driver: { select: { email: true, name: true, phone: true } },
+      user: true,
+      pickup: true,
+      dropoff: true,
+    },
+  });
+  if (!booking) {
+    return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
+  }
+  if (booking.status === "COMPLETED" || booking.status === "CANCELLED" || booking.invoice) {
+    return NextResponse.json(
+      { error: "Impossible de supprimer une réservation terminée, annulée ou facturée." },
+      { status: 409 }
+    );
+  }
+
+  await prisma.bookingNote.create({
+    data: { content: note, bookingId: id, authorId: session?.user?.id ?? null },
+  });
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: { status: "CANCELLED" },
+    include: {
+      user: { select: { name: true, email: true, phone: true } },
+      customer: { select: { fullName: true, phone: true, email: true } },
+      driver: { select: { id: true, name: true, email: true, phone: true } },
+      pickup: true,
+      dropoff: true,
+      bookingNotes: { orderBy: { createdAt: "asc" } },
+      invoice: true,
+    },
+  });
+
+  const site = await getSiteContact().catch(() => ({
+    phone: "",
+    email: "",
+    address: { city: "Tignieu-Jameyzieu" },
+  }));
+  const when = updated.dateTime.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
+  const formatAddr = (addr?: {
+    name?: string | null;
+    street?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+  }) =>
+    `${addr?.name ?? ""} ${addr?.street ?? ""} ${addr?.postalCode ?? ""} ${addr?.city ?? ""}`.trim();
+
+  const mailUser =
+    updated.user?.email || updated.customer?.email
+      ? buildBookingEmail({
+          status: "cancelled",
+          to: (updated.user?.email ?? updated.customer?.email) as string,
+          badgeLabel: "Réservation annulée",
+          statusLabel: "Annulée",
+          title: "Votre réservation est annulée",
+          intro: "Votre demande a été annulée. Retrouvez le détail ci-dessous.",
+          bookingRef: `CMD-${updated.id}`,
+          pickupDateTime: when,
+          pickupAddress: formatAddr(updated.pickup),
+          dropoffAddress: formatAddr(updated.dropoff),
+          passengers: `${updated.pax}`,
+          luggage: `${updated.luggage ?? 0}`,
+          paymentMethod: updated.priceCents ? `${(updated.priceCents / 100).toFixed(2)} €` : "—",
+          manageUrl: "/espace-client/bookings",
+          changes: [`Motif : ${note}`],
+          phone: site.phone,
+          email: site.email,
+          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+          preheader: "Votre réservation a été annulée.",
+          siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
+          privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
+          legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+        })
+      : null;
+
+  const mailDriver = booking.driver?.email
+    ? buildBookingEmail({
+        status: "cancelled",
+        to: booking.driver.email,
+        badgeLabel: "Course annulée",
+        statusLabel: "Annulée",
+        title: "Course annulée",
+        intro: "La course assignée a été annulée.",
+        bookingRef: `CMD-${updated.id}`,
+        pickupDateTime: when,
+        pickupAddress: formatAddr(updated.pickup),
+        dropoffAddress: formatAddr(updated.dropoff),
+        passengers: `${updated.pax}`,
+        luggage: `${updated.luggage ?? 0}`,
+        paymentMethod: updated.priceCents ? `${(updated.priceCents / 100).toFixed(2)} €` : "—",
+        manageUrl: "/dashboard/bookings",
+        changes: [`Motif : ${note}`],
+        phone: site.phone,
+        email: site.email,
+        brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+        preheader: "Course annulée",
+        siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
+        privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
+        legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+      })
+    : null;
+
+  if (mailUser) sendMail(mailUser).catch(() => {});
+  if (mailDriver) sendMail(mailDriver).catch(() => {});
+
+  return NextResponse.json({ booking: updated }, { status: 200 });
 }
