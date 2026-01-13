@@ -92,15 +92,15 @@ describe("BookingsAdminTable UI", () => {
       ) {
         return;
       }
-      if (typeof msg === "string" && msg.includes("Not implemented: navigation")) {
+      const asString =
+        typeof msg === "string"
+          ? msg
+          : msg instanceof Error
+            ? `${msg.name}: ${msg.message}`
+            : String(msg ?? "");
+      if (asString.includes("Not implemented: navigation")) return;
+      if (asString.includes("The current testing environment is not configured to support act"))
         return;
-      }
-      if (
-        typeof msg === "string" &&
-        msg.includes("The current testing environment is not configured to support act")
-      ) {
-        return;
-      }
       originalError(msg, ...rest);
     });
   });
