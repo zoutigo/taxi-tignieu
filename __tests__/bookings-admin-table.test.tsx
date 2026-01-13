@@ -4,6 +4,7 @@ import renderer from "react-test-renderer";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import { BookingsAdminTable } from "@/components/dashboard/bookings-admin-table";
 import type { BookingStatus } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime/library";
 import { act } from "react";
 
 const SelectCtx = createContext<{ onValueChange?: (v: string) => void }>({});
@@ -162,12 +163,20 @@ describe("BookingsAdminTable UI", () => {
             invoice: {
               id: "inv1",
               bookingId: "bdetail",
-              amountCents: 0,
+              amount: new Decimal(0),
               pdfPath: "",
               issuedAt: new Date(),
               createdAt: new Date(),
               updatedAt: new Date(),
-            },
+              paid: true,
+              paymentMethod: "CB",
+              sendToClient: true,
+              realKm: null,
+              realLuggage: null,
+              realPax: null,
+              waitHours: 0,
+              adjustmentComment: null,
+            } as unknown as BookingRow["invoice"],
             id: "completed2",
           },
         ]}
@@ -744,20 +753,20 @@ describe("BookingsAdminTable UI", () => {
       invoice: {
         id: "inv1",
         bookingId: "b4",
-        amountCents: 1000,
+        amount: new Decimal(1000),
         pdfPath: "inv.pdf",
         issuedAt: new Date(),
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as {
-        id: string;
-        bookingId: string;
-        amountCents: number;
-        pdfPath: string;
-        issuedAt: Date;
-        createdAt: Date;
-        updatedAt: Date;
-      },
+        paid: true,
+        paymentMethod: "CB",
+        sendToClient: true,
+        realKm: null,
+        realLuggage: null,
+        realPax: null,
+        waitHours: 0,
+        adjustmentComment: null,
+      } as unknown as BookingRow["invoice"],
     };
     let tree: renderer.ReactTestRenderer;
     act(() => {
@@ -818,7 +827,7 @@ describe("BookingsAdminTable UI", () => {
         invoice: {
           id: "inv",
           bookingId: "b-invoice",
-          amountCents: 1000,
+          amount: 1000,
           pdfPath: "p.pdf",
           issuedAt: new Date(),
           createdAt: new Date(),

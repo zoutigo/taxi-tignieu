@@ -64,7 +64,7 @@ function drawText(
 
 export async function generateInvoicePdf(
   booking: BookingWithRelations,
-  amountCents: number,
+  amountEuros: number,
   company?: CompanyInfo
 ) {
   ensureDir();
@@ -82,7 +82,7 @@ export async function generateInvoicePdf(
   const textColor = hexToRgb(invoicePalette.text);
   const muted = hexToRgb(invoicePalette.muted);
 
-  const amountEuros = (amountCents / 100).toFixed(2);
+  const amountLabel = amountEuros.toFixed(2);
   const clientName = booking.user?.name ?? booking.userId ?? "Client";
   const clientEmail = booking.user?.email ?? "";
   const contactLine =
@@ -153,7 +153,7 @@ export async function generateInvoicePdf(
     // Amount box
     drawRect(width - margin - 150, height - margin - headerHeight - 120, 150, 70, accent),
     drawText(
-      `${amountEuros} €`,
+      `${amountLabel} €`,
       width - margin - 135,
       height - margin - headerHeight - 80,
       "F2",

@@ -8,6 +8,13 @@ import { z } from "zod";
 const createSchema = z.object({
   bookingId: z.string().min(1),
   amountEuros: z.number().positive().optional(),
+  realKm: z.number().optional(),
+  realLuggage: z.number().optional(),
+  realPax: z.number().optional(),
+  waitHours: z.number().optional(),
+  adjustmentComment: z.string().optional(),
+  paid: z.boolean().optional(),
+  paymentMethod: z.enum(["CB", "CASH", "PAYPAL", "BTC"]).optional(),
   issuedAt: z.string().datetime().optional(),
   sendToClient: z.boolean().optional(),
 });
@@ -26,7 +33,19 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const { bookingId, amountEuros, issuedAt } = parsed.data;
+  const {
+    bookingId,
+    amountEuros,
+    issuedAt,
+    sendToClient,
+    realKm,
+    realLuggage,
+    realPax,
+    waitHours,
+    adjustmentComment,
+    paid,
+    paymentMethod,
+  } = parsed.data;
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -42,8 +61,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const amountCents =
-    amountEuros != null ? Math.round(amountEuros * 100) : (booking.priceCents ?? 0);
+  const amount =
+    amountEuros != null ? amountEuros : booking.priceCents != null ? booking.priceCents / 100 : 0;
   const issuedAtValue = issuedAt ? new Date(issuedAt) : new Date();
 
   const siteConfig = (await prisma.siteConfig.findFirst({
@@ -62,21 +81,37 @@ export async function POST(request: Request) {
       }
     : { name: "Taxi Tignieu" };
 
-  const { fileName, filePath } = await generateInvoicePdf(booking, amountCents, company);
+  const { fileName, filePath } = await generateInvoicePdf(booking, amount, company);
 
   const invoice = await prisma.invoice.upsert({
     where: { bookingId },
     update: {
-      amountCents,
+      amount,
       pdfPath: filePath,
       issuedAt: issuedAtValue,
       updatedAt: new Date(),
+      realKm: realKm ?? null,
+      realLuggage: realLuggage ?? null,
+      realPax: realPax ?? null,
+      waitHours: waitHours ?? 0,
+      adjustmentComment: adjustmentComment ?? null,
+      sendToClient: sendToClient ?? true,
+      paid: paid ?? true,
+      paymentMethod: paymentMethod ?? "CB",
     },
     create: {
       bookingId,
-      amountCents,
+      amount,
       pdfPath: filePath,
       issuedAt: issuedAtValue,
+      realKm: realKm ?? null,
+      realLuggage: realLuggage ?? null,
+      realPax: realPax ?? null,
+      waitHours: waitHours ?? 0,
+      adjustmentComment: adjustmentComment ?? null,
+      sendToClient: sendToClient ?? true,
+      paid: paid ?? true,
+      paymentMethod: paymentMethod ?? "CB",
     },
   });
 

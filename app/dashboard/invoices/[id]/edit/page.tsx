@@ -93,19 +93,26 @@ export default async function InvoiceEditPage({ params }: { params: Promise<{ id
         mode="edit"
         defaultValues={{
           bookingId: invoice.bookingId,
-          amountEuros: invoice.amountCents / 100,
+          amountEuros: Number(invoice.amount),
           issuedAt: invoice.issuedAt.toISOString(),
           pdfPath: invoice.pdfPath,
-          realKm: estimatedKm,
+          realKm: invoice.realKm != null ? Number(invoice.realKm) : estimatedKm,
           estimatedLuggage: invoice.booking?.luggage ?? undefined,
-          realLuggage: invoice.booking?.luggage ?? undefined,
+          realLuggage:
+            invoice.realLuggage != null ? Number(invoice.realLuggage) : invoice.booking?.luggage,
           estimatedPax: invoice.booking?.pax ?? undefined,
-          realPax: invoice.booking?.pax ?? undefined,
+          realPax: invoice.realPax != null ? Number(invoice.realPax) : invoice.booking?.pax,
           waitHours:
-            typeof (invoice.booking as { waitHours?: number } | null | undefined)?.waitHours ===
-            "number"
-              ? ((invoice.booking as { waitHours?: number } | null | undefined)?.waitHours ?? 0)
-              : 0,
+            invoice.waitHours != null
+              ? Number(invoice.waitHours)
+              : typeof (invoice.booking as { waitHours?: number } | null | undefined)?.waitHours ===
+                  "number"
+                ? ((invoice.booking as { waitHours?: number } | null | undefined)?.waitHours ?? 0)
+                : 0,
+          sendToClient: invoice.sendToClient ?? true,
+          adjustmentComment: invoice.adjustmentComment ?? "",
+          paid: invoice.paid ?? true,
+          paymentMethod: invoice.paymentMethod ?? "CB",
         }}
         bookingSummary={{
           id: invoice.bookingId,
@@ -124,7 +131,12 @@ export default async function InvoiceEditPage({ params }: { params: Promise<{ id
           estimatedKm,
           estimatedLuggage: invoice.booking?.luggage ?? undefined,
           estimatedPax: invoice.booking?.pax ?? undefined,
-          estimatedAmount: invoice.amountCents ? invoice.amountCents / 100 : undefined,
+          estimatedAmount:
+            invoice.amount != null
+              ? Number(invoice.amount)
+              : invoice.booking?.priceCents
+                ? invoice.booking.priceCents / 100
+                : undefined,
         }}
       />
     </div>

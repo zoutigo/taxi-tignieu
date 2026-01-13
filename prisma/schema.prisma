@@ -187,14 +187,29 @@ model TariffConfig {
 }
 
 model Invoice {
-  id          String   @id @default(cuid())
-  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  bookingId   String   @unique
-  amountCents Int
-  pdfPath     String
-  issuedAt    DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String          @id @default(cuid())
+  booking           Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId         String          @unique
+  amount            Decimal         @db.Decimal(10, 2) @default(0)
+  pdfPath           String
+  issuedAt          DateTime        @default(now())
+  realKm            Decimal?        @db.Decimal(8, 2)
+  realLuggage       Int?
+  realPax           Int?
+  waitHours         Int             @default(0)
+  sendToClient      Boolean         @default(true)
+  adjustmentComment String?
+  paid              Boolean         @default(true)
+  paymentMethod     PaymentMethod?  @default(CB)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+enum PaymentMethod {
+  CB
+  CASH
+  PAYPAL
+  BTC
 }
 
 model ContactMessage {

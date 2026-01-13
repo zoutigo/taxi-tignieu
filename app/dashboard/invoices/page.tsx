@@ -35,7 +35,7 @@ export default async function InvoicesPage() {
             inv.booking?.customer?.fullName ??
             inv.booking?.user?.email ??
             "Client inconnu",
-          amountEuros: inv.amountCents / 100,
+          amountEuros: Number(inv.amount),
           issuedAt: inv.issuedAt.toISOString(),
           pdfPath: inv.pdfPath,
           bookingId: inv.bookingId ?? null,

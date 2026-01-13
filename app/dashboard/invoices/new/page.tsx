@@ -126,6 +126,8 @@ export default async function InvoiceCreatePage({
               : 0,
           sendToClient: true,
           adjustmentComment: "",
+          paid: true,
+          paymentMethod: "CB",
         }}
         bookingSummary={{
           id: booking.id,
