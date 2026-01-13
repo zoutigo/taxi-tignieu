@@ -50,6 +50,7 @@
 - Use Tailwind theme tokens and shadcn-style components in `components/ui/*` (`Button`, `Card`, `Dialog`, `Form`, etc.) with `cn` helper; prefer variants over new CSS.
 - Reuse layout helpers (e.g., `SiteHeader`, `SiteFooter`, landing blocks) before creating new shells.
 - New `page.tsx` files must define metadata, stay responsive, align with site themes/colors, and maintain an elegant look.
+- Designs are mobile-first and fully responsive; ensure layouts adapt smoothly from small screens to desktop.
 - Keep brand styling consistent with `app/globals.css` (Tailwind v4, Public Sans/Space Grotesk, gold/navy palette).
 - Use NextAuth session data for gating/protection; favor server components and server actions for mutations.
 

@@ -3,6 +3,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Address, SiteConfig } from "@prisma/client";
 import { generateInvoicePdf } from "@/lib/billing";
+import { z } from "zod";
+
+const createSchema = z.object({
+  bookingId: z.string().min(1),
+  amountEuros: z.number().positive().optional(),
+  issuedAt: z.string().datetime().optional(),
+  sendToClient: z.boolean().optional(),
+});
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -11,10 +19,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const bookingId = typeof body?.bookingId === "string" ? body.bookingId : null;
-  if (!bookingId) {
-    return NextResponse.json({ error: "bookingId requis" }, { status: 400 });
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error.flatten() },
+      { status: 400 }
+    );
   }
+  const { bookingId, amountEuros, issuedAt } = parsed.data;
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -30,7 +42,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const amountCents = booking.priceCents ?? 0;
+  const amountCents =
+    amountEuros != null ? Math.round(amountEuros * 100) : (booking.priceCents ?? 0);
+  const issuedAtValue = issuedAt ? new Date(issuedAt) : new Date();
+
   const siteConfig = (await prisma.siteConfig.findFirst({
     include: { address: true },
   })) as (SiteConfig & { address: Address }) | null;
@@ -49,13 +64,23 @@ export async function POST(request: Request) {
 
   const { fileName, filePath } = await generateInvoicePdf(booking, amountCents, company);
 
-  const bill = await prisma.invoice.upsert({
+  const invoice = await prisma.invoice.upsert({
     where: { bookingId },
-    update: { amountCents, pdfPath: filePath, updatedAt: new Date() },
-    create: { bookingId, amountCents, pdfPath: filePath },
+    update: {
+      amountCents,
+      pdfPath: filePath,
+      issuedAt: issuedAtValue,
+      updatedAt: new Date(),
+    },
+    create: {
+      bookingId,
+      amountCents,
+      pdfPath: filePath,
+      issuedAt: issuedAtValue,
+    },
   });
 
-  return NextResponse.json({ bill, download: fileName }, { status: 201 });
+  return NextResponse.json({ invoice, download: fileName }, { status: 201 });
 }
 
 export async function GET() {
@@ -64,10 +89,11 @@ export async function GET() {
     return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
   }
 
-  const bills = await prisma.invoice.findMany({
+  const invoices = await prisma.invoice.findMany({
     orderBy: { createdAt: "desc" },
-    include: { booking: { include: { pickup: true, dropoff: true, user: true } } },
+    include: { booking: { include: { user: true, customer: true } } },
   });
-  return NextResponse.json({ bills });
+  return NextResponse.json({ invoices });
 }
+
 export const runtime = "nodejs";

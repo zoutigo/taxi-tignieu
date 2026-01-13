@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import React, { createContext, useContext } from "react";
 import renderer from "react-test-renderer";
-import { render, fireEvent } from "@testing-library/react";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { BookingsAdminTable } from "@/components/dashboard/bookings-admin-table";
 import type { BookingStatus } from "@prisma/client";
 import { act } from "react";
@@ -132,7 +132,15 @@ describe("BookingsAdminTable UI", () => {
       />
     );
     const btn = getByText("Facturer");
-    expect(btn.closest("a")?.getAttribute("href")).toBe("/dashboard/invoices");
+    expect(btn.closest("a")?.getAttribute("href")).toBe(
+      "/dashboard/invoices/new?bookingId=completed"
+    );
+
+    // simulate click triggers navigation toward creation page
+    const anchor = btn.closest("a") as HTMLAnchorElement;
+    // simulate navigation intent via click (without overriding window.location)
+    fireEvent.click(anchor);
+    expect(anchor.getAttribute("href")).toBe("/dashboard/invoices/new?bookingId=completed");
 
     unmount();
 
@@ -869,5 +877,57 @@ describe("BookingsAdminTable UI", () => {
       textFromChildren(n.props.children).includes("Réservation annulée.")
     );
     expect(success.length).toBeGreaterThan(0);
+  });
+
+  it("termine avec facture : statut mis à jour et redirection vers création de facture", async () => {
+    jest.useFakeTimers();
+    const fetchMock = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          booking: { ...baseBooking, id: "b-fin", status: "COMPLETED" as BookingStatus },
+        }),
+      })
+    );
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = fetchMock as jest.Mock;
+
+    const { getByLabelText, getByText, getByPlaceholderText, queryByText } = render(
+      <BookingsAdminTable
+        initialBookings={[{ ...baseBooking, id: "b-fin", status: "CONFIRMED" as BookingStatus }]}
+        drivers={drivers}
+        currentUser={{ isAdmin: true }}
+      />
+    );
+
+    await act(async () => {
+      const finishBtn = getByLabelText("Terminer");
+      fireEvent.click(finishBtn);
+
+      const noteArea = await waitFor(() =>
+        getByPlaceholderText("Commentaires (attente, incidents, etc.)")
+      );
+      fireEvent.change(noteArea, { target: { value: "fin de course ok" } });
+
+      const invoiceCheckbox = getByLabelText("Générer une facture maintenant");
+      fireEvent.click(invoiceCheckbox);
+
+      const submit = getByText("Valider la fin de course");
+      fireEvent.click(submit);
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/admin/bookings",
+          expect.objectContaining({
+            method: "PATCH",
+            body: expect.stringContaining('"status":"COMPLETED"'),
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(queryByText("Terminée")).toBeTruthy();
+      });
+    });
+    jest.useRealTimers();
   });
 });

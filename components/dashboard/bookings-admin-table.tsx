@@ -505,7 +505,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
       setFinishInvoice((prev) => ({ ...prev, [b.id]: false }));
       if (generateInvoice && typeof window !== "undefined") {
         setTimeout(() => {
-          window.location.href = "/dashboard/invoices";
+          window.location.href = `/dashboard/invoices/new?bookingId=${b.id}&from=complete`;
         }, 350);
       }
     } catch (e) {
@@ -736,7 +736,10 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                 </span>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   {b.status === "COMPLETED" && !b.invoice ? (
-                    <Link href="/dashboard/invoices" className="cursor-pointer">
+                    <Link
+                      href={`/dashboard/invoices/new?bookingId=${b.id}`}
+                      className="cursor-pointer"
+                    >
                       <Button
                         size="sm"
                         variant="outline"
