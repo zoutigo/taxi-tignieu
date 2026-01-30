@@ -7,6 +7,7 @@ export type BookingWithRelations = Booking & {
   pickup: Address | null;
   dropoff: Address | null;
   user?: User | null;
+  customer?: { fullName?: string | null; email?: string | null; phone?: string | null } | null;
 };
 
 const INVOICES_DIR = path.join(process.cwd(), "invoices");
@@ -36,6 +37,8 @@ export type CompanyInfo = {
   phone?: string;
   email?: string;
   addressLine?: string;
+  siret?: string | null;
+  ape?: string | null;
 };
 
 type Color = { r: number; g: number; b: number };
@@ -65,17 +68,36 @@ function drawText(
 export async function generateInvoicePdf(
   booking: BookingWithRelations,
   amountEuros: number,
-  company?: CompanyInfo
+  company?: CompanyInfo,
+  opts?: {
+    invoiceNumber?: string;
+    issueDate?: Date;
+    serviceDate?: Date;
+    distanceKm?: number | null;
+    passengers?: number | null;
+    luggage?: number | null;
+    waitHours?: number | null;
+    paymentMethod?: string | null;
+    paid?: boolean | null;
+  }
 ) {
   ensureDir();
-  const fileName = `facture-${booking.id}-${Date.now()}.pdf`;
+  const issueDateObj = opts?.issueDate ?? new Date();
+  const clientSlug = (booking.customer?.fullName ?? booking.user?.name ?? "client")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const invoiceSlug = (opts?.invoiceNumber ?? booking.id).replace(/[^a-z0-9]+/gi, "-");
+  const dateSlug = issueDateObj.toISOString().slice(0, 10);
+  const siteSlug = (company?.name ?? "taxi-tignieu").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const fileName = `facture-${dateSlug}-${clientSlug}-${siteSlug}-${invoiceSlug}.pdf`;
   const filePath = path.join(INVOICES_DIR, fileName);
 
   // Simple one-page PDF (A4)
   const width = 595.28;
   const height = 841.89;
   const margin = 40;
-  const headerHeight = 90;
+  const headerHeight = 110;
   const primary = hexToRgb(invoicePalette.primary);
   const accent = hexToRgb(invoicePalette.accent);
   const onAccent = hexToRgb(invoicePalette.onAccent);
@@ -83,93 +105,178 @@ export async function generateInvoicePdf(
   const muted = hexToRgb(invoicePalette.muted);
 
   const amountLabel = amountEuros.toFixed(2);
-  const clientName = booking.user?.name ?? booking.userId ?? "Client";
-  const clientEmail = booking.user?.email ?? "";
+  const clientName = booking.customer?.fullName ?? booking.user?.name ?? booking.userId ?? "Client";
+  const clientEmail = booking.customer?.email ?? booking.user?.email ?? "";
+  const clientPhone = booking.customer?.phone ?? booking.user?.phone ?? "";
+  const invoiceNumber = opts?.invoiceNumber ?? `#${booking.id}`;
+  const issueDate = issueDateObj.toLocaleDateString("fr-FR");
+  const serviceDate = (opts?.serviceDate ?? booking.dateTime).toLocaleString("fr-FR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const distanceText =
+    opts?.distanceKm != null ? `${Math.round(opts.distanceKm * 10) / 10} km` : "—";
+  const passengerText = opts?.passengers != null ? String(opts.passengers) : "—";
+  const luggageText = opts?.luggage != null ? String(opts.luggage) : "—";
+  const waitText = opts?.waitHours != null ? `${opts.waitHours} h` : "0 h";
+  const paymentText = opts?.paymentMethod ?? "Non renseigné";
+  const paidText = opts?.paid === false ? "Facture non acquittée" : "Facture acquittée";
   const contactLine =
     [company?.phone, company?.email, company?.addressLine].filter(Boolean).join(" · ") ||
     "Service 24/7";
 
+  const top = height - margin;
   const contents = [
     // Header bar
-    drawRect(margin, height - margin - headerHeight, width - margin * 2, headerHeight, primary),
-    // Logo badge (approximation)
-    drawRect(margin + 16, height - margin - headerHeight + 16, 50, 50, accent),
-    drawText("Taxi", margin + 24, height - margin - headerHeight + 46, "F2", 14, onAccent),
-    drawText("Tignieu", margin + 24, height - margin - headerHeight + 30, "F2", 14, onAccent),
-    // Brand title
+    drawRect(margin, top - headerHeight, width - margin * 2, headerHeight, primary),
+    // Logo badge
+    drawRect(margin + 18, top - headerHeight + 18, 48, 48, accent),
+    drawText("🚕", margin + 30, top - headerHeight + 44, "F2", 16, primary),
+    drawText(company?.name ?? "Taxi Tignieu", margin + 78, top - 34, "F2", 20, onAccent),
+    drawText("À votre service 24/7", margin + 78, top - 52, "F1", 11, onAccent),
+    // phone pill
+    drawRect(width - margin - 130, top - 40, 120, 30, accent),
+    drawText(contactLine || "06 50 59 78 39", width - margin - 120, top - 22, "F1", 11, primary),
+    // Title and meta
+    drawText("FACTURE", margin, top - headerHeight - 10, "F2", 18, textColor),
+    drawText(
+      `N° ${invoiceNumber}`,
+      width - margin - 190,
+      top - headerHeight - 14,
+      "F2",
+      12,
+      textColor
+    ),
+    drawText(
+      `Émise le ${issueDate}`,
+      width - margin - 190,
+      top - headerHeight - 30,
+      "F1",
+      11,
+      textColor
+    ),
+    drawText(
+      `Prestation : ${serviceDate}`,
+      width - margin - 190,
+      top - headerHeight - 46,
+      "F1",
+      11,
+      textColor
+    ),
+    // Seller block
     drawText(
       company?.name ?? "Taxi Tignieu",
-      margin + 76,
-      height - margin - 36,
+      margin,
+      top - headerHeight - 28,
       "F2",
-      22,
-      onAccent
+      12.5,
+      textColor
     ),
-    drawText("À votre service 24/7", margin + 76, height - margin - 54, "F1", 12, onAccent),
-    // Invoice label + reservation number (right side, outside header)
-    drawText("Facture", width - margin - 120, height - margin - 30, "F1", 13, onAccent),
+    drawText(company?.addressLine ?? "", margin, top - headerHeight - 42, "F1", 11, textColor),
+    drawText(contactLine, margin, top - headerHeight - 56, "F1", 11, muted),
     drawText(
-      `Réservation #${booking.id}`,
-      width - margin - 160,
-      height - margin - 48,
+      `SIRET : ${company?.siret ?? "—"} • APE : ${company?.ape ?? "—"}`,
+      margin,
+      top - headerHeight - 70,
       "F1",
-      11,
-      onAccent
+      10.5,
+      muted
     ),
-    // Contact line
-    drawText(contactLine, margin, height - margin - headerHeight - 24, "F1", 11, textColor),
     // Client block
-    drawText("Client", margin, height - margin - headerHeight - 60, "F1", 11, textColor),
-    drawText(clientName, margin, height - margin - headerHeight - 78, "F2", 13, textColor),
-    drawText(clientEmail, margin, height - margin - headerHeight - 94, "F1", 11, textColor),
-    // Trip info
-    drawText("Départ", margin, height - margin - headerHeight - 126, "F1", 11, textColor),
-    drawText(
-      formatAddress(booking.pickup),
-      margin,
-      height - margin - headerHeight - 142,
-      "F1",
-      11,
-      textColor
+    drawRect(margin, top - headerHeight - 160, (width - margin * 2) / 2 - 6, 100, accent),
+    drawText("Facturé à", margin + 12, top - headerHeight - 122, "F2", 11.5, primary),
+    drawText(clientName, margin + 12, top - headerHeight - 138, "F2", 12.5, primary),
+    drawText(clientEmail || "—", margin + 12, top - headerHeight - 154, "F1", 10.5, onAccent),
+    drawText(clientPhone || "—", margin + 12, top - headerHeight - 170, "F1", 10.5, onAccent),
+    // Trip box
+    drawRect(
+      margin + (width - margin * 2) / 2 + 6,
+      top - headerHeight - 160,
+      (width - margin * 2) / 2 - 6,
+      100,
+      primary
     ),
-    drawText("Arrivée", margin, height - margin - headerHeight - 172, "F1", 11, textColor),
     drawText(
-      formatAddress(booking.dropoff),
-      margin,
-      height - margin - headerHeight - 188,
-      "F1",
-      11,
-      textColor
+      "Détails course",
+      margin + (width - margin * 2) / 2 + 18,
+      top - headerHeight - 122,
+      "F2",
+      11.5,
+      onAccent
     ),
-    drawText("Date/heure", margin, height - margin - headerHeight - 218, "F1", 11, textColor),
     drawText(
-      new Date(booking.dateTime).toLocaleString("fr-FR"),
-      margin,
-      height - margin - headerHeight - 234,
+      `Départ: ${formatAddress(booking.pickup)}`,
+      margin + (width - margin * 2) / 2 + 18,
+      top - headerHeight - 138,
       "F1",
-      11,
-      textColor
+      10.5,
+      onAccent
+    ),
+    drawText(
+      `Arrivée: ${formatAddress(booking.dropoff)}`,
+      margin + (width - margin * 2) / 2 + 18,
+      top - headerHeight - 154,
+      "F1",
+      10.5,
+      onAccent
+    ),
+    drawText(
+      `Distance: ${distanceText} • Passagers: ${passengerText} • Bagages: ${luggageText} • Attente: ${waitText}`,
+      margin + (width - margin * 2) / 2 + 18,
+      top - headerHeight - 170,
+      "F1",
+      10.5,
+      onAccent
     ),
     // Amount box
-    drawRect(width - margin - 150, height - margin - headerHeight - 120, 150, 70, accent),
-    drawText(
-      `${amountLabel} €`,
-      width - margin - 135,
-      height - margin - headerHeight - 80,
-      "F2",
-      18,
-      onAccent
+    drawRect(margin, top - headerHeight - 240, width - margin * 2, 60, accent),
+    drawText("Total TTC", margin + 14, top - headerHeight - 208, "F2", 13, primary),
+    drawText(`${amountLabel} €`, width - margin - 120, top - headerHeight - 208, "F2", 16, primary),
+    // Paid bar
+    drawRect(
+      margin,
+      top - headerHeight - 286,
+      width - margin * 2,
+      38,
+      paidText.includes("non") ? { r: 1, g: 0.91, b: 0.91 } : { r: 0.91, g: 0.97, b: 0.93 }
     ),
     drawText(
-      "Service 24/7",
-      width - margin - 135,
-      height - margin - headerHeight - 98,
+      paidText,
+      margin + 14,
+      top - headerHeight - 262,
+      "F2",
+      11.5,
+      paidText.includes("non") ? { r: 0.72, g: 0.16, b: 0.16 } : { r: 0.1, g: 0.5, b: 0.2 }
+    ),
+    drawText(
+      `Paiement : ${paymentText}`,
+      width - margin - 200,
+      top - headerHeight - 262,
       "F1",
       11,
-      onAccent
+      textColor
     ),
     // Footer
-    drawText(contactLine, margin, margin + 10, "F1", 10, muted),
+    drawText(
+      "Prestation de transport de personnes. Tarifs réglementés. Merci pour votre confiance.",
+      margin,
+      margin + 22,
+      "F1",
+      10.5,
+      muted
+    ),
+    drawText(
+      (company?.name ?? "Taxi Tignieu") +
+        " • " +
+        (company?.addressLine ?? "") +
+        " • " +
+        (company?.email ?? ""),
+      margin,
+      margin + 10,
+      "F1",
+      10.5,
+      muted
+    ),
   ].join("");
 
   const contentStream = `q\n${contents}Q\n`;

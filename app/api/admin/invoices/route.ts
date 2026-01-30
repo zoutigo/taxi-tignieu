@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { pickup: true, dropoff: true, user: true },
+    include: { pickup: true, dropoff: true, user: true, customer: true },
   });
   if (!booking) {
     return NextResponse.json({ error: "Réservation introuvable" }, { status: 404 });
@@ -78,10 +78,22 @@ export async function POST(request: Request) {
               siteConfig.address.postalCode ?? ""
             } ${siteConfig.address.city ?? ""}`.trim()
           : "",
+        siret: siteConfig.siret,
+        ape: siteConfig.ape,
       }
     : { name: "Taxi Tignieu" };
 
-  const { fileName, filePath } = await generateInvoicePdf(booking, amount, company);
+  const { fileName, filePath } = await generateInvoicePdf(booking, amount, company, {
+    invoiceNumber: bookingId,
+    issueDate: issuedAtValue,
+    serviceDate: booking.dateTime,
+    distanceKm: realKm ?? undefined,
+    passengers: realPax ?? booking.pax,
+    luggage: realLuggage ?? booking.luggage,
+    waitHours: waitHours ?? undefined,
+    paymentMethod,
+    paid: paid ?? true,
+  });
 
   const invoice = await prisma.invoice.upsert({
     where: { bookingId },

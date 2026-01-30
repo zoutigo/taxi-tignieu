@@ -324,12 +324,12 @@ export function InvoiceEditForm({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Mise à jour impossible");
       }
-      setMessage({
-        type: "success",
-        text: mode === "edit" ? "Facture mise à jour." : "Facture créée.",
-      });
-      router.refresh();
-      setTimeout(() => setMessage(null), 4000);
+      const data = await res.json().catch(() => ({}));
+      const targetId = data?.invoice?.id ?? data?.id ?? invoiceId ?? defaultValues.bookingId;
+      const notice = mode === "edit" ? "updated" : "created";
+      router.push(
+        `/dashboard/invoices?notice=${notice}${targetId ? `&invoiceId=${targetId}` : ""}`
+      );
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erreur inconnue" });
     }

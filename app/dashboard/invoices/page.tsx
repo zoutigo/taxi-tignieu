@@ -2,13 +2,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { InvoicesTable } from "@/components/dashboard/invoices-table";
+import { InvoicesNotice } from "@/components/dashboard/invoices-notice";
 
 export const metadata = {
   title: "Factures - Tableau de bord",
   description: "Consultez les factures générées pour vos courses.",
 };
 
-export default async function InvoicesPage() {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams?: { notice?: string; invoiceId?: string };
+}) {
   const session = await auth();
   if (!session?.user?.isAdmin) {
     redirect("/dashboard");
@@ -19,12 +24,22 @@ export default async function InvoicesPage() {
     include: { booking: { include: { user: true, customer: true } } },
   });
 
+  const noticeParam = searchParams?.notice;
+  const invoiceId = searchParams?.invoiceId;
+  const noticeText =
+    noticeParam === "created"
+      ? `Facture ${invoiceId ? `#${invoiceId} ` : ""}créée avec succès`
+      : noticeParam === "updated"
+        ? `Facture ${invoiceId ? `#${invoiceId} ` : ""}mise à jour avec succès`
+        : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-      <div>
+      <div className="space-y-3">
         <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Admin</p>
         <h1 className="text-2xl font-semibold text-foreground">Factures</h1>
         <p className="text-sm text-muted-foreground">Liste des factures générées.</p>
+        {noticeText ? <InvoicesNotice key={noticeText} message={noticeText} /> : null}
       </div>
 
       <InvoicesTable
