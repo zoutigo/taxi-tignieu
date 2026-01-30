@@ -23,12 +23,14 @@ export type PaginationSettings = {
   bookings: number;
   avis: number;
   users: number;
+  invoices: number;
 };
 
 const defaultSettings: PaginationSettings = {
   bookings: 10,
   avis: 10,
   users: 10,
+  invoices: 10,
 };
 
 export function loadPaginationSettings(): PaginationSettings {
@@ -41,6 +43,7 @@ export function loadPaginationSettings(): PaginationSettings {
       bookings: parsed.bookings && parsed.bookings > 0 ? parsed.bookings : defaultSettings.bookings,
       avis: parsed.avis && parsed.avis > 0 ? parsed.avis : defaultSettings.avis,
       users: parsed.users && parsed.users > 0 ? parsed.users : defaultSettings.users,
+      invoices: parsed.invoices && parsed.invoices > 0 ? parsed.invoices : defaultSettings.invoices,
     };
   } catch {
     return defaultSettings;

@@ -2,7 +2,7 @@ name: Deploy to o2switch (Next.js standalone + Prisma)
 
 on:
   push:
-    branches: ["main"]
+    branches: ["tryou"]
 
 jobs:
   deploy:
