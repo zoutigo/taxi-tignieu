@@ -3,7 +3,7 @@ FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package manifests and Prisma schema so @prisma/client can generate correctly
+# Copy package manifests and Prisma schema so @prisma/client can generate correctlys
 COPY package*.json ./
 COPY prisma ./prisma
 
