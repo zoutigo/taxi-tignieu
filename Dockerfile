@@ -51,9 +51,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Prisma config & schema for runtime (migrations)
-# (si tu n'as pas prisma.config.js, supprime juste cette ligne)
-COPY --from=builder /app/prisma.config.js ./prisma.config.js
+# Prisma schema for runtime (migrations)
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
