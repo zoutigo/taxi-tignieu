@@ -3,6 +3,11 @@ FROM node:22-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
+# Prisma v6 exige DATABASE_URL même pour `prisma generate`.
+# On fournit un ARG avec valeur neutre qui peut être remplacée au build.
+ARG DATABASE_URL="mysql://user:pass@localhost:3306/placeholder"
+ENV DATABASE_URL=${DATABASE_URL}
+
 # Copy package manifests and Prisma schema so @prisma/client can generate correctlys
 COPY package*.json ./
 COPY prisma ./prisma
@@ -14,6 +19,10 @@ RUN npx prisma generate
 FROM node:22-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+
+# Reprise de l'ARG pour cette étape
+ARG DATABASE_URL="mysql://user:pass@localhost:3306/placeholder"
+ENV DATABASE_URL=${DATABASE_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
