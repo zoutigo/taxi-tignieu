@@ -185,7 +185,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     const timeStr = d.toISOString().slice(11, 16);
     const tariff = inferTariffFromDateTime(dateStr, timeStr);
     try {
-      const res = await fetch("/api/tarifs/quote", {
+      const res = await fetch("/api/forecast/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

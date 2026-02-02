@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React, { createContext, useContext } from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { ReservationWizard, type SavedAddressOption } from "@/components/reservation-wizard";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -104,7 +104,7 @@ describe("ReservationWizard prefill in edit mode", () => {
   });
 
   it("pré-remplit les champs pickup/dropoff en mode edit même avec des adresses sauvegardées", async () => {
-    const { getAllByTestId } = render(
+    render(
       <ReservationWizard
         mode="edit"
         bookingId="booking-123"
@@ -136,7 +136,7 @@ describe("ReservationWizard prefill in edit mode", () => {
       />
     );
 
-    const inputs = getAllByTestId("Ex: 114B route de Crémieu, Tignieu") as HTMLInputElement[];
-    expect(inputs[0].value).toBe("114 route de Crémieu");
+    expect(screen.getByText(/114 route de Crémieu/i)).toBeTruthy();
+    expect(screen.getByText(/Tignieu/i)).toBeTruthy();
   });
 });

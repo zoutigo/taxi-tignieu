@@ -281,7 +281,7 @@ describe("BookingsAdminTable UI", () => {
 
   it("recalcule prix et km quand on modifie adresse, passagers, bagages ou heure", async () => {
     const fetchMock = jest.fn((url) => {
-      if (url === "/api/tarifs/quote") {
+      if (url === "/api/forecast/quote") {
         return Promise.resolve({
           ok: true,
           json: async () => ({ distanceKm: 12.34, price: 42 }),
@@ -328,7 +328,7 @@ describe("BookingsAdminTable UI", () => {
       fireEvent.change(paxInput, { target: { value: "3" } });
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/tarifs/quote",
+      "/api/forecast/quote",
       expect.objectContaining({ method: "POST" })
     );
 

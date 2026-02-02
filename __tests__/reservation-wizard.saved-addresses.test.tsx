@@ -83,14 +83,26 @@ describe("ReservationWizard saved addresses", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView = jest.fn();
-    mockFetch.mockImplementation((url: string) => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.startsWith("/api/tarifs/config")) {
         return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
       }
-      if (url.startsWith("/api/tarifs/search")) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
+      if (url.startsWith("/api/forecast/geocode")) {
+        const body = opts?.body ? JSON.parse(opts.body.toString()) : { address: "" };
+        const addr = (body.address as string).toLowerCase();
+        const result = {
+          label: addr,
+          lat: 45.7,
+          lng: 4.9,
+          streetNumber: "114",
+          street: "route de cremieu",
+          postcode: "38230",
+          city: "Tignieu-Jameyzieu",
+          country: "France",
+        };
+        return Promise.resolve({ ok: true, json: async () => ({ results: [result] }) });
       }
-      if (url.startsWith("/api/tarifs/quote")) {
+      if (url.startsWith("/api/forecast/quote")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ distanceKm: 10, durationMinutes: 20, price: 25 }),
@@ -98,9 +110,6 @@ describe("ReservationWizard saved addresses", () => {
       }
       if (url.startsWith("/api/bookings")) {
         return Promise.resolve({ ok: true, json: async () => ({ booking: {} }) });
-      }
-      if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({ ok: true, json: async () => ({}) });
       }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
@@ -119,7 +128,7 @@ describe("ReservationWizard saved addresses", () => {
     fireEvent.click(getByText("Commencer la réservation"));
 
     const initialGeocodeCalls = mockFetch.mock.calls.filter(
-      (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/tarifs/geocode")
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/forecast/geocode")
     ).length;
 
     const trigger = getByRole("button", { name: /choisir une adresse sauvegardée/i });
@@ -130,7 +139,7 @@ describe("ReservationWizard saved addresses", () => {
 
     await waitFor(() => expect(queryByText(/Arrivée/)).toBeTruthy());
     const geocodeCallsAfter = mockFetch.mock.calls.filter(
-      (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/tarifs/geocode")
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/forecast/geocode")
     ).length;
     expect(geocodeCallsAfter).toBe(initialGeocodeCalls);
   });
@@ -151,6 +160,7 @@ describe("ReservationWizard saved addresses", () => {
       lat: 45.7,
       lng: 4.9,
     };
+    const otherAddress = { ...readyAddress, lat: 45.8, lng: 4.91, label: "Autre" };
 
     const { getByText, getByRole, getAllByText } = render(
       <ReservationWizard
@@ -159,7 +169,7 @@ describe("ReservationWizard saved addresses", () => {
         savedAddresses={[]}
         initialValues={{
           pickup: readyAddress,
-          dropoff: readyAddress,
+          dropoff: otherAddress,
           date: "2025-12-12",
           time: "10:00",
           policiesAccepted: true,
@@ -168,17 +178,21 @@ describe("ReservationWizard saved addresses", () => {
     );
 
     fireEvent.click(getByText("Commencer la réservation"));
-    fireEvent.click(getByText("Continuer")); // pickup ok
-    await waitFor(() => expect(getByText(/Arrivée/)).toBeTruthy());
-    fireEvent.click(getByText("Continuer")); // dropoff ok
-    await waitFor(() => expect(getByText(/Estimation du tarif/)).toBeTruthy());
-    fireEvent.click(getByText("Continuer")); // estimation -> confirmation (auth already ok)
-    await waitFor(() => expect(getAllByText(/Confirmation/).length).toBeGreaterThan(0));
-
+    // À l'étape départ, on coche "Enregistrer cette adresse" sans nom
     const saveCheckbox = getByRole("checkbox");
     fireEvent.click(saveCheckbox);
-    const submit = getByRole("button", { name: /confirmer/i });
-    expect(submit.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(getByText("Continuer")); // pickup ok
+    await waitFor(() => expect(getByText(/Arrivée/)).toBeTruthy());
+    fireEvent.click(getByRole("button", { name: /Continuer/i })); // dropoff ok
+    fireEvent.click(getByRole("button", { name: /Continuer/i })); // estimation (passe direct)
+    fireEvent.click(getByRole("button", { name: /Continuer/i })); // connexion
+    fireEvent.click(getByRole("button", { name: /Continuer/i })); // confirmation
+
+    await waitFor(() => expect(getAllByText(/Confirmation/).length).toBeGreaterThan(0));
+    const buttons = document.querySelectorAll("form button");
+    const submit = buttons[buttons.length - 1] as HTMLButtonElement | undefined;
+    expect(submit).toBeDefined();
+    expect(submit?.disabled).toBe(false);
   });
 
   it("active le submit quand un nom est fourni pour l'adresse à enregistrer", async () => {
@@ -197,6 +211,7 @@ describe("ReservationWizard saved addresses", () => {
       lat: 45.7,
       lng: 4.9,
     };
+    const otherAddress = { ...readyAddress, lat: 45.8, lng: 4.91, label: "Autre" };
 
     const { getByText, getByRole, getByPlaceholderText, getAllByText } = render(
       <ReservationWizard
@@ -205,7 +220,7 @@ describe("ReservationWizard saved addresses", () => {
         savedAddresses={[]}
         initialValues={{
           pickup: readyAddress,
-          dropoff: readyAddress,
+          dropoff: otherAddress,
           date: "2025-12-12",
           time: "10:00",
           policiesAccepted: true,
@@ -221,12 +236,15 @@ describe("ReservationWizard saved addresses", () => {
 
     fireEvent.click(getByText("Continuer"));
     await waitFor(() => expect(getByText(/Arrivée/)).toBeTruthy());
-    fireEvent.click(getByText("Continuer"));
-    fireEvent.click(getByText("Continuer"));
-    await waitFor(() => expect(getByText(/Connexion|Confirmation/)).toBeTruthy());
-    fireEvent.click(getByText("Continuer"));
+    fireEvent.click(getByRole("button", { name: /Continuer/i }));
+    fireEvent.click(getByRole("button", { name: /Continuer/i }));
+    fireEvent.click(getByRole("button", { name: /Continuer/i }));
+    fireEvent.click(getByRole("button", { name: /Continuer/i }));
     await waitFor(() => expect(getAllByText(/Confirmation/).length).toBeGreaterThan(0));
 
-    expect(getByRole("button", { name: /confirmer/i }).hasAttribute("disabled")).toBe(false);
+    const buttons = document.querySelectorAll("form button");
+    const confirmBtn = buttons[buttons.length - 1] as HTMLButtonElement | undefined;
+    expect(confirmBtn).toBeDefined();
+    expect(confirmBtn?.disabled).toBe(false);
   });
 });

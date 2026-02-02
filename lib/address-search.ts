@@ -1,8 +1,12 @@
 import { parseAddressParts, type AddressData } from "@/lib/booking-utils";
 
-export const normalizeAddressSuggestion = (s: AddressData): AddressData => {
+export const normalizeAddressSuggestion = (s: AddressData, query?: string): AddressData => {
   const parsed = parseAddressParts(s.label);
-  const streetNumber = s.streetNumber ?? parsed.streetNumber ?? "";
+  const queryTokens = (query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  const queryNumber = queryTokens.find((t) => /^\d{1,5}$/.test(t));
+  const queryPostcode = queryTokens.find((t) => /^\d{4,5}$/.test(t));
+
+  const streetNumber = s.streetNumber ?? parsed.streetNumber ?? queryNumber ?? "";
   let street = s.street ?? parsed.street ?? "";
   if (streetNumber) {
     const regex = new RegExp(`^\\s*${streetNumber}\\s+`, "i");
@@ -15,16 +19,25 @@ export const normalizeAddressSuggestion = (s: AddressData): AddressData => {
     const regex = new RegExp(`^\\s*${streetNumber}\\s+`, "i");
     street = street.replace(regex, "").trim();
   }
-  const withCountry =
+  const postcode = s.postcode ?? parsed.cp ?? queryPostcode ?? "";
+  const labelLine1 = [streetNumber, street].filter(Boolean).join(" ").trim();
+  const labelLine2 = [postcode, s.city ?? parsed.city].filter(Boolean).join(" ").trim();
+  let withCountry =
     s.country && !s.label.toLowerCase().includes(s.country.toLowerCase())
       ? `${s.label}, ${s.country}`
       : s.label;
+  const normalizedLabel = withCountry.toLowerCase();
+  if (labelLine1 && !normalizedLabel.includes(labelLine1.toLowerCase())) {
+    withCountry = [labelLine1, labelLine2, s.country].filter(Boolean).join(", ");
+  } else if (labelLine2 && !normalizedLabel.includes(labelLine2.toLowerCase())) {
+    withCountry = `${withCountry}, ${labelLine2}`;
+  }
 
   return {
     ...s,
     label: withCountry,
     city: s.city ?? parsed.city,
-    postcode: s.postcode ?? parsed.cp,
+    postcode,
     street,
     streetNumber,
   };
@@ -34,30 +47,26 @@ export async function fetchAddressSuggestions(query: string): Promise<AddressDat
   if (query.trim().length < 3) return [];
 
   try {
-    const res = await fetch(`/api/tarifs/search?q=${encodeURIComponent(query)}`);
-    const data = (await res.json()) as { results?: AddressData[] };
-    const normalizedQuery = query.trim().toLowerCase();
-    const queryNumberMatch = query.match(/(\d{1,4})/);
-    const queryNumber = queryNumberMatch?.[1] ?? null;
-    const normalized =
+    const res = await fetch("/api/forecast/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: query }),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      results?: Array<AddressData & { formatted_address?: string; place_id?: string }>;
+    };
+    return (
       data.results
-        ?.map((s) => normalizeAddressSuggestion(s))
-        .filter((s) => {
-          const label = s.label.toLowerCase();
-          const streetLine = `${s.streetNumber ?? ""} ${s.street ?? ""}`.trim().toLowerCase();
-          const matchesQuery =
-            label.includes(normalizedQuery) ||
-            streetLine.includes(normalizedQuery) ||
-            (s.street ?? "").toLowerCase().includes(normalizedQuery);
-
-          return (
-            Number.isFinite(s.lat) &&
-            Number.isFinite(s.lng) &&
-            ((s.city?.trim().length ?? 0) > 0 || (s.postcode?.trim().length ?? 0) > 0) &&
-            matchesQuery &&
-            (!queryNumber || (s.streetNumber ?? "").toString().includes(queryNumber))
-          );
-        })
+        ?.map((s) =>
+          normalizeAddressSuggestion(
+            {
+              ...s,
+              label: s.formatted_address ?? s.label ?? query,
+            },
+            query
+          )
+        )
         .filter((s, idx, arr) => {
           const key = `${s.label.toLowerCase()}-${s.lat}-${s.lng}-${s.postcode ?? ""}-${s.city ?? ""}`;
           return (
@@ -68,27 +77,54 @@ export async function fetchAddressSuggestions(query: string): Promise<AddressDat
             ) === idx
           );
         })
-        .filter((s) => s.label.toLowerCase() !== normalizedQuery)
-        ?.slice(0, 5) ?? [];
+        .slice(0, 5) ?? []
+    );
+  } catch {
+    return [];
+  }
+}
 
-    if (normalized.length > 0) {
-      return normalized;
-    }
-
-    // Fallback: geocode unique result for free-text queries
-    try {
-      const geoRes = await fetch(`/api/tarifs/geocode?q=${encodeURIComponent(query)}`);
-      if (geoRes.ok) {
-        const geo = (await geoRes.json()) as AddressData | null;
-        if (geo && Number.isFinite(geo.lat) && Number.isFinite(geo.lng)) {
-          return [normalizeAddressSuggestion(geo)];
+export async function fetchForecastAddressSuggestions(query: string): Promise<AddressData[]> {
+  if (query.trim().length < 5) return [];
+  try {
+    const res = await fetch("/api/forecast/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: query }),
+    });
+    if (!res.ok) {
+      // Surface server error to dev console (dev only) to understand why it fails (e.g., Google REQUEST_DENIED)
+      if (process.env.NODE_ENV !== "production") {
+        try {
+          const errPayload = await res.json();
+          console.warn("forecast geocode error", errPayload);
+        } catch {
+          // ignore parse errors
         }
       }
-    } catch {
-      // ignore
+      return [];
     }
-
-    return [];
+    const data = (await res.json()) as {
+      results?: Array<
+        AddressData & {
+          formatted_address?: string;
+        }
+      >;
+    };
+    return (
+      data.results
+        ?.map((s) =>
+          normalizeAddressSuggestion(
+            {
+              ...s,
+              label: s.formatted_address ?? s.label ?? query,
+            },
+            query
+          )
+        )
+        .filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng))
+        .slice(0, 5) ?? []
+    );
   } catch {
     return [];
   }
