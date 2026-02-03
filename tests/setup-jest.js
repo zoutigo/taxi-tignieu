@@ -7,7 +7,9 @@ beforeAll(() => {
     const [first] = args;
     if (
       typeof first === "string" &&
-      (first.includes("react-test-renderer is deprecated") || first.includes("wrapped in act("))
+      (first.includes("react-test-renderer is deprecated") ||
+        first.includes("wrapped in act(") ||
+        first.includes("incrementalCache missing in unstable_cache"))
     ) {
       return;
     }

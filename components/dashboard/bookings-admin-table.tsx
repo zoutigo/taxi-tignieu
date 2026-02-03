@@ -753,8 +753,6 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
         const editState = showAddressInput[b.id] ?? { pickup: false, dropoff: false };
         const hasPickupLabel = Boolean((b.pickupLabel ?? "").trim());
         const hasDropoffLabel = Boolean((b.dropoffLabel ?? "").trim());
-        const isPickupEditing = Boolean(editState.pickup || !hasPickupLabel);
-        const isDropoffEditing = Boolean(editState.dropoff || !hasDropoffLabel);
         const pickupLocked = hasPickupLabel && !editState.pickup;
         const dropoffLocked = hasDropoffLabel && !editState.dropoff;
 
