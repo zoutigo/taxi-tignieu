@@ -49,10 +49,18 @@ describe("UserAddressesManager flows", () => {
   beforeEach(() => {
     // @ts-expect-error mock fetch
     global.fetch = jest.fn((url: string, options?: RequestInit) => {
-      if (url.startsWith("/api/tarifs/search")) {
+      if (url.startsWith("/api/forecast/geocode")) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ results: [suggestion] }),
+          json: () =>
+            Promise.resolve({
+              results: [
+                {
+                  ...suggestion,
+                  label: "89 rue du travail, 38230 Pont-de-Chéruy, France",
+                },
+              ],
+            }),
         }) as unknown as Response;
       }
       if (url.startsWith("/api/profile/addresses") && options?.method === "POST") {
@@ -96,12 +104,6 @@ describe("UserAddressesManager flows", () => {
           json: () => Promise.resolve({ ok: true, defaultAddressId: null }),
         }) as unknown as Response;
       }
-      if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(null),
-        }) as unknown as Response;
-      }
       throw new Error(`Unhandled fetch ${url}`);
     });
   });
@@ -119,21 +121,23 @@ describe("UserAddressesManager flows", () => {
     const search = screen.getByPlaceholderText(/rue de la république/i);
     fireEvent.change(search, { target: { value: "89 rue du travail" } });
 
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/i }));
     await waitFor(() =>
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/api/tarifs/search"))
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/forecast/geocode"),
+        expect.objectContaining({ method: "POST" })
+      )
     );
 
-    let suggestionBtn: HTMLElement | null = null;
-    await waitFor(() => {
+    const suggestionBtn = (await waitFor(() => {
       const buttons = screen.getAllByRole("button");
-      suggestionBtn = buttons.find((b) =>
-        (b.textContent || "").toLowerCase().includes("rue du travail")
-      ) as HTMLElement | null;
-      expect(suggestionBtn).toBeTruthy();
-    });
-    if (!suggestionBtn) {
-      throw new Error("Suggestion not found");
-    }
+      const found =
+        buttons.find((b) => (b.textContent || "").toLowerCase().includes("travail")) ??
+        buttons.find((b) => (b.textContent || "").toLowerCase().includes("89")) ??
+        null;
+      expect(found).toBeTruthy();
+      return found;
+    })) as HTMLElement;
     fireEvent.click(suggestionBtn);
 
     const labelInput = screen.getByLabelText(/nom de l'adresse/i);

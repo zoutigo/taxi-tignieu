@@ -81,50 +81,49 @@ type GeocodeResponse = {
   name?: string;
 } | null;
 
-type SearchSuggestion = {
-  label: string;
-  city?: string;
-  postcode?: string;
-  country?: string;
-  lat: number;
-  lng: number;
-};
-
 export async function fetchAddressData(address: string): Promise<AddressData> {
   const geocode = async (): Promise<GeocodeResponse> => {
-    const res = await fetch(`/api/tarifs/geocode?q=${encodeURIComponent(address)}`);
-    if (!res.ok) return null;
-    return (await res.json()) as GeocodeResponse;
-  };
-
-  const searchTop = async (text: string): Promise<SearchSuggestion | null> => {
     try {
-      const res = await fetch(`/api/tarifs/search?q=${encodeURIComponent(text)}`);
-      if (!res.ok) return null;
-      const data = (await res.json()) as { results?: SearchSuggestion[] };
-      return data.results?.[0] ?? null;
+      const res = await fetch("/api/forecast/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          results?: Array<
+            AddressData & { formatted_address?: string; place_id?: string; streetNumber?: string }
+          >;
+        };
+        const first = data.results?.[0];
+        if (first) {
+          return {
+            lat: first.lat,
+            lng: first.lng,
+            label: first.formatted_address ?? first.label ?? address,
+            city: first.city,
+            postcode: first.postcode,
+            country: first.country,
+            street: first.street,
+            name: first.place_id,
+          };
+        }
+      }
     } catch {
-      return null;
+      // ignore
     }
+    return null;
   };
 
   const geo = (await geocode()) ?? {};
-  let suggestion = await searchTop(address);
-  if (
-    !suggestion &&
-    (geo as GeocodeResponse)?.label &&
-    (geo as GeocodeResponse)!.label !== address
-  ) {
-    suggestion = await searchTop((geo as GeocodeResponse)!.label as string);
-  }
 
   const merged: AddressData = {
-    lat: (geo as AddressData).lat ?? suggestion?.lat ?? NaN,
-    lng: (geo as AddressData).lng ?? suggestion?.lng ?? NaN,
-    label: (geo as AddressData).label ?? suggestion?.label ?? address,
-    city: (geo as AddressData).city ?? suggestion?.city,
-    postcode: (geo as AddressData).postcode ?? suggestion?.postcode,
-    country: (geo as AddressData).country ?? suggestion?.country,
+    lat: (geo as AddressData).lat ?? NaN,
+    lng: (geo as AddressData).lng ?? NaN,
+    label: (geo as AddressData).label ?? address,
+    city: (geo as AddressData).city,
+    postcode: (geo as AddressData).postcode,
+    country: (geo as AddressData).country,
     street: (geo as AddressData).street,
     name: (geo as AddressData).name,
   };

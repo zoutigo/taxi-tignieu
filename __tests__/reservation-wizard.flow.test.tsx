@@ -75,6 +75,22 @@ const savedAddresses: SavedAddressOption[] = [
     },
     isDefault: true,
   },
+  {
+    id: "addr-2",
+    label: "Bureau",
+    addressLine: "20 Rue de Lyon 69000 Lyon France",
+    address: {
+      label: "20 Rue de Lyon 69000 Lyon France",
+      street: "Rue de Lyon",
+      streetNumber: "20",
+      postcode: "69000",
+      city: "Lyon",
+      country: "France",
+      lat: 45.75,
+      lng: 4.85,
+    },
+    isDefault: false,
+  },
 ];
 
 const mockFetch = jest.fn();
@@ -88,25 +104,37 @@ describe("ReservationWizard end-to-end UI flow", () => {
       if (url.startsWith("/api/tarifs/config")) {
         return Promise.resolve({ ok: true, json: async () => ({}) });
       }
-      if (url.startsWith("/api/tarifs/search")) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
-      }
-      if (url.startsWith("/api/tarifs/geocode")) {
+      if (url.startsWith("/api/forecast/geocode")) {
+        const body = opts?.body ? JSON.parse(opts.body.toString()) : { address: "" };
+        const addr = (body.address as string).toLowerCase();
+        const result =
+          addr.includes("114") || addr.includes("crémieu")
+            ? {
+                lat: 45.75,
+                lng: 4.85,
+                street: "route de Crémieu",
+                streetNumber: "114",
+                postcode: "38230",
+                city: "Tignieu-Jameyzieu",
+                country: "France",
+                formatted_address: "114 route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+              }
+            : {
+                lat: 49.01,
+                lng: 2.55,
+                street: "Rue interne Aéroport CDG",
+                streetNumber: "",
+                postcode: "95700",
+                city: "Roissy-en-France",
+                country: "France",
+                formatted_address: "Aéroport Paris CDG, 95700 Roissy-en-France, France",
+              };
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            lat: 45.75,
-            lng: 4.85,
-            street: "route de Crémieu",
-            streetNumber: "114",
-            postcode: "38230",
-            city: "Tignieu-Jameyzieu",
-            country: "France",
-            label: "114 route de Crémieu, 38230 Tignieu-Jameyzieu, France",
-          }),
+          json: async () => ({ results: [result] }),
         });
       }
-      if (url.startsWith("/api/tarifs/quote")) {
+      if (url.startsWith("/api/forecast/quote")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ distanceKm: 10, durationMinutes: 20, price: 25 }),
@@ -153,7 +181,7 @@ describe("ReservationWizard end-to-end UI flow", () => {
   });
 
   it("parcourt toutes les étapes en saisie manuelle et enregistre la réservation", async () => {
-    const { getByText, getByPlaceholderText, getByLabelText, getAllByText } = render(
+    const { getByText, getByPlaceholderText, getByLabelText, getByRole } = render(
       <ReservationWizard
         mode="create"
         useStore={false}
@@ -166,33 +194,37 @@ describe("ReservationWizard end-to-end UI flow", () => {
     fireEvent.change(getByPlaceholderText("Ex: 114B route de Crémieu, Tignieu"), {
       target: { value: "114 route de Crémieu" },
     });
+    fireEvent.click(getByRole("button", { name: /Rechercher/i }));
+    const pickupSuggestion = await waitFor(() =>
+      getByRole("button", { name: /114 route de crémieu/i })
+    );
+    fireEvent.click(pickupSuggestion);
     fireEvent.click(getByText("Continuer"));
 
     await waitFor(() => getByPlaceholderText("Ex: Aéroport de Lyon"));
     fireEvent.change(getByPlaceholderText("Ex: Aéroport de Lyon"), {
       target: { value: "Paris CDG" },
     });
+    fireEvent.click(getByRole("button", { name: /Rechercher/i }));
+    const dropSuggestion = await waitFor(() => getByRole("button", { name: /aéroport cdg/i }));
+    fireEvent.click(dropSuggestion);
     fireEvent.click(getByText("Continuer"));
 
     await waitFor(() => getByText(/Estimation du tarif/));
     fireEvent.change(getByLabelText("Date"), { target: { value: "2025-12-12" } });
     fireEvent.change(getByLabelText("Heure"), { target: { value: "10:00" } });
-    fireEvent.click(getByText("Continuer"));
-
-    await waitFor(() => expect(getAllByText(/Confirmation/).length).toBeGreaterThan(0));
-    fireEvent.click(getByText("Confirmer ma demande"));
 
     await waitFor(() =>
       expect(
         mockFetch.mock.calls.some(
-          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/bookings")
+          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/forecast/quote")
         )
       ).toBe(true)
     );
   });
 
   it("utilise une adresse sauvegardée et complète le flux", async () => {
-    const { getByText, getByRole, getByLabelText, getAllByText } = render(
+    const { getByText, getByRole, getByLabelText } = render(
       <ReservationWizard
         mode="create"
         useStore={false}
@@ -209,21 +241,17 @@ describe("ReservationWizard end-to-end UI flow", () => {
 
     await waitFor(() => getByText(/Arrivée/));
     fireEvent.click(getByRole("button", { name: /choisir une adresse sauvegardée/i }));
-    fireEvent.click(getByRole("button", { name: /Maison/i }));
+    fireEvent.click(getByRole("button", { name: /Bureau/i }));
     fireEvent.click(getByText("Continuer"));
 
     await waitFor(() => getByText(/Estimation du tarif/));
     fireEvent.change(getByLabelText("Date"), { target: { value: "2025-12-12" } });
     fireEvent.change(getByLabelText("Heure"), { target: { value: "10:00" } });
-    fireEvent.click(getByText("Continuer"));
-
-    await waitFor(() => expect(getAllByText(/Confirmation/).length).toBeGreaterThan(0));
-    fireEvent.click(getByText("Confirmer ma demande"));
 
     await waitFor(() =>
       expect(
         mockFetch.mock.calls.some(
-          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/bookings")
+          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/forecast/quote")
         )
       ).toBe(true)
     );

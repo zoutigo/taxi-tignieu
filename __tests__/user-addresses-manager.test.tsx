@@ -19,7 +19,7 @@ describe("UserAddressesManager address selection", () => {
   beforeEach(() => {
     // @ts-expect-error global fetch mock for test
     global.fetch = jest.fn((url: string) => {
-      if (url.startsWith("/api/tarifs/search")) {
+      if (url.startsWith("/api/forecast/geocode")) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ results: [sampleSuggestion] }),
@@ -38,6 +38,7 @@ describe("UserAddressesManager address selection", () => {
 
     const searchInput = screen.getByPlaceholderText(/rue de la république/i);
     fireEvent.change(searchInput, { target: { value: "114 route de cremieu" } });
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/i }));
 
     const suggestionButton = await waitFor(() =>
       screen.getByRole("button", { name: /114 route de cremieu/i })
@@ -65,9 +66,10 @@ describe("UserAddressesManager address selection", () => {
 
     const searchInput = screen.getByPlaceholderText(/rue de la république/i);
     fireEvent.change(searchInput, { target: { value: "114 route de cremieu" } });
+    fireEvent.click(screen.getByRole("button", { name: /Rechercher/i }));
 
     const suggestionButton = await waitFor(() =>
-      screen.getByRole("button", { name: /114 route de cremieu, france/i })
+      screen.getByRole("button", { name: /114 route de cremieu/i })
     );
 
     const detail = within(suggestionButton).getByText(/38230/i);

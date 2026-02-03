@@ -67,25 +67,40 @@ describe("ReservationPage price display", () => {
   });
 
   it("affiche un prix non nul quand distance > 0 (fallback local)", async () => {
-    mockFetch.mockImplementation((url: string) => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.startsWith("/api/tarifs/config")) {
         return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
       }
-      if (url.startsWith("/api/tarifs/search")) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
-      }
-      if (url.startsWith("/api/tarifs/geocode")) {
+      if (url.startsWith("/api/forecast/geocode")) {
+        const body = opts?.body ? JSON.parse(opts.body.toString()) : { address: "" };
+        const addr = (body.address as string).toLowerCase();
+        const first = {
+          lat: 45.75,
+          lng: 4.85,
+          country: "France",
+          city: "Tignieu-Jameyzieu",
+          postcode: "38230",
+          street: "route de Crémieu",
+          streetNumber: "114",
+          formatted_address: "114B route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+          label: "114B route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+        };
+        const second = {
+          lat: 45.9,
+          lng: 4.7,
+          country: "France",
+          city: "Lyon",
+          postcode: "69000",
+          street: "Aéroport de Lyon",
+          formatted_address: "Aéroport de Lyon, 69000 Lyon, France",
+          label: "Aéroport de Lyon, 69000 Lyon, France",
+        };
         return Promise.resolve({
           ok: true,
-          json: async () => ({
-            lat: 45.75,
-            lng: 4.85,
-            country: "France",
-            label: "114B route de Crémieu, France",
-          }),
+          json: async () => ({ results: addr.includes("aéroport") ? [second] : [first] }),
         });
       }
-      if (url.startsWith("/api/tarifs/quote")) {
+      if (url.startsWith("/api/forecast/quote")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ distanceKm: 51, durationMinutes: 48, price: 0 }),
@@ -122,6 +137,29 @@ describe("ReservationPage price display", () => {
         target: { value: "114B route de Crémieu" },
       });
     });
+    const textFrom = (val: unknown): string => {
+      if (typeof val === "string" || typeof val === "number") return String(val);
+      if (Array.isArray(val)) return val.map(textFrom).join("");
+      if (val && typeof val === "object" && "props" in val) {
+        return textFrom((val as { props?: { children?: unknown } }).props?.children);
+      }
+      return "";
+    };
+    const searchButtons = root.findAll(
+      (n) => n.type === "button" && /rechercher/i.test(textFrom(n.props.children))
+    );
+    expect(searchButtons.length).toBeGreaterThan(0);
+    const pickupSearchBtn = searchButtons[0];
+    await act(async () => {
+      (pickupSearchBtn.props.onClick as () => void)();
+    });
+
+    const pickupSuggestion = root.find(
+      (n) => n.type === "button" && textFrom(n.props.children).toLowerCase().includes("crémieu")
+    );
+    await act(async () => {
+      (pickupSuggestion.props.onClick as () => void)();
+    });
 
     // Step 1 -> 2
     const nextBtn = root.find((n) => n.type === "button" && n.props.children === "Continuer");
@@ -139,6 +177,20 @@ describe("ReservationPage price display", () => {
       (dropInput.props.onChange as (e: { target: { value: string } }) => void)({
         target: { value: "Aéroport de Lyon" },
       });
+    });
+    const dropSearchButtons = root.findAll(
+      (n) => n.type === "button" && /rechercher/i.test(textFrom(n.props.children))
+    );
+    expect(dropSearchButtons.length).toBeGreaterThan(0);
+    const dropSearchBtn = dropSearchButtons[1] ?? dropSearchButtons[0];
+    await act(async () => {
+      (dropSearchBtn.props.onClick as () => void)();
+    });
+    const dropSuggestion = root.find(
+      (n) => n.type === "button" && textFrom(n.props.children).toLowerCase().includes("aéroport")
+    );
+    await act(async () => {
+      (dropSuggestion.props.onClick as () => void)();
     });
 
     // Step 2 -> 3

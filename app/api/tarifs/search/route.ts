@@ -1,13 +1,35 @@
 import { NextResponse } from "next/server";
+import { parseAddressParts } from "@/lib/booking-utils";
 
 const PHOTON_URL = "https://photon.komoot.io/api";
 const ORS_AUTOCOMPLETE_URL = "https://api.openrouteservice.org/geocode/autocomplete";
+
+type Feature = {
+  properties?: Record<string, unknown>;
+  geometry?: { coordinates?: number[] };
+};
+
+type ScoreEntry = {
+  label: string;
+  city: string;
+  postcode: string;
+  country: string;
+  street?: string;
+  streetNumber?: string;
+  lat: number;
+  lng: number;
+  score: number;
+  firstTokenPos: number;
+  cityTokensMatchAll: boolean;
+  numberMatch: boolean;
+  postcodeMatch: boolean;
+};
 
 const fetchORSAutocomplete = async (query: string, apiKey?: string) => {
   if (!apiKey) return null;
   const url = `${ORS_AUTOCOMPLETE_URL}?api_key=${apiKey}&text=${encodeURIComponent(
     query
-  )}&size=6&lang=fr`;
+  )}&size=6&lang=fr&boundary.country=FRA&layers=address,street,venue&sources=openstreetmap`;
   const res = await fetch(url);
   if (!res.ok) return null;
   const data = await res.json();
@@ -32,6 +54,37 @@ const normalize = (text: string) =>
     .trim()
     .replace(/\s+/g, " ");
 
+const enrichWithGeocode = async (text: string): Promise<Partial<ScoreEntry>> => {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/tarifs/geocode?q=${encodeURIComponent(
+        text
+      )}`
+    );
+    if (!res.ok) return {};
+    const data = (await res.json()) as {
+      streetNumber?: string;
+      street?: string;
+      postcode?: string;
+      city?: string;
+      country?: string;
+      lat?: number;
+      lng?: number;
+    };
+    return {
+      streetNumber: data.streetNumber,
+      street: data.street,
+      postcode: data.postcode,
+      city: data.city,
+      country: data.country,
+      lat: data.lat,
+      lng: data.lng,
+    };
+  } catch {
+    return {};
+  }
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q");
@@ -40,6 +93,8 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Parse query for fallback components (number/CP/city)
+    const parsedQuery = parseAddressParts(q);
     const apiKey = process.env.OPENROUTESERVICE_API_KEY;
     const ors = await fetchORSAutocomplete(q, apiKey);
     const fallbackQuery = normalize(q);
@@ -60,50 +115,64 @@ export async function GET(request: Request) {
 
     const normQ = normalize(q).toLowerCase();
     const tokens = normQ.split(" ").filter(Boolean);
-    const numberToken = tokens.find((t) => /^\d+$/.test(t));
+    const numberToken = parsedQuery.streetNumber || tokens.find((t) => /^\d+$/.test(t));
     const cityTokens = tokens.filter((t) => t.length > 2 && !/^\d+$/.test(t));
-    const features: Array<{
-      properties?: Record<string, unknown>;
-      geometry?: { coordinates?: number[] };
-    }> =
-      (
-        chosen as {
-          features?: Array<{
-            properties?: Record<string, unknown>;
-            geometry?: { coordinates?: number[] };
-          }>;
-        }
-      ).features ?? [];
+    const cpToken = parsedQuery.cp || tokens.find((t) => /^\d{4,5}$/.test(t));
+    const queryStreet = normalize(parsedQuery.street ?? "").toLowerCase();
+    const features: Feature[] = (chosen as { features?: Feature[] }).features ?? [];
 
-    type ScoreEntry = {
-      label: string;
-      city: string;
-      postcode: string;
-      country: string;
-      lat: number;
-      lng: number;
-      score: number;
-      firstTokenPos: number;
-      cityTokensMatchAll: boolean;
-      numberMatch: boolean;
+    const extractAddress = (props: Record<string, unknown> = {}) => {
+      const streetNumberRaw =
+        (props.housenumber as string) ??
+        (props.house_number as string) ??
+        (props.number as string) ??
+        "";
+      const street =
+        (props.street as string) ?? (props.streetname as string) ?? (props.name as string) ?? "";
+      const postcodeRaw = (props.postalcode as string) ?? (props.postcode as string) ?? "";
+      const city =
+        (props.city as string) ??
+        (props.locality as string) ??
+        (props.county as string) ??
+        (props.region as string) ??
+        (props.state as string) ??
+        "";
+      const country = (props.country as string) ?? "";
+
+      const streetNumber = streetNumberRaw || numberToken || "";
+      const postcode = postcodeRaw || cpToken || "";
+
+      const line1 = [streetNumber, street].filter(Boolean).join(" ").trim();
+      const line2 = [postcode, city].filter(Boolean).join(" ").trim();
+
+      let label = (props.label as string) ?? "";
+      const normalizedLabel = normalize(label);
+      const needsLine1 = line1 && !normalizedLabel.includes(normalize(line1));
+      const needsPostcode = postcode && !normalizedLabel.includes(postcode);
+      if (!label) {
+        label = [line1 || street || streetNumber, line2, country].filter(Boolean).join(", ");
+      } else if (needsLine1) {
+        label = [line1, line2, country].filter(Boolean).join(", ");
+      } else if (needsPostcode && line2) {
+        label = [label, line2, country].filter(Boolean).join(", ");
+      }
+
+      return { streetNumber, street, postcode, city, country, label };
     };
 
     const scored: ScoreEntry[] =
       features.map((f) => {
-        const label = String(f.properties?.label ?? f.properties?.name ?? q);
-        const city = String(
-          f.properties?.city ??
-            f.properties?.locality ??
-            f.properties?.county ??
-            f.properties?.region ??
-            f.properties?.country ??
-            ""
+        const { street, streetNumber, postcode, city, country, label } = extractAddress(
+          f.properties
         );
-        const postcode = String(f.properties?.postalcode ?? f.properties?.postcode ?? "");
-        const country = String(f.properties?.country ?? "");
         const normLabel = normalize(label).toLowerCase();
-        const hasNumber = /\d+/.test(label);
-        const numberMatch = numberToken && normLabel.includes(numberToken);
+        const hasNumber = streetNumber ? true : /\d+/.test(label);
+        const numberMatch =
+          (numberToken && normLabel.includes(numberToken)) ||
+          (streetNumber && numberToken === streetNumber);
+        const postcodeMatch =
+          (cpToken && postcode && postcode.includes(cpToken)) ||
+          (postcode && normLabel.includes(postcode));
         const startsWith = normLabel.startsWith(normQ);
         const containsAllTokens = tokens.every((t) => normLabel.includes(t));
         const tokenHits = tokens.reduce((acc, t) => acc + (normLabel.includes(t) ? 1 : 0), 0);
@@ -121,11 +190,12 @@ export async function GET(request: Request) {
           (containsAllTokens ? 12 : 0) +
           tokenHits * 2 +
           cityHits * 4 +
-          (numberMatch ? 20 : hasNumber ? 5 : -10) +
+          (numberMatch ? 26 : hasNumber ? 8 : -12) +
           (postcode ? 14 : 0) + // +10 par rapport aux autres critères
+          (postcodeMatch ? 16 : cpToken ? -8 : 0) +
           (city ? 3 : 0) +
           (cityTokensMatchAll ? 20 : 0) +
-          (country?.toLowerCase() === "france" ? 1 : 0) +
+          (country?.toLowerCase() === "france" || country?.toLowerCase() === "fr" ? 18 : -22) +
           Math.max(0, 8 - firstTokenPos / 8);
 
         if (numberToken && !numberMatch) score -= 10;
@@ -136,33 +206,88 @@ export async function GET(request: Request) {
           city,
           postcode,
           country,
+          street,
+          streetNumber,
           lat: Number(f.geometry?.coordinates?.[1]),
           lng: Number(f.geometry?.coordinates?.[0]),
           score,
           firstTokenPos,
           cityTokensMatchAll,
           numberMatch: Boolean(numberMatch),
+          postcodeMatch: Boolean(postcodeMatch),
         };
       }) ?? [];
 
+    const isFrance = (c: string) => {
+      const val = c?.toLowerCase();
+      return val === "france" || val === "fr";
+    };
+    const hasFrance = scored.some((s) => isFrance(s.country));
+
     // Prioritize perfect city matches and number matches first, then by score
-    const results = scored
-      .sort((a: ScoreEntry, b: ScoreEntry) => {
+    const baseResults = (hasFrance ? scored.filter((s) => isFrance(s.country)) : scored).sort(
+      (a: ScoreEntry, b: ScoreEntry) => {
         if (a.cityTokensMatchAll !== b.cityTokensMatchAll) return a.cityTokensMatchAll ? -1 : 1;
         if (a.numberMatch !== b.numberMatch) return a.numberMatch ? -1 : 1;
         return (
           b.score - a.score || a.firstTokenPos - b.firstTokenPos || a.label.length - b.label.length
         );
-      })
-      .map(({ label, city, postcode, country, lat, lng }) => ({
-        label,
-        city,
-        postcode,
-        country,
-        lat,
-        lng,
-      }));
-    return NextResponse.json({ results });
+      }
+    );
+
+    const results = await Promise.all(
+      baseResults.map(
+        async ({ label, city, postcode, country, street, streetNumber, lat, lng }) => {
+          const finalStreetNumber = streetNumber || numberToken || "";
+          const finalPostcode = postcode || cpToken || "";
+
+          // Enrich if number or postcode missing
+          if (!streetNumber || !postcode) {
+            const enrich = await enrichWithGeocode(q);
+            if (enrich.streetNumber) streetNumber = String(enrich.streetNumber);
+            if (enrich.postcode) postcode = String(enrich.postcode);
+            if (enrich.street) street = enrich.street;
+            if (enrich.city) city = enrich.city;
+            if (enrich.country) country = enrich.country;
+            if (Number.isFinite(enrich.lat) && Number.isFinite(enrich.lng)) {
+              lat = enrich.lat as number;
+              lng = enrich.lng as number;
+            }
+          }
+
+          const rebuiltLabel = [
+            [streetNumber || finalStreetNumber, street].filter(Boolean).join(" ").trim() || label,
+            [postcode || finalPostcode, city].filter(Boolean).join(" ").trim(),
+            country,
+          ]
+            .filter((p) => p && p.length > 0)
+            .join(", ");
+
+          return {
+            label: rebuiltLabel || label,
+            city,
+            postcode: postcode || finalPostcode,
+            country,
+            street,
+            streetNumber: streetNumber || finalStreetNumber,
+            lat,
+            lng,
+          };
+        }
+      )
+    );
+
+    const filtered = results.filter((r) => {
+      const streetNorm = normalize(r.street ?? "").toLowerCase();
+      const cityNorm = normalize(r.city ?? "").toLowerCase();
+      const cityTokensMatch =
+        cityTokens.length === 0 || cityTokens.every((t) => cityNorm.includes(t));
+      const streetMatch = !queryStreet || (streetNorm && streetNorm.includes(queryStreet));
+      const cpMatch = !cpToken || !r.postcode || r.postcode === cpToken;
+      return streetMatch && cityTokensMatch && cpMatch;
+    });
+
+    return NextResponse.json({ results: filtered.length > 0 ? filtered : results });
   } catch (error) {
     return NextResponse.json({ error: "Erreur interne", details: String(error) }, { status: 500 });
   }

@@ -97,6 +97,7 @@ export function ReservationWizard({
   savedAddresses = [],
 }: Props) {
   const storePrice = useBookingStore((state) => state.estimatedPrice);
+  const storeEstimate = useBookingStore((state) => state.estimate);
   const defaultValues = useMemo<BookingEstimateInput>(() => {
     const emptyAddress: AddressData = {
       label: "",
@@ -108,7 +109,7 @@ export function ReservationWizard({
       city: "",
       country: "",
     };
-    return {
+    const base = {
       pickup: { ...emptyAddress, ...(initialValues?.pickup ?? {}) },
       dropoff: { ...emptyAddress, ...(initialValues?.dropoff ?? {}) },
       date: initialValues?.date ?? "",
@@ -118,7 +119,16 @@ export function ReservationWizard({
       notes: initialValues?.notes ?? "",
       policiesAccepted: initialValues?.policiesAccepted ?? false,
     };
-  }, [initialValues]);
+    if (useStore && storeEstimate) {
+      return {
+        ...base,
+        ...storeEstimate,
+        pickup: { ...base.pickup, ...(storeEstimate.pickup ?? {}) },
+        dropoff: { ...base.dropoff, ...(storeEstimate.dropoff ?? {}) },
+      };
+    }
+    return base;
+  }, [initialValues, storeEstimate, useStore]);
 
   const router = useRouter();
   const session = useSession();
@@ -136,17 +146,25 @@ export function ReservationWizard({
     dropoff: false,
   });
   const [suppressTokens, setSuppressTokens] = useState({ pickup: 0, dropoff: 0 });
-  const [addressMode, setAddressMode] = useState<{
+  const addressMode: {
     pickup: "saved" | "manual";
     dropoff: "saved" | "manual";
-  }>({
-    pickup: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
-    dropoff: mode === "edit" ? "manual" : savedAddresses.length ? "saved" : "manual",
+  } = {
+    pickup: "manual",
+    dropoff: "manual",
+  };
+  const [showInput, setShowInput] = useState<{ pickup: boolean; dropoff: boolean }>({
+    pickup: true,
+    dropoff: true,
   });
   useEffect(() => {
     if (mode === "edit") {
       updateStep(1);
     }
+    setShowInput({
+      pickup: !defaultValues.pickup.label?.trim().length,
+      dropoff: !defaultValues.dropoff.label?.trim().length,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [shouldSaveAddress, setShouldSaveAddress] = useState<{ pickup: boolean; dropoff: boolean }>(
@@ -170,8 +188,47 @@ export function ReservationWizard({
     defaultValues,
   });
 
+  const normalizeForRecap = (
+    addr?: (Partial<AddressData> & { lat?: number | null; lng?: number | null }) | null
+  ): AddressData | null => {
+    if (!addr) return null;
+    return {
+      label: addr.label ?? "",
+      lat: Number(addr.lat ?? NaN),
+      lng: Number(addr.lng ?? NaN),
+      street: addr.street ?? "",
+      streetNumber: addr.streetNumber ?? "",
+      postcode: addr.postcode ?? "",
+      city: addr.city ?? "",
+      country: addr.country ?? "",
+      name: addr.name,
+    };
+  };
+
   const pickupAddress = useWatch({ control: form.control, name: "pickup" }) as AddressData;
   const dropoffAddress = useWatch({ control: form.control, name: "dropoff" }) as AddressData;
+  const recapPickup = normalizeForRecap(
+    pickupAddress?.label?.trim()?.length
+      ? { ...pickupAddress, lat: pickupAddress.lat ?? NaN, lng: pickupAddress.lng ?? NaN }
+      : storeEstimate?.pickup
+        ? {
+            ...storeEstimate.pickup,
+            lat: storeEstimate.pickup.lat ?? NaN,
+            lng: storeEstimate.pickup.lng ?? NaN,
+          }
+        : null
+  );
+  const recapDropoff = normalizeForRecap(
+    dropoffAddress?.label?.trim()?.length
+      ? { ...dropoffAddress, lat: dropoffAddress.lat ?? NaN, lng: dropoffAddress.lng ?? NaN }
+      : storeEstimate?.dropoff
+        ? {
+            ...storeEstimate.dropoff,
+            lat: storeEstimate.dropoff.lat ?? NaN,
+            lng: storeEstimate.dropoff.lng ?? NaN,
+          }
+        : null
+  );
 
   const saveLabelMissing =
     (shouldSaveAddress.pickup && saveLabels.pickup.trim().length < 2) ||
@@ -182,6 +239,27 @@ export function ReservationWizard({
     if (!issue) return "Certains champs sont incomplets.";
     const field = Array.isArray(issue.path) && issue.path.length ? issue.path.join(".") : "champ";
     return `${field}: ${issue.message}`;
+  };
+
+  const persistEstimate = useCallback(
+    (nextPrice: number | null = quotePrice) => {
+      if (!useStore) return;
+      const current = form.getValues();
+      setBookingEstimate(current as BookingEstimateInput, nextPrice);
+    },
+    [form, quotePrice, useStore]
+  );
+
+  const formatAddressLine = (addr?: AddressData | null) => {
+    if (!addr) return "Adresse non sélectionnée";
+    const parts = [addr.streetNumber, addr.street, addr.postcode, addr.city, addr.country]
+      .filter((p) => typeof p === "string" && p.trim().length > 0)
+      .join(" ");
+    return parts.trim().length > 0
+      ? parts
+      : addr.label?.trim()?.length
+        ? addr.label
+        : "Adresse non sélectionnée";
   };
 
   const validateStepAddress = useCallback(
@@ -257,9 +335,6 @@ export function ReservationWizard({
 
   useEffect(() => {
     form.reset(defaultValues);
-    if (useStore) {
-      clearBookingEstimate();
-    }
     setQuoteDistance("");
     setQuoteDuration("");
   }, [defaultValues, form, useStore]);
@@ -344,6 +419,7 @@ export function ReservationWizard({
     savedSelectionRef.current[kind] = false;
     setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
     form.setValue(kind, next, { shouldValidate: false, shouldDirty: true });
+    setShowInput((prev) => ({ ...prev, [kind]: true }));
   };
 
   const ensureAddress = useCallback(
@@ -372,8 +448,9 @@ export function ReservationWizard({
   const pickSuggestion = (s: AddressData, kind: "pickup" | "dropoff") => {
     const addr = normalizeAddressSuggestion(s);
     savedSelectionRef.current[kind] = false;
-    setShouldSaveAddress((prev) => ({ ...prev, [kind]: addressMode[kind] === "manual" }));
+    setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
     applyAddress(kind, addr);
+    setShowInput((prev) => ({ ...prev, [kind]: false }));
   };
 
   const handleSavedAddressSelect = (kind: "pickup" | "dropoff", id: string) => {
@@ -385,10 +462,10 @@ export function ReservationWizard({
     };
     savedSelectionRef.current[kind] = true;
     setSuppressTokens((prev) => ({ ...prev, [kind]: prev[kind] + 1 }));
-    setAddressMode((prev) => ({ ...prev, [kind]: "saved" }));
     setShouldSaveAddress((prev) => ({ ...prev, [kind]: false }));
     setSaveLabels((prev) => ({ ...prev, [kind]: "" }));
     applyAddress(kind, addr);
+    setShowInput((prev) => ({ ...prev, [kind]: false }));
   };
 
   const saveAddressIfNeeded = useCallback(
@@ -509,16 +586,17 @@ export function ReservationWizard({
 
       const tariff = inferTariffFromDateTime(values.date, values.time);
 
-      const res = await fetch("/api/tarifs/quote", {
+      const res = await fetch("/api/forecast/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: { lat: gFrom.lat, lng: gFrom.lng },
-          to: { lat: gTo.lat, lng: gTo.lng },
+          pickup: { lat: gFrom.lat, lng: gFrom.lng },
+          dropoff: { lat: gTo.lat, lng: gTo.lng },
+          date: values.date,
+          time: values.time,
+          passengers: values.passengers,
+          luggage: values.luggage,
           tariff: tariff as TariffCode,
-          baggageCount: values.luggage,
-          fifthPassenger: values.passengers > 4,
-          waitMinutes: 0,
         }),
       });
       const data = await res.json();
@@ -556,22 +634,13 @@ export function ReservationWizard({
       setQuotePrice(finalPrice);
       setQuoteDistance(distance.toFixed(2));
       setQuoteDuration(durationMinutes > 0 ? String(durationMinutes) : "");
-      if (useStore) {
-        setBookingEstimate(
-          {
-            ...values,
-            pickup: gFrom,
-            dropoff: gTo,
-          },
-          finalPrice
-        );
-      }
+      persistEstimate(finalPrice);
     } catch (e) {
       setError("Erreur lors du calcul du tarif : " + String(e));
     } finally {
       setQuoteLoading(false);
     }
-  }, [form, tariffConfig, useStore, ensureAddress]);
+  }, [form, tariffConfig, ensureAddress, persistEstimate]);
 
   const watchedDate = form.watch("date");
   const watchedTime = form.watch("time");
@@ -579,7 +648,20 @@ export function ReservationWizard({
   const watchedLuggage = form.watch("luggage");
   const watchedPickup = form.watch("pickup");
   const watchedDropoff = form.watch("dropoff");
-
+  const scheduleReady = useMemo(() => {
+    const passengersNum = Number(watchedPassengers);
+    const luggageNum = Number(watchedLuggage);
+    const hasDate = Boolean((watchedDate as string | undefined)?.trim?.() ?? watchedDate);
+    const hasTime = Boolean((watchedTime as string | undefined)?.trim?.() ?? watchedTime);
+    return (
+      hasDate &&
+      hasTime &&
+      Number.isFinite(passengersNum) &&
+      Number.isFinite(luggageNum) &&
+      passengersNum > 0 &&
+      luggageNum >= 0
+    );
+  }, [watchedDate, watchedTime, watchedPassengers, watchedLuggage]);
   useEffect(() => {
     if (step !== 3) return;
     const quoteKey = JSON.stringify({
@@ -663,6 +745,7 @@ export function ReservationWizard({
         setError("Adresse de départ invalide.");
         return;
       }
+      persistEstimate();
       updateStep(2);
       return;
     }
@@ -677,10 +760,22 @@ export function ReservationWizard({
         setError("Adresse d'arrivée invalide.");
         return;
       }
+      const pick = form.getValues("pickup") as AddressData;
+      if (
+        Number.isFinite(pick.lat) &&
+        Number.isFinite(pick.lng) &&
+        Math.abs(Number(pick.lat) - Number(drop.lat)) < 1e-6 &&
+        Math.abs(Number(pick.lng) - Number(drop.lng)) < 1e-6
+      ) {
+        setError("L'adresse d'arrivée doit être différente de l'adresse de départ.");
+        return;
+      }
+      persistEstimate();
       updateStep(3);
       return;
     }
     if (step === 3) {
+      persistEstimate();
       updateStep(4);
       return;
     }
@@ -720,10 +815,33 @@ export function ReservationWizard({
     setMaxStepVisited((prev) => Math.max(prev, Math.min(target, 5)));
   };
 
+  const goToPrev = () => {
+    if (step === 0) return;
+    persistEstimate();
+    updateStep((Math.max(0, step - 1) as WizardStep) ?? 0);
+  };
+
   const startReservation = () => {
     updateStep(1);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  const canContinue = useMemo(() => {
+    switch (step) {
+      case 0:
+        return true;
+      case 1:
+        return pickupReady;
+      case 2:
+        return dropoffReady;
+      case 3:
+        return scheduleReady;
+      case 4:
+        return sessionStatus === "authenticated";
+      default:
+        return true;
+    }
+  }, [step, pickupReady, dropoffReady, scheduleReady, sessionStatus]);
 
   const handleStepClick = (target: WizardStep) => {
     if (target > maxStepVisited) return;
@@ -835,50 +953,14 @@ export function ReservationWizard({
 
               {step === 1 && (
                 <div className="space-y-4">
-                  <div className="text-sm font-medium text-muted-foreground">Départ</div>
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Indiquez votre adresse de départ.
+                  </div>
                   <div className="space-y-3 rounded-2xl border border-amber-200/70 bg-amber-50/60 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
                       Adresse de départ
                     </p>
                     {savedAddresses.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 text-xs font-semibold text-amber-800">
-                        <button
-                          type="button"
-                          className={cn(
-                            "rounded-full px-3 py-1 transition",
-                            addressMode.pickup === "saved"
-                              ? "bg-amber-600 text-white shadow-sm"
-                              : "bg-white/80 text-amber-800 border border-amber-200"
-                          )}
-                          onClick={() => {
-                            setAddressMode((prev) => ({ ...prev, pickup: "saved" }));
-                            setShouldSaveAddress((prev) => ({ ...prev, pickup: false }));
-                            setSuppressTokens((prev) => ({ ...prev, pickup: prev.pickup + 1 }));
-                          }}
-                        >
-                          Mes adresses
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            "rounded-full px-3 py-1 transition",
-                            addressMode.pickup === "manual"
-                              ? "bg-amber-600 text-white shadow-sm"
-                              : "bg-white/80 text-amber-800 border border-amber-200"
-                          )}
-                          onClick={() => {
-                            setAddressMode((prev) => ({ ...prev, pickup: "manual" }));
-                            savedSelectionRef.current.pickup = false;
-                            setShouldSaveAddress((prev) => ({ ...prev, pickup: false }));
-                            clearAddress("pickup");
-                          }}
-                        >
-                          Saisir une adresse
-                        </button>
-                      </div>
-                    ) : null}
-
-                    {addressMode.pickup === "saved" && savedAddresses.length > 0 ? (
                       <div className="space-y-2 rounded-xl border border-amber-200/80 bg-white/70 p-3">
                         <Select
                           onValueChange={(value) => handleSavedAddressSelect("pickup", value)}
@@ -889,12 +971,12 @@ export function ReservationWizard({
                           >
                             <SelectValue placeholder="Choisir une de mes adresses favorites" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="rounded-xl border border-amber-200/70 shadow-lg">
                             {savedAddresses.map((addr) => (
                               <SelectItem
                                 key={addr.id}
                                 value={addr.id}
-                                className="cursor-pointer data-[state=checked]:bg-primary/15 data-[state=checked]:text-foreground"
+                                className="cursor-pointer data-[state=checked]:bg-amber-100 data-[highlighted]:bg-amber-100 data-[state=checked]:text-amber-900 data-[highlighted]:text-amber-900"
                               >
                                 <div className="flex flex-col text-left">
                                   <span className="text-sm font-semibold text-foreground">
@@ -909,7 +991,8 @@ export function ReservationWizard({
                           </SelectContent>
                         </Select>
                       </div>
-                    ) : (
+                    ) : null}
+                    {showInput.pickup ? (
                       <FormField
                         control={form.control}
                         name="pickup.label"
@@ -925,40 +1008,58 @@ export function ReservationWizard({
                                 }}
                                 onSelect={(addr) => pickSuggestion(addr, "pickup")}
                                 suppressToken={suppressTokens.pickup}
+                                mode="forecast"
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    )}
-                    {addressMode.pickup === "manual" ? (
-                      <>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                          <Input
-                            readOnly
-                            value={pickupAddress?.street || pickupAddress?.streetNumber || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={pickupAddress?.postcode || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={pickupAddress?.city || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={pickupAddress?.country || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                        </div>
-                        {renderSaveCheckbox("pickup")}
-                      </>
                     ) : null}
+                    {pickupAddress?.label?.trim()?.length && !showInput.pickup ? (
+                      <div className="flex items-start gap-3 rounded-xl border border-amber-200/80 bg-white/70 p-3">
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-semibold text-foreground">
+                            {formatAddressLine(pickupAddress)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {pickupAddress?.label ?? "Adresse sélectionnée"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+                          onClick={() => {
+                            setShowInput((prev) => ({ ...prev, pickup: true }));
+                          }}
+                        >
+                          Modifier
+                        </button>
+                      </div>
+                    ) : null}
+                    <div className="hidden grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                      <Input
+                        readOnly
+                        value={pickupAddress?.street || pickupAddress?.streetNumber || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={pickupAddress?.postcode || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={pickupAddress?.city || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={pickupAddress?.country || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                    </div>
+                    {renderSaveCheckbox("pickup")}
                   </div>
                 </div>
               )}
@@ -974,31 +1075,8 @@ export function ReservationWizard({
                       <div className="flex flex-wrap gap-2 text-xs font-semibold text-sky-800">
                         <button
                           type="button"
-                          className={cn(
-                            "rounded-full px-3 py-1 transition",
-                            addressMode.dropoff === "saved"
-                              ? "bg-sky-600 text-white shadow-sm"
-                              : "bg-white/80 text-sky-800 border border-sky-200"
-                          )}
+                          className="rounded-full px-3 py-1 transition bg-white/80 text-sky-800 border border-sky-200"
                           onClick={() => {
-                            setAddressMode((prev) => ({ ...prev, dropoff: "saved" }));
-                            setShouldSaveAddress((prev) => ({ ...prev, dropoff: false }));
-                            setSuppressTokens((prev) => ({ ...prev, dropoff: prev.dropoff + 1 }));
-                          }}
-                        >
-                          Mes adresses
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            "rounded-full px-3 py-1 transition",
-                            addressMode.dropoff === "manual"
-                              ? "bg-sky-600 text-white shadow-sm"
-                              : "bg-white/80 text-sky-800 border border-sky-200"
-                          )}
-                          onClick={() => {
-                            setAddressMode((prev) => ({ ...prev, dropoff: "manual" }));
-                            savedSelectionRef.current.dropoff = false;
                             setShouldSaveAddress((prev) => ({ ...prev, dropoff: false }));
                             clearAddress("dropoff");
                           }}
@@ -1008,7 +1086,7 @@ export function ReservationWizard({
                       </div>
                     ) : null}
 
-                    {addressMode.dropoff === "saved" && savedAddresses.length > 0 ? (
+                    {savedAddresses.length > 0 ? (
                       <div className="space-y-2 rounded-xl border border-sky-200/80 bg-white/70 p-3">
                         <Select
                           onValueChange={(value) => handleSavedAddressSelect("dropoff", value)}
@@ -1039,7 +1117,8 @@ export function ReservationWizard({
                           </SelectContent>
                         </Select>
                       </div>
-                    ) : (
+                    ) : null}
+                    {showInput.dropoff ? (
                       <FormField
                         control={form.control}
                         name="dropoff.label"
@@ -1055,40 +1134,56 @@ export function ReservationWizard({
                                 }}
                                 onSelect={(addr) => pickSuggestion(addr, "dropoff")}
                                 suppressToken={suppressTokens.dropoff}
+                                mode="forecast"
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    )}
-                    {addressMode.dropoff === "manual" ? (
-                      <>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                          <Input
-                            readOnly
-                            value={dropoffAddress?.street || dropoffAddress?.streetNumber || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={dropoffAddress?.postcode || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={dropoffAddress?.city || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                          <Input
-                            readOnly
-                            value={dropoffAddress?.country || "Auto"}
-                            className="bg-muted/50 text-sm"
-                          />
-                        </div>
-                        {renderSaveCheckbox("dropoff")}
-                      </>
                     ) : null}
+                    {dropoffAddress?.label?.trim()?.length && !showInput.dropoff ? (
+                      <div className="flex items-start gap-3 rounded-xl border border-sky-200/80 bg-white/70 p-3">
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-semibold text-foreground">
+                            {formatAddressLine(dropoffAddress)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {dropoffAddress?.label ?? "Adresse sélectionnée"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded-lg border border-sky-300 px-3 py-2 text-xs font-semibold text-sky-800 transition hover:bg-sky-100"
+                          onClick={() => setShowInput((prev) => ({ ...prev, dropoff: true }))}
+                        >
+                          Modifier
+                        </button>
+                      </div>
+                    ) : null}
+                    <div className="hidden grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                      <Input
+                        readOnly
+                        value={dropoffAddress?.street || dropoffAddress?.streetNumber || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={dropoffAddress?.postcode || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={dropoffAddress?.city || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                      <Input
+                        readOnly
+                        value={dropoffAddress?.country || "Auto"}
+                        className="bg-muted/50 text-sm"
+                      />
+                    </div>
+                    {renderSaveCheckbox("dropoff")}
                   </div>
                 </div>
               )}
@@ -1257,6 +1352,37 @@ export function ReservationWizard({
               {step === 5 && (
                 <div className="space-y-4">
                   <div className="text-sm font-medium text-muted-foreground">Confirmation</div>
+                  <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm">
+                    <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                      Récapitulatif
+                    </p>
+                    <ul className="space-y-1">
+                      <li>
+                        <span className="font-semibold text-foreground">Départ : </span>
+                        {formatAddressLine(recapPickup)}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Arrivée : </span>
+                        {formatAddressLine(recapDropoff)}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Date / heure : </span>
+                        {(form.watch("date") || "—") + " " + (form.watch("time") || "")}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Passagers : </span>
+                        {form.watch("passengers") ?? "—"}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Bagages : </span>
+                        {form.watch("luggage") ?? "—"}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Notes : </span>
+                        {form.watch("notes")?.trim()?.length ? form.watch("notes") : "—"}
+                      </li>
+                    </ul>
+                  </div>
                   <FormField
                     control={form.control}
                     name="policiesAccepted"
@@ -1285,28 +1411,45 @@ export function ReservationWizard({
                     : "créez une demande de réservation"}
                   . Nous la confirmons par e-mail ou SMS.
                 </div>
-                {step < 5 ? (
-                  <Button type="button" className="cursor-pointer" onClick={goToNext}>
-                    Continuer
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="cursor-pointer"
-                    disabled={
-                      isPostingRef.current ||
-                      sessionStatus !== "authenticated" ||
-                      !form.watch("policiesAccepted") ||
-                      saveLabelMissing
-                    }
-                  >
-                    {isPostingRef.current
-                      ? "Envoi..."
-                      : mode === "edit"
-                        ? "Enregistrer les modifications"
-                        : "Confirmer ma demande"}
-                  </Button>
-                )}
+                <div className="flex gap-3">
+                  {step > 0 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={goToPrev}
+                    >
+                      Retour
+                    </Button>
+                  ) : null}
+                  {step < 5 ? (
+                    <Button
+                      type="button"
+                      className="cursor-pointer"
+                      onClick={goToNext}
+                      disabled={!canContinue}
+                    >
+                      Continuer
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      className="cursor-pointer"
+                      disabled={
+                        isPostingRef.current ||
+                        sessionStatus !== "authenticated" ||
+                        !form.watch("policiesAccepted") ||
+                        saveLabelMissing
+                      }
+                    >
+                      {isPostingRef.current
+                        ? "Envoi..."
+                        : mode === "edit"
+                          ? "Enregistrer les modifications"
+                          : "Confirmer ma demande"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </form>
           </Form>

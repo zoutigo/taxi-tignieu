@@ -18,28 +18,7 @@ describe("address-search helpers", () => {
   beforeEach(() => {
     // @ts-expect-error mock fetch
     global.fetch = jest.fn((url: string) => {
-      const q = new URLSearchParams(url.split("?")[1] ?? "").get("q") ?? "";
-      if (url.startsWith("/api/tarifs/search")) {
-        const results: AddressData[] = [
-          base,
-          { ...base, lat: 1, lng: 1 }, // duplicate
-          { ...base, label: "sans ville", city: "", postcode: "38230" },
-          { ...base, label: "sans cp", city: "Tignieu-Jameyzieu", postcode: "" },
-          {
-            ...base,
-            label: "autre adresse",
-            street: "Rue inconnue",
-            city: "Paris",
-            postcode: "75001",
-          },
-        ];
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ results }),
-        }) as unknown as Response;
-      }
-
-      if (url.startsWith("/api/tarifs/geocode") && q.includes("leclerc tignieu")) {
+      if (url.startsWith("/api/forecast/geocode")) {
         const geo: AddressData = {
           label: "Centre Commercial E.Leclerc Tignieu-Jameyzieu, France",
           lat: 45.74,
@@ -52,7 +31,7 @@ describe("address-search helpers", () => {
         };
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve(geo),
+          json: () => Promise.resolve({ results: [geo] }),
         }) as unknown as Response;
       }
 
@@ -83,13 +62,14 @@ describe("address-search helpers", () => {
     expect(uniques.size).toBe(suggestions.length);
     expect(suggestions.every((s) => s.city || s.postcode)).toBe(true);
     expect(suggestions.length).toBeLessThanOrEqual(5);
-    expect(suggestions.every((s) => (s.streetNumber ?? "").includes("114"))).toBe(true);
+    expect(suggestions.every((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng))).toBe(true);
   });
 
   it("falls back to geocode when search returns no results", async () => {
     const suggestions = await fetchAddressSuggestions("leclerc tignieu");
     expect(suggestions.length).toBe(1);
     expect(suggestions[0].city).toBe("Tignieu-Jameyzieu");
-    expect(suggestions[0].label.toLowerCase()).toContain("leclerc");
+    expect(suggestions[0].postcode).toBe("38230");
+    expect(suggestions[0].street?.toLowerCase()).toContain("commerce");
   });
 });

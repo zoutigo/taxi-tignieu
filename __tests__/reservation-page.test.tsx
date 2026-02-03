@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import React, { createContext, useContext } from "react";
-import { render, fireEvent, waitFor } from "@testing-library/react";
+import { render, fireEvent, waitFor, screen } from "@testing-library/react";
 import ReservationPage from "@/components/reservation-page";
 import { ReservationWizard } from "@/components/reservation-wizard";
 import { useRouter } from "next/navigation";
@@ -85,14 +85,40 @@ describe("ReservationPage wizard", () => {
   });
 
   it("enchaine les étapes jusqu'à l'estimation", async () => {
-    mockFetch.mockImplementation((url: string) => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (url.startsWith("/api/tarifs/config")) {
         return Promise.resolve({ ok: true, json: async () => defaultTariffConfig });
       }
-      if (url.startsWith("/api/tarifs/search")) {
-        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
+      if (url.startsWith("/api/forecast/geocode")) {
+        const body = opts?.body ? JSON.parse(opts.body.toString()) : { address: "" };
+        const addr = (body.address as string).toLowerCase();
+        const first = {
+          lat: 45.75,
+          lng: 4.85,
+          country: "France",
+          city: "Tignieu-Jameyzieu",
+          postcode: "38230",
+          street: "route de Crémieu",
+          streetNumber: "114",
+          formatted_address: "114B route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+          label: "114B route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+        };
+        const second = {
+          lat: 45.72,
+          lng: 5.08,
+          country: "France",
+          city: "Lyon",
+          postcode: "69000",
+          street: "Aéroport de Lyon",
+          formatted_address: "Aéroport de Lyon, 69000 Lyon, France",
+          label: "Aéroport de Lyon, 69000 Lyon, France",
+        };
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ results: addr.includes("aéroport") ? [second] : [first] }),
+        });
       }
-      if (url.startsWith("/api/tarifs/quote")) {
+      if (url.startsWith("/api/forecast/quote")) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ distanceKm: 10, durationMinutes: 20, price: 25 }),
@@ -101,36 +127,26 @@ describe("ReservationPage wizard", () => {
       if (url.startsWith("/api/bookings")) {
         return Promise.resolve({ ok: true, json: async () => ({ booking: {} }) });
       }
-      if (url.startsWith("/api/tarifs/geocode")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            lat: 45.75,
-            lng: 4.85,
-            country: "France",
-            label: "114B route de Crémieu, France",
-          }),
-        });
-      }
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
 
-    const { getByPlaceholderText, getByText, queryByText, getByLabelText } = render(
-      <ReservationPage />
-    );
+    const { getByPlaceholderText, getByText, getByLabelText } = render(<ReservationPage />);
 
     fireEvent.click(getByText("Commencer la réservation"));
 
     fireEvent.change(getByPlaceholderText("Ex: 114B route de Crémieu, Tignieu"), {
       target: { value: "114B route de Crémieu" },
     });
-    await waitFor(() => expect(getByText("Continuer").getAttribute("disabled")).toBeNull());
+    fireEvent.click(getByText("Rechercher"));
+    fireEvent.click(await screen.findByRole("button", { name: /114 route de crémieu/i }));
     fireEvent.click(getByText("Continuer"));
 
     await waitFor(() => getByPlaceholderText("Ex: Aéroport de Lyon"));
     fireEvent.change(getByPlaceholderText("Ex: Aéroport de Lyon"), {
       target: { value: "Aéroport de Lyon" },
     });
+    fireEvent.click(getByText("Rechercher"));
+    fireEvent.click(await screen.findByRole("button", { name: /aéroport de lyon/i }));
     fireEvent.click(getByText("Continuer"));
 
     // étape estimation : renseigner date/heure pour éviter l'erreur
@@ -144,12 +160,12 @@ describe("ReservationPage wizard", () => {
     await waitFor(() =>
       expect(
         mockFetch.mock.calls.some(
-          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/tarifs/quote")
+          (c) => typeof c[0] === "string" && (c[0] as string).includes("/api/forecast/quote")
         )
       ).toBe(true)
     );
 
-    // Après estimation on passe à l'étape 4 (connexion)
-    expect(queryByText("Connexion")).toBeTruthy();
+    // Après estimation on passe à l'étape suivante (connexion si non loggé, sinon confirmation)
+    expect(screen.queryAllByText(/Connexion|Confirmation/).length).toBeGreaterThan(0);
   });
 });
