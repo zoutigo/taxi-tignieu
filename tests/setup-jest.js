@@ -1,4 +1,6 @@
 const originalError = console.error;
+const originalLog = console.log;
+const originalDebug = console.debug;
 
 beforeAll(() => {
   console.error = (...args) => {
@@ -11,10 +13,14 @@ beforeAll(() => {
     }
     return originalError(...args);
   };
+  console.log = () => {};
+  console.debug = () => {};
 });
 
 afterAll(() => {
   console.error = originalError;
+  console.log = originalLog;
+  console.debug = originalDebug;
 });
 
 // Polyfill ResizeObserver for Radix components in JSDOM
