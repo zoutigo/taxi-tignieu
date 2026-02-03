@@ -1,31 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
 import { buildBookingEmail, sendMail } from "@/lib/mailer";
 import { getSiteContact } from "@/lib/site-config";
+import { bookingUpdateSchema } from "@/lib/validation/booking-update";
 
 const isAdminLike = (session: unknown): boolean => {
   const s = session as { user?: { isAdmin?: boolean; isManager?: boolean } } | null;
   return Boolean(s?.user && (s.user.isAdmin || s.user.isManager));
 };
-
-const updateSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  pickup: z.string().optional(),
-  dropoff: z.string().optional(),
-  date: z.string().optional(),
-  time: z.string().optional(),
-  passengers: z.number().optional(),
-  luggage: z.number().optional(),
-  babySeat: z.boolean().optional(),
-  notes: z.string().optional(),
-  status: z.enum(["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"]).optional(),
-  priceCents: z.number().int().optional(),
-  driverId: z.union([z.string(), z.null()]).optional(),
-  completionNotes: z.string().optional(),
-  generateInvoice: z.boolean().optional(),
-});
 
 export async function GET() {
   const session = await auth();
@@ -61,7 +44,7 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json();
-  const parsed = updateSchema.safeParse(body);
+  const parsed = bookingUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Données invalides" }, { status: 400 });
   }
@@ -69,6 +52,12 @@ export async function PATCH(req: Request) {
     id,
     pickup,
     dropoff,
+    pickupLabel,
+    dropoffLabel,
+    pickupLat,
+    pickupLng,
+    dropoffLat,
+    dropoffLng,
     date,
     time,
     passengers,
@@ -81,6 +70,10 @@ export async function PATCH(req: Request) {
     driverId,
   } = parsed.data;
   const bookingId = String(id);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[admin/bookings PATCH] payload", parsed.data);
+  }
 
   if (status === "COMPLETED" && !(completionNotes && completionNotes.trim().length > 0)) {
     return NextResponse.json(
@@ -150,8 +143,30 @@ export async function PATCH(req: Request) {
   }
 
   const data: Record<string, unknown> = {};
-  if (pickup !== undefined) data.pickup = pickup;
-  if (dropoff !== undefined) data.dropoff = dropoff;
+  const pickupValue = pickupLabel ?? pickup;
+  const dropoffValue = dropoffLabel ?? dropoff;
+
+  const pickupUpdate: Record<string, unknown> = {};
+  if (pickupValue !== undefined) {
+    pickupUpdate.name = pickupValue;
+    pickupUpdate.street = pickupValue;
+  }
+  if (pickupLat !== undefined) pickupUpdate.latitude = pickupLat;
+  if (pickupLng !== undefined) pickupUpdate.longitude = pickupLng;
+  if (Object.keys(pickupUpdate).length > 0) {
+    data.pickup = { update: pickupUpdate };
+  }
+
+  const dropoffUpdate: Record<string, unknown> = {};
+  if (dropoffValue !== undefined) {
+    dropoffUpdate.name = dropoffValue;
+    dropoffUpdate.street = dropoffValue;
+  }
+  if (dropoffLat !== undefined) dropoffUpdate.latitude = dropoffLat;
+  if (dropoffLng !== undefined) dropoffUpdate.longitude = dropoffLng;
+  if (Object.keys(dropoffUpdate).length > 0) {
+    data.dropoff = { update: dropoffUpdate };
+  }
   if (date && time) data.dateTime = new Date(`${date}T${time}`);
   if (passengers !== undefined) data.pax = passengers;
   if (luggage !== undefined) data.luggage = luggage;

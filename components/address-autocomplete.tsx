@@ -11,6 +11,8 @@ import {
 } from "@/lib/address-search";
 import type { AddressData } from "@/lib/booking-utils";
 import { parseAddressParts } from "@/lib/booking-utils";
+import { AddressActionButton } from "@/components/ui/address-action-button";
+import { Search, Pencil } from "lucide-react";
 
 type Props = {
   value: string;
@@ -22,6 +24,8 @@ type Props = {
   suppressToken?: number;
   suppressInitial?: boolean;
   mode?: "legacy" | "forecast";
+  locked?: boolean;
+  onRequestEdit?: () => void;
 };
 
 export function AddressAutocomplete({
@@ -34,14 +38,28 @@ export function AddressAutocomplete({
   suppressToken,
   suppressInitial = false,
   mode = "forecast",
+  locked = false,
+  onRequestEdit,
 }: Props) {
   const [suggestions, setSuggestions] = useState<AddressData[]>([]);
   const [loading, setLoading] = useState(false);
   const suppressNextFetchRef = useRef(false);
   const prevSuppressToken = useRef<number | undefined>(undefined);
   const firstRunRef = useRef(true);
+  const lockedRef = useRef(locked);
+  const [editing, setEditing] = useState(!locked);
   const [searchNonce, setSearchNonce] = useState(0);
   const [queryToSearch, setQueryToSearch] = useState("");
+
+  useEffect(() => {
+    lockedRef.current = locked;
+    // Defer pour éviter cascade render
+    if (locked) {
+      setTimeout(() => setEditing(false), 0);
+    }
+  }, [locked]);
+
+  const shouldLockView = locked || (!editing && Boolean(value?.trim()));
 
   useEffect(() => {
     if (suppressInitial && firstRunRef.current) {
@@ -54,7 +72,11 @@ export function AddressAutocomplete({
     }
     let active = true;
     const run = async () => {
-      if (searchNonce === 0) return;
+      if (searchNonce === 0 || (shouldLockView && !editing)) {
+        setSuggestions([]);
+        setLoading(false);
+        return;
+      }
       const minLen = mode === "forecast" ? 5 : 3;
       const q = queryToSearch.trim();
       if (disabled || !q || q.length < minLen) {
@@ -76,7 +98,16 @@ export function AddressAutocomplete({
     return () => {
       active = false;
     };
-  }, [mode, searchNonce, queryToSearch, disabled, suppressInitial, suppressToken]);
+  }, [
+    mode,
+    searchNonce,
+    queryToSearch,
+    disabled,
+    suppressInitial,
+    suppressToken,
+    editing,
+    shouldLockView,
+  ]);
 
   const handleSelect = (addr: AddressData) => {
     const normalized = normalizeAddressSuggestion(addr, value);
@@ -84,43 +115,81 @@ export function AddressAutocomplete({
     suppressNextFetchRef.current = true;
     setLoading(false);
     setSuggestions([]);
+    setQueryToSearch("");
+    setSearchNonce(0);
+    setEditing(false);
   };
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex gap-2">
-        <Input
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setSuggestions([]);
-            setLoading(false);
-          }}
-          autoComplete="street-address"
-          className="text-base"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
+      {shouldLockView && !editing ? (
+        <div
+          className="flex items-center gap-2"
+          onClick={(e) => {
+            // Bloque toute interaction involontaire quand on est en mode verrouillé.
+            // Le bouton reste cliquable ; on ignore uniquement les clics hors bouton.
+            const target = e.target as HTMLElement;
+            if (!target.closest("button")) {
+              e.stopPropagation();
               e.preventDefault();
-              setQueryToSearch(e.currentTarget.value);
-              setSearchNonce((n) => n + 1);
             }
           }}
-        />
-        <button
-          type="button"
-          className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted"
-          onClick={() => {
-            setQueryToSearch(value);
-            setSearchNonce((n) => n + 1);
-          }}
-          disabled={disabled || !value || value.trim().length < 5}
         >
-          Rechercher
-        </button>
-      </div>
+          <div
+            data-testid="address-locked-box"
+            className="pointer-events-none flex-1 select-none rounded-lg border border-primary/50 bg-primary/15 px-3 py-2 text-sm font-semibold text-primary-foreground"
+            tabIndex={-1}
+            aria-readonly
+          >
+            {value || placeholder || "Adresse sélectionnée"}
+          </div>
+          <AddressActionButton
+            icon={Pencil}
+            label="Modifier l'adresse"
+            variant="edit"
+            onClick={() => {
+              setEditing(true);
+              onRequestEdit?.();
+            }}
+            disabled={disabled}
+          />
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Input
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => {
+              if (disabled) return;
+              onChange(e.target.value);
+              setSuggestions([]);
+              setLoading(false);
+            }}
+            autoComplete="street-address"
+            className="text-base"
+            onKeyDown={(e) => {
+              if (disabled) return;
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setQueryToSearch(e.currentTarget.value);
+                setSearchNonce((n) => n + 1);
+              }
+            }}
+          />
+          <AddressActionButton
+            icon={Search}
+            label="Rechercher"
+            variant="search"
+            disabled={disabled || !value || value.trim().length < 5}
+            onClick={() => {
+              setQueryToSearch(value);
+              setSearchNonce((n) => n + 1);
+            }}
+          />
+        </div>
+      )}
       {loading ? <p className="text-xs text-muted-foreground">Recherche en cours...</p> : null}
-      {suggestions.length > 0 ? (
+      {!locked && suggestions.length > 0 ? (
         <div className="rounded-xl border border-border/70 bg-card shadow-lg">
           {suggestions.map((s, idx) => {
             const parsed = parseAddressParts(s.label);

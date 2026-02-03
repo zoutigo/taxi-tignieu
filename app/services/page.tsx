@@ -22,7 +22,7 @@ export default async function ServicesPage() {
         <section className="rounded-[28px] border border-border/70 bg-sidebar px-6 py-10 text-sidebar-foreground shadow-[0_35px_70px_rgba(5,15,35,0.38)] sm:px-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-3">
-              <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
+              <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] bg-white/15 px-4 py-2 text-white shadow-inner">
                 Nos services
               </p>
               <h1 className="font-display text-4xl leading-tight text-white sm:text-5xl">
@@ -38,7 +38,7 @@ export default async function ServicesPage() {
                 href="/reserver"
                 className="btn btn-primary justify-center shadow-[0_30px_55px_rgba(246,196,49,0.45)] sm:w-auto"
               >
-                Réserver un trajet
+                Réserver
               </Link>
               <a
                 href={phoneHref}

@@ -173,6 +173,15 @@ export default async function Home() {
                 </div>
               ))}
             </div>
+            <div>
+              <Link
+                href="/services"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80"
+              >
+                Découvrir tous nos services
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           <div className="flex flex-col gap-6">
@@ -222,7 +231,7 @@ export default async function Home() {
       <section className="rounded-[32px] border border-border/70 bg-gradient-to-r from-sidebar via-sidebar/95 to-[#0d1a32] px-6 py-10 text-sidebar-foreground shadow-[0_35px_55px_rgba(2,8,32,0.35)] sm:px-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl space-y-3">
-            <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
+            <p className="badge-pill text-xs font-semibold uppercase tracking-[0.35em] bg-white/15 px-4 py-2 text-white shadow-inner">
               Confiance locale
             </p>
             <h2 className="font-display text-3xl text-white sm:text-4xl">

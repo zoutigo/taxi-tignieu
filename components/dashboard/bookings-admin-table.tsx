@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import type { Booking, BookingNote, BookingStatus, User, Invoice } from "@prisma/client";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
@@ -33,8 +33,10 @@ import {
 import { AppMessage } from "@/components/app-message";
 import { cn } from "@/lib/utils";
 import type { AddressData } from "@/lib/booking-utils";
+import type { Address } from "@prisma/client";
 import { inferTariffFromDateTime, haversineKm } from "@/lib/booking-utils";
 import { computePriceEuros } from "@/lib/tarifs";
+import { bookingUpdateSchema } from "@/lib/validation/booking-update";
 
 type Driver = Pick<User, "id" | "name" | "email" | "phone">;
 
@@ -143,30 +145,46 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const [finishNote, setFinishNote] = useState<Record<string, string>>({});
   const [finishInvoice, setFinishInvoice] = useState<Record<string, boolean>>({});
   const [detailsOpen, setDetailsOpen] = useState<Record<string, boolean>>({});
+  const [showAddressInput, setShowAddressInput] = useState<
+    Record<string, { pickup: boolean; dropoff: boolean }>
+  >({});
   const [inlineFeedback, setInlineFeedback] = useState<
     Record<string, { type: "success" | "error"; text: string }>
   >({});
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [cancelNote, setCancelNote] = useState<Record<string, string>>({});
   const [suppressToken, setSuppressToken] = useState<Record<string, number>>({});
+  const lastQuotePayloadRef = useRef<Record<string, string>>({});
 
-  const recomputeQuote = async (bk: BookingRow) => {
-    const pickupLat =
+  const getPickupCoords = useCallback((bk: BookingRow) => {
+    const lat =
       bk.pickupLat ??
       (bk as unknown as { pickup?: { latitude?: number | null } }).pickup?.latitude ??
-      undefined;
-    const pickupLng =
+      null;
+    const lng =
       bk.pickupLng ??
       (bk as unknown as { pickup?: { longitude?: number | null } }).pickup?.longitude ??
-      undefined;
-    const dropoffLat =
+      null;
+    return { lat, lng };
+  }, []);
+
+  const getDropoffCoords = useCallback((bk: BookingRow) => {
+    const lat =
       bk.dropoffLat ??
       (bk as unknown as { dropoff?: { latitude?: number | null } }).dropoff?.latitude ??
-      undefined;
-    const dropoffLng =
+      null;
+    const lng =
       bk.dropoffLng ??
       (bk as unknown as { dropoff?: { longitude?: number | null } }).dropoff?.longitude ??
-      undefined;
+      null;
+    return { lat, lng };
+  }, []);
+
+  const recomputeQuote = async (bk: BookingRow, opts?: { forceDistance?: boolean }) => {
+    const forceDistance = opts?.forceDistance ?? false;
+
+    const { lat: pickupLat, lng: pickupLng } = getPickupCoords(bk);
+    const { lat: dropoffLat, lng: dropoffLng } = getDropoffCoords(bk);
 
     if (
       pickupLat == null ||
@@ -180,37 +198,83 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     ) {
       return;
     }
+
+    // Étape 1 : distance uniquement si forcée ou inconnue
+    let distanceFromApi: number | null = null;
+    let durationFromApi: number | null = null;
+    if (forceDistance || bk.distanceKm == null) {
+      try {
+        const resDist = await fetch("/api/forecast/distance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pickup: { lat: pickupLat, lng: pickupLng },
+            dropoff: { lat: dropoffLat, lng: dropoffLng },
+          }),
+        });
+        const dataDist = await resDist.json().catch(() => ({}));
+        if (resDist.ok && dataDist?.distanceKm != null) {
+          const parsed = Number(dataDist.distanceKm);
+          if (Number.isFinite(parsed)) distanceFromApi = parsed;
+          const durationParsed = Number(dataDist.durationMinutes);
+          if (Number.isFinite(durationParsed)) durationFromApi = durationParsed;
+        }
+      } catch {
+        // silencieux, on tombera en fallback
+      }
+    }
+
     const d = new Date(bk.dateTime as unknown as string);
     const dateStr = d.toISOString().slice(0, 10);
     const timeStr = d.toISOString().slice(11, 16);
     const tariff = inferTariffFromDateTime(dateStr, timeStr);
+
     try {
+      const passengers = Math.max(0, bk.pax ?? 1);
+      const baggageCount = Math.max(0, bk.luggage ?? 0);
+
+      const payload = {
+        pickup: { lat: pickupLat, lng: pickupLng },
+        dropoff: { lat: dropoffLat, lng: dropoffLng },
+        tariff,
+        passengers,
+        baggageCount,
+        fifthPassenger: passengers > 4,
+        waitMinutes: 0,
+        date: dateStr,
+        time: timeStr,
+        distanceKm: distanceFromApi ?? bk.distanceKm ?? null,
+        durationMinutes: durationFromApi,
+      };
+
+      const payloadKey = JSON.stringify(payload);
+      if (lastQuotePayloadRef.current[bk.id] === payloadKey) {
+        return;
+      }
+      lastQuotePayloadRef.current[bk.id] = payloadKey;
+
       const res = await fetch("/api/forecast/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: { lat: pickupLat, lng: pickupLng },
-          to: { lat: dropoffLat, lng: dropoffLng },
-          tariff,
-          baggageCount: bk.luggage ?? 0,
-          fifthPassenger: (bk.pax ?? 0) > 4,
-          waitMinutes: 0,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error ?? "Calcul du tarif impossible");
       }
-      const distanceApi = Number(data.distanceKm);
+      const distanceApi =
+        distanceFromApi ??
+        (Number.isFinite(Number(data.distanceKm)) ? Number(data.distanceKm) : bk.distanceKm);
       const priceApi = Number(data.price);
-      const distance = Number.isFinite(distanceApi)
+      const distanceCalc = Number.isFinite(distanceApi)
         ? distanceApi
         : haversineKm({ lat: pickupLat, lng: pickupLng }, { lat: dropoffLat, lng: dropoffLng });
+      const distance: number | null = Number.isFinite(distanceCalc) ? Number(distanceCalc) : null;
       const price = Number.isFinite(priceApi)
         ? priceApi
-        : computePriceEuros(distance, tariff, {
-            baggageCount: bk.luggage ?? 0,
-            fifthPassenger: (bk.pax ?? 0) > 4,
+        : computePriceEuros(distance ?? 0, tariff, {
+            baggageCount,
+            fifthPassenger: passengers > 4,
             waitMinutes: 0,
           });
       setBookings((prev) =>
@@ -218,7 +282,10 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
           b.id === bk.id
             ? {
                 ...b,
-                distanceKm: Number.isFinite(distance) ? Number(distance.toFixed(2)) : b.distanceKm,
+                distanceKm:
+                  distance !== null && Number.isFinite(distance)
+                    ? Number(distance.toFixed(2))
+                    : b.distanceKm,
                 priceCents: Number.isFinite(price) ? Math.round(price * 100) : b.priceCents,
               }
             : b
@@ -265,6 +332,8 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     }
   }, [page, totalPages]);
 
+  // Quand on quitte le mode édition, on referme systématiquement les inputs
+
   const FEEDBACK_DURATION = 10000;
 
   useEffect(() => {
@@ -310,6 +379,29 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const formatClientLabel = (b: BookingRow) =>
     b.user?.name ?? b.customer?.fullName ?? b.user?.email ?? "Client";
 
+  const formatAddressFallback = (addr?: {
+    streetNumber?: string | null;
+    street?: string | null;
+    postalCode?: string | null;
+    city?: string | null;
+    country?: string | null;
+    name?: string | null;
+  }) => {
+    if (!addr) return "";
+    if (addr.name?.trim()) return addr.name;
+    const parts = [addr.streetNumber, addr.street, addr.postalCode, addr.city, addr.country]
+      .filter(Boolean)
+      .map((p) => String(p).trim())
+      .filter(Boolean);
+    return parts.join(" ");
+  };
+
+  const getPickupLabel = (bk: BookingRow) =>
+    bk.pickupLabel?.trim() || formatAddressFallback((bk as unknown as { pickup?: Address }).pickup);
+  const getDropoffLabel = (bk: BookingRow) =>
+    bk.dropoffLabel?.trim() ||
+    formatAddressFallback((bk as unknown as { dropoff?: Address }).dropoff);
+
   const updateLocal = (updated: BookingRow) => {
     setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
   };
@@ -331,20 +423,48 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
   const handleSave = async (b: BookingRow) => {
     setSavingId(b.id);
     try {
-      const updated = await patchBooking({
+      const payload = {
         id: b.id,
-        pax: b.pax,
+        pickupLabel: getPickupLabel(b),
+        dropoffLabel: getDropoffLabel(b),
+        pickupLat: b.pickupLat,
+        pickupLng: b.pickupLng,
+        dropoffLat: b.dropoffLat,
+        dropoffLng: b.dropoffLng,
+        passengers: b.pax,
         luggage: b.luggage,
         status: b.status,
         priceCents: b.priceCents ?? undefined,
         distanceKm: b.distanceKm ?? undefined,
         notes: b.notes ?? "",
         dateTime: b.dateTime,
-      });
-      updateLocal(updated as BookingRow);
+      };
+      const dateIso =
+        b.dateTime instanceof Date ? b.dateTime.toISOString() : (b.dateTime as string);
+      const validationPayload = {
+        ...payload,
+        date: dateIso.slice(0, 10),
+        time: dateIso.slice(11, 16),
+        passengers: b.pax,
+      };
+      const parsed = bookingUpdateSchema.safeParse(validationPayload);
+      if (!parsed.success) {
+        setError("Validation front : " + parsed.error.issues.map((i) => i.message).join(", "));
+        setSavingId(null);
+        return;
+      }
+      const updated = await patchBooking(payload);
+      const merged = {
+        ...b,
+        ...payload,
+        ...(updated as BookingRow),
+        pickupLabel: payload.pickupLabel,
+        dropoffLabel: payload.dropoffLabel,
+      };
+      updateLocal(merged);
       setGlobalFeedback({
         type: "success",
-        text: `Réservation ${b.id} mise à jour pour ${formatClientLabel((updated as BookingRow) ?? b)}.`,
+        text: `Réservation ${b.id} mise à jour pour ${formatClientLabel((merged as BookingRow) ?? b)}.`,
       });
       setMessage(null);
       scrollToTop();
@@ -448,15 +568,32 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
     }
     setSavingId(b.id);
     try {
-      const updated = await patchBooking({ id: b.id, status: "CONFIRMED", driverId, notes: note });
-      updateLocal(updated as BookingRow);
+      const payload = {
+        id: b.id,
+        status: "CONFIRMED" as BookingStatus,
+        driverId,
+        notes: note,
+        passengers: b.pax,
+        luggage: b.luggage,
+        distanceKm: b.distanceKm,
+        priceCents: b.priceCents,
+      };
+      const updated = await patchBooking(payload);
+      const merged = {
+        ...b,
+        ...payload,
+        ...(updated as BookingRow),
+        pickupLabel: b.pickupLabel,
+        dropoffLabel: b.dropoffLabel,
+      };
+      updateLocal(merged);
       setInlineFeedback((prev) => ({
         ...prev,
         [b.id]: { type: "success", text: "Réservation confirmée et assignée." },
       }));
       setGlobalFeedback({
         type: "success",
-        text: `Réservation ${b.id} confirmée pour ${formatClientLabel((updated as BookingRow) ?? b)}.`,
+        text: `Réservation ${b.id} confirmée pour ${formatClientLabel((merged as BookingRow) ?? b)}.`,
       });
       scrollToTop();
       setMessage("Réservation confirmée et assignée.");
@@ -613,6 +750,14 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
       </div>
 
       {pageBookings.map((b) => {
+        const editState = showAddressInput[b.id] ?? { pickup: false, dropoff: false };
+        const hasPickupLabel = Boolean((b.pickupLabel ?? "").trim());
+        const hasDropoffLabel = Boolean((b.dropoffLabel ?? "").trim());
+        const isPickupEditing = Boolean(editState.pickup || !hasPickupLabel);
+        const isDropoffEditing = Boolean(editState.dropoff || !hasDropoffLabel);
+        const pickupLocked = hasPickupLabel && !editState.pickup;
+        const dropoffLocked = hasDropoffLabel && !editState.dropoff;
+
         const clientName = b.user?.name ?? b.customer?.fullName ?? "—";
         const clientPhone = b.user?.phone ?? b.customer?.phone ?? "—";
         const clientEmail = b.user?.email ?? b.customer?.email ?? "—";
@@ -621,8 +766,8 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
         const dateValue =
           b.dateTime instanceof Date ? b.dateTime.toISOString() : (b.dateTime as unknown as string);
         const priceLabel = b.priceCents != null ? `${(b.priceCents / 100).toFixed(0)} €` : "—";
-        const pickupText = b.pickupLabel ?? "";
-        const dropoffText = b.dropoffLabel ?? "";
+        const pickupText = getPickupLabel(b);
+        const dropoffText = getDropoffLabel(b);
         const noteText =
           b.notes ??
           (b.bookingNotes && b.bookingNotes.length
@@ -775,6 +920,10 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                       onClick={() => {
                         setEditingId((prev) => (prev === b.id ? null : b.id));
                         setSuppressToken((prev) => ({ ...prev, [b.id]: Date.now() }));
+                        setShowAddressInput((prev) => ({
+                          ...prev,
+                          [b.id]: { pickup: false, dropoff: false },
+                        }));
                       }}
                     >
                       <Pencil className="h-4 w-4" />
@@ -1068,10 +1217,22 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
               {editingId === b.id ? (
                 <div className="rounded-xl border border-border/70 bg-background p-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+                    <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                       Départ
                       <AddressAutocomplete
                         value={b.pickupLabel ?? ""}
+                        locked={pickupLocked}
+                        onRequestEdit={() => {
+                          setShowAddressInput((prev) => ({
+                            ...prev,
+                            [b.id]: {
+                              ...(prev[b.id] ?? { dropoff: false, pickup: false }),
+                              pickup: true,
+                            },
+                          }));
+                          setSuppressToken((prev) => ({ ...prev, [b.id]: Date.now() }));
+                        }}
+                        disabled={savingId === b.id}
                         placeholder="Adresse de départ"
                         suppressToken={suppressToken[b.id]}
                         suppressInitial
@@ -1080,31 +1241,62 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                             prev.map((bk) => (bk.id === b.id ? { ...bk, pickupLabel: val } : bk))
                           )
                         }
-                        onSelect={(addr: AddressData) =>
+                        onSelect={(addr: AddressData) => {
+                          const selectedLat = Number(addr.lat);
+                          const selectedLng = Number(addr.lng);
+                          setShowAddressInput((prev) => ({
+                            ...prev,
+                            [b.id]: { pickup: false, dropoff: false },
+                          }));
                           setBookings((prev) => {
                             const next = prev.map((bk) =>
                               bk.id === b.id
                                 ? {
                                     ...bk,
                                     pickupLabel: addr.label,
-                                    pickupLat: addr.lat,
-                                    pickupLng: addr.lng,
+                                    pickupLat: Number.isFinite(selectedLat)
+                                      ? selectedLat
+                                      : (bk.pickupLat ??
+                                        (bk as unknown as { pickup?: { latitude?: number | null } })
+                                          .pickup?.latitude ??
+                                        null),
+                                    pickupLng: Number.isFinite(selectedLng)
+                                      ? selectedLng
+                                      : (bk.pickupLng ??
+                                        (
+                                          bk as unknown as {
+                                            pickup?: { longitude?: number | null };
+                                          }
+                                        ).pickup?.longitude ??
+                                        null),
                                   }
                                 : bk
                             );
                             const updated = next.find((bk) => bk.id === b.id);
                             if (updated) {
-                              void recomputeQuote(updated);
+                              void recomputeQuote(updated, { forceDistance: true });
                             }
                             return next;
-                          })
-                        }
+                          });
+                        }}
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+                    <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
                       Arrivée
                       <AddressAutocomplete
                         value={b.dropoffLabel ?? ""}
+                        locked={dropoffLocked}
+                        onRequestEdit={() => {
+                          setShowAddressInput((prev) => ({
+                            ...prev,
+                            [b.id]: {
+                              ...(prev[b.id] ?? { dropoff: false, pickup: false }),
+                              dropoff: true,
+                            },
+                          }));
+                          setSuppressToken((prev) => ({ ...prev, [b.id]: Date.now() }));
+                        }}
+                        disabled={savingId === b.id}
                         placeholder="Adresse d'arrivée"
                         suppressToken={suppressToken[b.id]}
                         suppressInitial
@@ -1113,25 +1305,47 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                             prev.map((bk) => (bk.id === b.id ? { ...bk, dropoffLabel: val } : bk))
                           )
                         }
-                        onSelect={(addr: AddressData) =>
+                        onSelect={(addr: AddressData) => {
+                          const selectedLat = Number(addr.lat);
+                          const selectedLng = Number(addr.lng);
+                          setShowAddressInput((prev) => ({
+                            ...prev,
+                            [b.id]: { pickup: false, dropoff: false },
+                          }));
                           setBookings((prev) => {
                             const next = prev.map((bk) =>
                               bk.id === b.id
                                 ? {
                                     ...bk,
                                     dropoffLabel: addr.label,
-                                    dropoffLat: addr.lat,
-                                    dropoffLng: addr.lng,
+                                    dropoffLat: Number.isFinite(selectedLat)
+                                      ? selectedLat
+                                      : (bk.dropoffLat ??
+                                        (
+                                          bk as unknown as {
+                                            dropoff?: { latitude?: number | null };
+                                          }
+                                        ).dropoff?.latitude ??
+                                        null),
+                                    dropoffLng: Number.isFinite(selectedLng)
+                                      ? selectedLng
+                                      : (bk.dropoffLng ??
+                                        (
+                                          bk as unknown as {
+                                            dropoff?: { longitude?: number | null };
+                                          }
+                                        ).dropoff?.longitude ??
+                                        null),
                                   }
                                 : bk
                             );
                             const updated = next.find((bk) => bk.id === b.id);
                             if (updated) {
-                              void recomputeQuote(updated);
+                              void recomputeQuote(updated, { forceDistance: true });
                             }
                             return next;
-                          })
-                        }
+                          });
+                        }}
                       />
                     </label>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1160,7 +1374,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                                   : bk
                               );
                               const updated = next.find((bk) => bk.id === b.id);
-                              if (updated) void recomputeQuote(updated);
+                              if (updated) void recomputeQuote(updated, { forceDistance: false });
                               return next;
                             })
                           }
@@ -1189,7 +1403,7 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                                   : bk
                               );
                               const updated = next.find((bk) => bk.id === b.id);
-                              if (updated) void recomputeQuote(updated);
+                              if (updated) void recomputeQuote(updated, { forceDistance: false });
                               return next;
                             })
                           }
@@ -1202,14 +1416,16 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                         Passagers
                         <Input
                           type="number"
+                          min={0}
                           value={b.pax}
                           onChange={(e) =>
                             setBookings((prev) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
                               const next = prev.map((bk) =>
-                                bk.id === b.id ? { ...bk, pax: Number(e.target.value) } : bk
+                                bk.id === b.id ? { ...bk, pax: val } : bk
                               );
                               const updated = next.find((bk) => bk.id === b.id);
-                              if (updated) void recomputeQuote(updated);
+                              if (updated) void recomputeQuote(updated, { forceDistance: false });
                               return next;
                             })
                           }
@@ -1220,14 +1436,16 @@ export function BookingsAdminTable({ initialBookings, drivers, currentUser }: Pr
                         Bagages
                         <Input
                           type="number"
+                          min={0}
                           value={b.luggage}
                           onChange={(e) =>
                             setBookings((prev) => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
                               const next = prev.map((bk) =>
-                                bk.id === b.id ? { ...bk, luggage: Number(e.target.value) } : bk
+                                bk.id === b.id ? { ...bk, luggage: val } : bk
                               );
                               const updated = next.find((bk) => bk.id === b.id);
-                              if (updated) void recomputeQuote(updated);
+                              if (updated) void recomputeQuote(updated, { forceDistance: false });
                               return next;
                             })
                           }

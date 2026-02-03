@@ -63,6 +63,38 @@ export default function AproposPage() {
             ))}
           </div>
 
+          <div className="space-y-3 rounded-3xl border border-border/70 bg-card p-5 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
+              Qualité de la flotte
+            </p>
+            <h3 className="text-xl font-semibold text-foreground">
+              Des véhicules suivis, propres et prêts à rouler
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Révisions constructeur, nettoyage intérieur/extérieur quotidien, pneus 4 saisons,
+              climatisation désinfectée, wifi & eau à bord. Nous changeons de véhicules tous les 3 à
+              4 ans pour garantir silence, confort et sécurité.
+            </p>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              <li className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+                Contrôles techniques anticipés et carnet d’entretien à jour
+              </li>
+              <li className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+                Intérieur désinfecté après chaque course longue ou aéroport
+              </li>
+              <li className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+                Chauffeurs formés à la conduite souple & éco-responsable
+              </li>
+              <li className="flex items-start gap-2 text-sm text-foreground">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
+                Assurance professionnelle VTC & assistance 0 km 24/7
+              </li>
+            </ul>
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <Link
               href="/reservation"
@@ -82,8 +114,8 @@ export default function AproposPage() {
         <div className="grid gap-4">
           <div className="overflow-hidden rounded-3xl shadow-[0_25px_70px_rgba(6,19,46,0.2)]">
             <Image
-              src="/images/apropos-clients.png"
-              alt="Client et chauffeur en berline"
+              src="/images/onecar.png"
+              alt="Véhicule Taxi Tignieu prêt pour la prise en charge"
               width={900}
               height={600}
               className="h-full w-full object-cover"
@@ -92,8 +124,8 @@ export default function AproposPage() {
           </div>
           <div className="overflow-hidden rounded-3xl shadow-[0_25px_70px_rgba(6,19,46,0.2)]">
             <Image
-              src="https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80"
-              alt="Mercedes berline Taxi Tignieu"
+              src="/images/threecars.png"
+              alt="Flotte Taxi Tignieu prête pour vos trajets"
               width={900}
               height={600}
               className="h-full w-full object-cover"

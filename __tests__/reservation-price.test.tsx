@@ -137,13 +137,6 @@ describe("ReservationPage price display", () => {
         target: { value: "114B route de Crémieu" },
       });
     });
-    const searchButtons = root.findAll(
-      (n) => n.type === "button" && n.props.children === "Rechercher"
-    );
-    const pickupSearchBtn = searchButtons[0];
-    await act(async () => {
-      (pickupSearchBtn.props.onClick as () => void)();
-    });
     const textFrom = (val: unknown): string => {
       if (typeof val === "string" || typeof val === "number") return String(val);
       if (Array.isArray(val)) return val.map(textFrom).join("");
@@ -152,6 +145,14 @@ describe("ReservationPage price display", () => {
       }
       return "";
     };
+    const searchButtons = root.findAll(
+      (n) => n.type === "button" && /rechercher/i.test(textFrom(n.props.children))
+    );
+    expect(searchButtons.length).toBeGreaterThan(0);
+    const pickupSearchBtn = searchButtons[0];
+    await act(async () => {
+      (pickupSearchBtn.props.onClick as () => void)();
+    });
 
     const pickupSuggestion = root.find(
       (n) => n.type === "button" && textFrom(n.props.children).toLowerCase().includes("crémieu")
@@ -178,8 +179,9 @@ describe("ReservationPage price display", () => {
       });
     });
     const dropSearchButtons = root.findAll(
-      (n) => n.type === "button" && n.props.children === "Rechercher"
+      (n) => n.type === "button" && /rechercher/i.test(textFrom(n.props.children))
     );
+    expect(dropSearchButtons.length).toBeGreaterThan(0);
     const dropSearchBtn = dropSearchButtons[1] ?? dropSearchButtons[0];
     await act(async () => {
       (dropSearchBtn.props.onClick as () => void)();
