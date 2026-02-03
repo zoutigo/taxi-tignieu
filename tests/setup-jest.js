@@ -4,15 +4,20 @@ const originalDebug = console.debug;
 
 beforeAll(() => {
   console.error = (...args) => {
-    const [first] = args;
-    if (
-      typeof first === "string" &&
-      (first.includes("react-test-renderer is deprecated") ||
-        first.includes("wrapped in act(") ||
-        first.includes("incrementalCache missing in unstable_cache"))
-    ) {
-      return;
-    }
+    const shouldSkip = args.some((a) => {
+      if (typeof a === "string") {
+        return (
+          a.includes("react-test-renderer is deprecated") ||
+          a.includes("wrapped in act(") ||
+          a.includes("incrementalCache missing in unstable_cache")
+        );
+      }
+      if (a instanceof Error) {
+        return a.message.includes("incrementalCache missing in unstable_cache");
+      }
+      return false;
+    });
+    if (shouldSkip) return;
     return originalError(...args);
   };
   console.log = () => {};
