@@ -153,6 +153,7 @@ describe("FeaturedTripsAdmin form", () => {
   });
 
   it("affiche une erreur si le slug existe déjà", async () => {
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
     // distance + quote ok, then submit returns conflict
     const fetchForecastAddressSuggestions = jest.mocked(
       addressSearch.fetchForecastAddressSuggestions
@@ -200,6 +201,7 @@ describe("FeaturedTripsAdmin form", () => {
     await waitFor(() =>
       expect(screen.queryAllByText(/slug existe déjà/i).length).toBeGreaterThan(0)
     );
+    errorSpy.mockRestore();
   });
 
   it("affiche les erreurs zod sur les champs requis", async () => {
