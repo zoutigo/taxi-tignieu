@@ -7,15 +7,17 @@ import { Button } from "@/components/ui/button";
 type Props = {
   label?: string;
   href?: string;
+  "data-testid"?: string;
 };
 
-export function BackButton({ label = "Retour", href }: Props) {
+export function BackButton({ label = "Retour", href, "data-testid": dataTestId }: Props) {
   const router = useRouter();
 
   return (
     <Button
       variant="outline"
       className="group inline-flex items-center gap-2 cursor-pointer"
+      data-testid={dataTestId}
       onClick={() => {
         if (href) {
           router.push(href);

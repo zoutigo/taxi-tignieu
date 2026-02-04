@@ -47,6 +47,12 @@ const cards = [
     moduleId: "faq",
   },
   {
+    title: "Trajets mis en avant",
+    href: "/dashboard/featured-trips",
+    desc: "Trajet type + zones desservies",
+    moduleId: "services",
+  },
+  {
     title: "Rôles",
     href: "/dashboard/roles",
     desc: "Permissions manager par module",
