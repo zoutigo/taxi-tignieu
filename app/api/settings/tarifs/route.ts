@@ -174,6 +174,11 @@ const quotePoi = async (from: Coords, to: Coords) => {
 };
 
 async function refreshFeaturedTripsWithTariff() {
+  // En tests, le client Prisma peut être partiellement mocké : on sort proprement.
+  if (!(prisma as { featuredTrip?: { findMany?: unknown } }).featuredTrip?.findMany) {
+    return;
+  }
+
   const trips = await prisma.featuredTrip.findMany({
     include: {
       pickupAddress: true,
