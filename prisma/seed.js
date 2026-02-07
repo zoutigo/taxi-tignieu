@@ -9,6 +9,8 @@ import {
   PICKUPS,
   REVIEW_COMMENTS,
   STATUSES,
+  FEATURED_ZONE_SEED,
+  FEATURED_TYPE_SEED,
 } from "./data/seed-static-data.js";
 import { serviceSeedData } from "./service-seed-data.js";
 
@@ -52,16 +54,15 @@ async function createAddress(label) {
 }
 
 async function ensureDrivers() {
-  return Promise.all(
+  const existing = await prisma.user.count({ where: { email: { in: DRIVER_EMAILS } } });
+  if (existing > 0) {
+    console.log("Skip drivers seed (already populated)");
+    return prisma.user.findMany({ where: { email: { in: DRIVER_EMAILS } } });
+  }
+  const created = await Promise.all(
     DRIVER_EMAILS.map((email, idx) =>
-      prisma.user.upsert({
-        where: { email },
-        update: {
-          isDriver: true,
-          name: `Chauffeur ${idx + 1}`,
-          image: AVATARS[idx % AVATARS.length],
-        },
-        create: {
+      prisma.user.create({
+        data: {
           email,
           name: `Chauffeur ${idx + 1}`,
           image: AVATARS[idx % AVATARS.length],
@@ -72,15 +73,20 @@ async function ensureDrivers() {
       })
     )
   );
+  console.log(`Seeded ${created.length} drivers`);
+  return created;
 }
 
 async function ensureCustomers() {
-  return Promise.all(
+  const existing = await prisma.user.count({ where: { email: { in: CUSTOMER_EMAILS } } });
+  if (existing > 0) {
+    console.log("Skip customers seed (already populated)");
+    return prisma.user.findMany({ where: { email: { in: CUSTOMER_EMAILS } } });
+  }
+  const created = await Promise.all(
     CUSTOMER_EMAILS.map((email, idx) =>
-      prisma.user.upsert({
-        where: { email },
-        update: { image: AVATARS[(idx + DRIVER_EMAILS.length) % AVATARS.length] },
-        create: {
+      prisma.user.create({
+        data: {
           email,
           name: `Client ${idx + 1}`,
           image: AVATARS[(idx + DRIVER_EMAILS.length) % AVATARS.length],
@@ -91,15 +97,18 @@ async function ensureCustomers() {
       })
     )
   );
+  console.log(`Seeded ${created.length} customers`);
+  return created;
 }
 
 async function seedBookings(drivers, customers) {
   const existingCount = await prisma.booking.count();
+  if (existingCount > 0) {
+    console.log("Skip bookings seed (already populated)");
+    return;
+  }
   const target = 100;
-  const toCreate = Math.max(0, target - existingCount);
-  // info log volontairement retiré pour éviter le bruit en CI
-
-  for (let i = 0; i < toCreate; i += 1) {
+  for (let i = 0; i < target; i += 1) {
     const customer = randChoice(customers);
     const driver = Math.random() < 0.6 ? randChoice(drivers) : null;
     const status = driver ? "CONFIRMED" : randChoice(STATUSES);
@@ -133,12 +142,14 @@ async function seedBookings(drivers, customers) {
 
 async function seedReviews(customers, bookings) {
   const existingCount = await prisma.review.count();
+  if (existingCount > 0) {
+    console.log("Skip reviews seed (already populated)");
+    return;
+  }
   const target = 70;
-  const toCreate = Math.max(0, target - existingCount);
-  // info log volontairement retiré pour éviter le bruit en CI
   const approvedStatuses = ["APPROVED", "PENDING"];
 
-  for (let i = 0; i < toCreate; i += 1) {
+  for (let i = 0; i < target; i += 1) {
     const user = randChoice(customers);
     const booking = bookings.length ? randChoice(bookings) : null;
     await prisma.review.create({
@@ -154,9 +165,11 @@ async function seedReviews(customers, bookings) {
 }
 
 async function seedServices() {
-  await prisma.sHighlight.deleteMany();
-  await prisma.service.deleteMany();
-  await prisma.sCategory.deleteMany();
+  const existing = await prisma.sCategory.count();
+  if (existing > 0) {
+    console.log("Skip services seed (already populated)");
+    return;
+  }
 
   for (const [catIndex, cat] of serviceSeedData.entries()) {
     const createdCategory = await prisma.sCategory.create({
@@ -188,7 +201,10 @@ async function seedServices() {
 
 async function seedFaqCategories() {
   const existingCount = await prisma.faqCategory.count();
-  if (existingCount > 0) return;
+  if (existingCount > 0) {
+    console.log("Skip FAQ categories seed (already populated)");
+    return;
+  }
 
   await prisma.faqCategory.createMany({
     data: FAQ_CATEGORIES.map((name) => ({
@@ -200,7 +216,10 @@ async function seedFaqCategories() {
 
 async function seedFaqs() {
   const existingFaqs = await prisma.faq.count();
-  if (existingFaqs > 0) return;
+  if (existingFaqs > 0) {
+    console.log("Skip FAQ seed (already populated)");
+    return;
+  }
 
   const categories = await prisma.faqCategory.findMany({ select: { id: true, name: true } });
   const map = new Map(categories.map((c) => [c.name, c.id]));
@@ -219,6 +238,86 @@ async function seedFaqs() {
   await prisma.faq.createMany({ data });
 }
 
+function parseEuroToCents(label) {
+  const num = Number(
+    String(label)
+      .replace(/[^\d.,]/g, "")
+      .replace(",", ".")
+  );
+  if (Number.isFinite(num)) return Math.round(num * 100);
+  return null;
+}
+
+async function seedFeaturedTrips() {
+  const existingTrips = await prisma.featuredTrip.count();
+  if (existingTrips > 0) {
+    console.log("Skip FeaturedTrips and pois seed (already populated)");
+    return;
+  }
+  for (const city of FEATURED_ZONE_SEED) {
+    const pickupLabel = city.name;
+    const poiDestinations = (city.poiPrices ?? []).map((poi, idx) => ({
+      label: poi.label,
+      priceCents: parseEuroToCents(poi.price),
+      order: idx,
+    }));
+
+    const trip = await prisma.featuredTrip.create({
+      data: {
+        slug: city.slug,
+        title: city.name,
+        summary: city.summary ?? "",
+        featuredSlot: "ZONE",
+        pickupLabel,
+        dropoffLabel: poiDestinations[0]?.label ?? null,
+        distanceKm: null,
+        durationMinutes: null,
+        basePriceCents: poiDestinations[0]?.priceCents ?? null,
+        priority: city.priority ?? 100,
+        active: true,
+        badge: city.badge ?? "Zone desservie",
+        zoneLabel: city.badge ?? undefined,
+      },
+    });
+
+    if (poiDestinations.length) {
+      await prisma.featuredPoi.createMany({
+        data: poiDestinations.map((p) => ({ ...p, tripId: trip.id })),
+      });
+    }
+  }
+
+  for (const trip of FEATURED_TYPE_SEED) {
+    const created = await prisma.featuredTrip.create({
+      data: {
+        slug: trip.slug,
+        title: trip.title,
+        summary: trip.summary ?? "",
+        featuredSlot: "TYPE",
+        pickupLabel: trip.pickupLabel,
+        dropoffLabel: trip.dropoffLabel ?? null,
+        basePriceCents: trip.basePriceCents ?? null,
+        priority: trip.priority ?? 10,
+        active: true,
+        badge: trip.badge ?? "Trajet type",
+        zoneLabel: null,
+      },
+    });
+
+    if (trip.dropoffLabel) {
+      await prisma.featuredPoi.create({
+        data: {
+          label: trip.dropoffLabel,
+          priceCents: trip.basePriceCents ?? null,
+          order: 0,
+          tripId: created.id,
+        },
+      });
+    }
+  }
+  console.log("Seeded featured trips and POI");
+}
+
 async function main() {
   // démarrage seed
   const drivers = await ensureDrivers();
@@ -229,6 +328,7 @@ async function main() {
   await seedServices();
   await seedFaqCategories();
   await seedFaqs();
+  await seedFeaturedTrips();
   // fin seed
 }
 

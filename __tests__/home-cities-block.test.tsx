@@ -4,7 +4,7 @@
 import { renderToReadableStream } from "react-dom/server";
 import type { ImageProps, StaticImageData } from "next/image";
 import Home from "@/app/page";
-import { cities } from "@/app/cities/city-data";
+import { cities } from "@/lib/data/cities";
 
 const streamToString = async (stream: ReadableStream): Promise<string> => {
   const reader = stream.getReader();
@@ -64,7 +64,12 @@ jest.mock("next/image", () => ({
 
 describe("Landing page - villes couvertes", () => {
   it("affiche les liens vers chaque ville", async () => {
-    const html = await streamToString(await renderToReadableStream(await Home()));
+    const stream = await renderToReadableStream(await Home());
+    const maybeReady = (stream as unknown as { allReady?: Promise<unknown> }).allReady;
+    if (maybeReady && typeof maybeReady.then === "function") {
+      await maybeReady;
+    }
+    const html = await streamToString(stream);
     cities.forEach((city) => {
       expect(html).toContain(`href="/${city.slug}"`);
       expect(html).toContain(city.name);

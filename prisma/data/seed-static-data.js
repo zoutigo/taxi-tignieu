@@ -198,3 +198,108 @@ export const FAQ_ITEMS = {
     },
   ],
 };
+
+export const FEATURED_ZONE_SEED = [
+  {
+    slug: "tignieu",
+    name: "Tignieu-Jameyzieu",
+    summary: "Aéroport, gares et trajets du quotidien en quelques minutes",
+    badge: "Zone phare",
+    priority: 1,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "35 €" },
+      { label: "Gare Part-Dieu", price: "69 €" },
+    ],
+  },
+  {
+    slug: "charvieu-chavagneux",
+    name: "Charvieu-Chavagneux",
+    summary: "Transferts rapides vers Lyon et l’Est lyonnais",
+    badge: "Zone desservie",
+    priority: 2,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "32 €" },
+      { label: "Gare Part-Dieu", price: "72 €" },
+    ],
+  },
+  {
+    slug: "pont-de-cheruy",
+    name: "Pont-de-Chéruy",
+    summary: "Vos trajets pro et perso, en confiance",
+    badge: "Zone desservie",
+    priority: 3,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "38 €" },
+      { label: "Gare Part-Dieu", price: "75 €" },
+    ],
+  },
+  {
+    slug: "cremieu",
+    name: "Crémieu",
+    summary: "Navettes aéroport, longues distances et tourisme",
+    badge: "Zone desservie",
+    priority: 4,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "42 €" },
+      { label: "Gare Part-Dieu", price: "82 €" },
+    ],
+  },
+  {
+    slug: "meyzieu",
+    name: "Meyzieu",
+    summary: "Solution rapide pour Eurexpo, aéroports et bureaux",
+    badge: "Zone desservie",
+    priority: 5,
+    poiPrices: [
+      { label: "Eurexpo", price: "32 €" },
+      { label: "Aéroport Lyon Saint-Exupéry", price: "28 €" },
+      { label: "Gare Part-Dieu", price: "45 €" },
+    ],
+  },
+  {
+    slug: "pusignan",
+    name: "Pusignan",
+    summary: "Prise en charge express à deux pas de l’aéroport",
+    badge: "Zone desservie",
+    priority: 6,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "22 €" },
+      { label: "Gare Part-Dieu", price: "48 €" },
+    ],
+  },
+  {
+    slug: "chavanoz",
+    name: "Chavanoz",
+    summary: "Trajets quotidiens, aéroports et santé",
+    badge: "Zone desservie",
+    priority: 7,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "34 €" },
+      { label: "Gare Part-Dieu", price: "72 €" },
+    ],
+  },
+  {
+    slug: "janneyrias",
+    name: "Janneyrias",
+    summary: "Chauffeur proche de l'aéroport et des zones d'affaires",
+    badge: "Zone desservie",
+    priority: 8,
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "20 €" },
+      { label: "Gare Part-Dieu", price: "46 €" },
+    ],
+  },
+];
+
+export const FEATURED_TYPE_SEED = [
+  {
+    slug: "tignieu-aeroport",
+    title: "Tignieu → Aéroport",
+    summary: "Lyon Saint-Exupéry ou Lyon Part-Dieu",
+    pickupLabel: "Tignieu-Jameyzieu, France",
+    dropoffLabel: "Aéroport Lyon Saint-Exupéry",
+    basePriceCents: 3500,
+    priority: 1,
+    badge: "Trajet type",
+  },
+];

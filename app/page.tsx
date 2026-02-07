@@ -18,7 +18,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getSiteContact } from "@/lib/site-config";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cities } from "@/app/cities/city-data";
+import { cities } from "@/lib/data/cities";
 import { FAQ_CATEGORIES, FAQ_ITEMS } from "@/lib/data/seed-static-data";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +90,118 @@ export default async function Home() {
     contact.address.street
   }, ${contact.address.postalCode} ${contact.address.city}`;
   const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
+  type FeaturedPublic = {
+    title: string | null;
+    summary: string | null;
+    pickupLabel: string | null;
+    dropoffLabel: string | null;
+    basePriceCents: number | null;
+    distanceKm: number | null;
+    durationMinutes: number | null;
+    badge: string | null;
+    zoneLabel: string | null;
+  };
+
+  let featuredType: FeaturedPublic | null = null;
+
+  try {
+    const res = await fetch(`${baseUrl}/api/featured-trips/public?slot=TYPE`, {
+      next: { tags: ["featured-trips"] },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      featuredType = (data.trips?.[0] as FeaturedPublic) ?? null;
+    }
+  } catch {
+    featuredType = null;
+  }
+
+  const fallbackFeatured = {
+    title: "Tignieu → Aéroport",
+    subtitle: "Lyon Saint-Exupéry ou Lyon Part-Dieu",
+    priceEuro: 35,
+    note: "Tarif indicatif journée, 1 à 4 passagers",
+  };
+
+  const computedSubtitle = featuredType
+    ? (featuredType.summary ??
+      featuredType.zoneLabel ??
+      `${featuredType.pickupLabel ?? ""} → ${featuredType.dropoffLabel ?? ""}`.trim())
+    : null;
+
+  const featuredCard = featuredType
+    ? {
+        title: featuredType.title ?? fallbackFeatured.title,
+        subtitle:
+          computedSubtitle && computedSubtitle.length
+            ? computedSubtitle
+            : fallbackFeatured.subtitle,
+        priceEuro:
+          featuredType.basePriceCents != null
+            ? Number(featuredType.basePriceCents) / 100
+            : fallbackFeatured.priceEuro,
+        note:
+          featuredType.badge ??
+          (featuredType.distanceKm && featuredType.durationMinutes
+            ? `${featuredType.distanceKm} km · ${featuredType.durationMinutes} min`
+            : fallbackFeatured.note),
+      }
+    : fallbackFeatured;
+
+  let zones: {
+    slug: string;
+    name: string;
+    heroSubtitle: string;
+    poiPrices: { label: string; price: string }[];
+  }[] = [];
+
+  try {
+    const res = await fetch(`${baseUrl}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
+      next: { tags: ["featured-trips"] },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      zones =
+        data.trips?.map(
+          (t: {
+            slug?: string;
+            id?: string;
+            title?: string;
+            summary?: string;
+            zoneLabel?: string;
+            pickupLabel?: string;
+            poiDestinations?: { label: string; priceCents?: number }[];
+          }) => ({
+            slug: t.slug ?? t.id ?? "",
+            name: t.title ?? "Zone",
+            heroSubtitle: t.summary ?? t.zoneLabel ?? t.pickupLabel ?? "",
+            poiPrices: (t.poiDestinations ?? []).map((p) => ({
+              label: p.label,
+              price:
+                p.priceCents != null
+                  ? `${(Number(p.priceCents) / 100).toFixed(0)} €`
+                  : (p.label ?? ""),
+            })),
+          })
+        ) ?? [];
+    }
+  } catch {
+    zones = [];
+  }
+
+  if (!zones.length) {
+    zones = cities.map((c) => ({
+      slug: c.slug,
+      name: c.name,
+      heroSubtitle: c.heroSubtitle,
+      poiPrices: c.poiPrices,
+    }));
+  }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-16 px-4 py-12 sm:px-6 lg:px-8">
@@ -189,13 +301,17 @@ export default async function Home() {
               <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">
                 Trajet type
               </p>
-              <h3 className="mt-4 font-display text-2xl text-foreground">Tignieu → Aéroport</h3>
-              <p className="text-sm text-muted-foreground">Lyon Saint-Exupéry ou Lyon Part-Dieu</p>
+              <h3 className="mt-4 font-display text-2xl text-foreground">{featuredCard.title}</h3>
+              <p className="text-sm text-muted-foreground">{featuredCard.subtitle}</p>
               <p className="mt-6 text-sm text-muted-foreground">à partir de</p>
-              <p className="text-5xl font-semibold text-primary">35 €</p>
-              <p className="text-xs text-muted-foreground">
-                Tarif indicatif journée, 1 à 4 passagers
+              <p className="text-5xl font-semibold text-primary">
+                {featuredCard.priceEuro.toLocaleString("fr-FR", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                €
               </p>
+              <p className="text-xs text-muted-foreground">{featuredCard.note}</p>
             </div>
 
             <div className="rounded-[28px] border border-border/70 bg-sidebar px-6 py-8 text-sidebar-foreground shadow-[0_35px_55px_rgba(2,8,32,0.35)]">
@@ -379,7 +495,7 @@ export default async function Home() {
           </Link>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cities.map((city) => (
+          {zones.map((city) => (
             <Link
               key={city.slug}
               href={`/${city.slug}`}

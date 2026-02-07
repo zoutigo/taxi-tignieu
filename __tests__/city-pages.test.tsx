@@ -3,7 +3,7 @@
  */
 import { renderToReadableStream } from "react-dom/server";
 import type { ImageProps, StaticImageData } from "next/image";
-import { cities } from "@/app/cities/city-data";
+import { cities } from "@/lib/data/cities";
 
 const streamToString = async (stream: ReadableStream): Promise<string> => {
   const reader = stream.getReader();
@@ -66,23 +66,14 @@ jest.mock("next/image", () => ({
 
 describe("City pages", () => {
   it("rend chaque page ville avec son titre et ses liens CTA", async () => {
-    const pages = [
-      { slug: "tignieu", mod: () => import("@/app/tignieu/page") },
-      { slug: "charvieu-chavagneux", mod: () => import("@/app/charvieu-chavagneux/page") },
-      { slug: "pont-de-cheruy", mod: () => import("@/app/pont-de-cheruy/page") },
-      { slug: "cremieu", mod: () => import("@/app/cremieu/page") },
-      { slug: "meyzieu", mod: () => import("@/app/meyzieu/page") },
-      { slug: "pusignan", mod: () => import("@/app/pusignan/page") },
-      { slug: "chavanoz", mod: () => import("@/app/chavanoz/page") },
-      { slug: "janneyrias", mod: () => import("@/app/janneyrias/page") },
-    ];
-
-    for (const page of pages) {
-      const city = cities.find((c) => c.slug === page.slug);
-      const mod = await page.mod();
-      const element = await mod.default();
+    global.fetch = jest
+      .fn(async () => ({ ok: true, json: async () => ({ trips: [] }) }) as Response)
+      .mockName("fetchMock");
+    for (const city of cities) {
+      const { CityPage } = await import("@/components/cities/city-page");
+      const element = await CityPage({ city });
       const html = await streamToString(await renderToReadableStream(element));
-      expect(html).toContain(city?.heroTitle ?? city?.name ?? page.slug);
+      expect(html).toContain(city?.heroTitle ?? city?.name ?? city.slug);
       expect(html).toContain('href="/reserver"');
     }
   });
