@@ -1,12 +1,11 @@
 import { MetadataRoute } from "next";
 import { cities } from "@/lib/data/cities";
 
+// Utilise le domaine public si disponible, sinon fallback sur le domaine de prod.
 const baseUrl = (() => {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!envUrl) {
-    throw new Error("Sitemap: NEXT_PUBLIC_APP_URL doit être défini pour générer des URLs valides.");
-  }
-  return envUrl.replace(/\/+$/, "");
+  const fallback = "https://taxi-tignieu-charvieu.fr";
+  return (envUrl ?? fallback).replace(/\/+$/, "");
 })();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
