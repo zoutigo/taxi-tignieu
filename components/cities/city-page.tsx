@@ -195,7 +195,8 @@ export async function CityPage({ city }: Props) {
 
   let apiPoiPrices: { label: string; price: string }[] | null = null;
   try {
-    const res = await fetch(`${baseUrl}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
+    // Appel interne en relatif pour éviter les soucis de DNS/SSL en prod
+    const res = await fetch("/api/featured-trips/public?slot=ZONE&withPrices=1", {
       cache: "no-store",
     });
     if (res.ok) {

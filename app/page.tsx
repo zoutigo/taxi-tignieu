@@ -110,7 +110,7 @@ export default async function Home() {
   let featuredType: FeaturedPublic | null = null;
 
   try {
-    const res = await fetch(`${baseUrl}/api/featured-trips/public?slot=TYPE`, {
+    const res = await fetch(`/api/featured-trips/public?slot=TYPE`, {
       next: { tags: ["featured-trips"] },
     });
     if (res.ok) {
@@ -161,7 +161,7 @@ export default async function Home() {
   }[] = [];
 
   try {
-    const res = await fetch(`${baseUrl}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
+    const res = await fetch(`/api/featured-trips/public?slot=ZONE&withPrices=1`, {
       next: { tags: ["featured-trips"] },
     });
     if (res.ok) {
