@@ -48,6 +48,7 @@ const mockTariffUpsert = prisma.tariffConfig.upsert as jest.MockedFunction<
 describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GOOGLE_MAPS_API_KEY = "test-key";
   });
 
   it("géocode pickup/POI et met à jour distances, durées et prix", async () => {
