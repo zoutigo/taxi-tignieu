@@ -3,7 +3,8 @@ import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { defaultTariffConfig } from "@/lib/tarifs";
+import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
+import { getTariffConfig } from "@/lib/tariff-config";
 
 const payloadSchema = z.object({
   baseCharge: z.number().nonnegative(),
@@ -101,15 +102,17 @@ export async function PATCH(req: Request) {
   return NextResponse.json(updated, { status: 200 });
 }
 
-// Pour les appels internes serveur->serveur, on cible l'instance locale de Next
-// afin d'éviter les échecs de résolution ou de TLS sur l'URL publique.
-const internalBaseUrl = (() => {
-  const port = process.env.PORT ?? "3000";
-  const host = process.env.INTERNAL_APP_HOST ?? "127.0.0.1";
-  return `http://${host}:${port}`;
-})();
-
 type Coords = { lat: number; lng: number };
+
+const haversineKm = (a: Coords, b: Coords) => {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const la1 = (a.lat * Math.PI) / 180;
+  const la2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+};
 
 const ensureCoords = async (address: {
   id?: string | null;
@@ -121,16 +124,31 @@ const ensureCoords = async (address: {
     return { addressId: address.id, coords: { lat: address.latitude, lng: address.longitude } };
   }
 
-  // Geocode via internal API (forecast/geocode)
-  const geoRes = await fetch(`${internalBaseUrl}/api/forecast/geocode`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ address: address.label }),
+  // Geocode direct via Google to éviter un aller-retour HTTP local qui peut échouer sur certaines stacks VPS
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_MAPS_API_KEY manquant pour le geocoding.");
+  }
+
+  const params = new URLSearchParams({
+    address: address.label,
+    key: apiKey,
+    components: "country:FR",
+    language: "fr",
+    region: "fr",
   });
-  const geoJson = geoRes.ok ? await geoRes.json().catch(() => null) : null;
+
+  const geoRes = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`
+  );
+  if (!geoRes.ok) {
+    throw new Error(`Geocoding HTTP failed (${geoRes.status}) for ${address.label}`);
+  }
+  const geoJson = await geoRes.json();
   const first = Array.isArray(geoJson?.results) ? geoJson.results[0] : null;
-  const lat = Number(first?.lat);
-  const lng = Number(first?.lng);
+  const loc = first?.geometry?.location;
+  const lat = Number(loc?.lat ?? first?.lat);
+  const lng = Number(loc?.lng ?? first?.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new Error(`Geocoding failed for ${address.label}`);
   }
@@ -164,17 +182,16 @@ const ensureCoords = async (address: {
 };
 
 const quotePoi = async (from: Coords, to: Coords) => {
-  const res = await fetch(`${internalBaseUrl}/api/forecast/quote`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      pickup: from,
-      dropoff: to,
-      tariff: "A",
-    }),
-  });
-  if (!res.ok) throw new Error(`Quote failed: ${res.status}`);
-  return (await res.json()) as { distanceKm: number; durationMinutes: number; price: number };
+  const cfg = await getTariffConfig();
+  const distanceKm = haversineKm(from, to);
+  const durationMinutes = Math.round((distanceKm / 40) * 60); // approx 40 km/h si non fourni
+  const price = computePriceEuros(
+    distanceKm,
+    "A",
+    { baggageCount: 0, fifthPassenger: false, waitMinutes: 0 },
+    cfg
+  );
+  return { distanceKm, durationMinutes, price };
 };
 
 async function refreshFeaturedTripsWithTariff() {

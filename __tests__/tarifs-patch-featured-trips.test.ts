@@ -129,8 +129,8 @@ describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
     const res = (await PATCH(req)) as Response;
     expect(res.status).toBe(200);
 
-    // 2 geocode + 1 quote
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // 2 appels geocode (pickup + poi) – plus de fetch pour le quote (calcul local)
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     // Adresse pickup créée et mise à jour des coords
     expect(mockAddrCreate).toHaveBeenCalledWith(
@@ -139,14 +139,17 @@ describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
     expect(mockAddrUpdate).toHaveBeenCalledTimes(0); // rien à update car on vient de créer
 
     // POI mis à jour
-    expect(mockPoiUpdate).toHaveBeenCalledWith({
-      where: { id: "poi1" },
-      data: expect.objectContaining({
-        distanceKm: 12.34,
-        durationMinutes: 20,
-        priceCents: Math.round(56.78 * 100),
-      }),
-    });
+    expect(mockPoiUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "poi1" },
+        data: expect.objectContaining({
+          dropoffAddressId: "addr1",
+          distanceKm: expect.any(Number),
+          durationMinutes: expect.any(Number),
+          priceCents: expect.any(Number),
+        }),
+      })
+    );
 
     // Trip mis à jour avec pickupAddressId
     expect(mockTripUpdate).toHaveBeenCalledWith({

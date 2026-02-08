@@ -8,15 +8,23 @@ type Props = {
   label?: string;
   href?: string;
   "data-testid"?: string;
+  variant?: React.ComponentProps<typeof Button>["variant"];
+  className?: string;
 };
 
-export function BackButton({ label = "Retour", href, "data-testid": dataTestId }: Props) {
+export function BackButton({
+  label = "Retour",
+  href,
+  variant = "outline",
+  className,
+  "data-testid": dataTestId,
+}: Props) {
   const router = useRouter();
 
   return (
     <Button
-      variant="outline"
-      className="group inline-flex items-center gap-2 cursor-pointer"
+      variant={variant}
+      className={`group inline-flex items-center gap-2 cursor-pointer ${className ?? ""}`}
       data-testid={dataTestId}
       onClick={() => {
         if (href) {

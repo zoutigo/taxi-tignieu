@@ -75,11 +75,18 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
       <header className="rounded-2xl bg-sidebar px-6 py-5 text-sidebar-foreground shadow-lg">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/70">Admin</p>
-        <h1 className="font-display text-3xl">Dashboard</h1>
-        <p className="text-sm text-white/80">Sélectionnez une section à gérer.</p>
-        <div className="mt-3">
-          <BackButton label="Retour au site" href="/" />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-white/70">Admin</p>
+            <h1 className="font-display text-3xl">Dashboard</h1>
+            <p className="text-sm text-white/80">Sélectionnez une section à gérer.</p>
+          </div>
+          <BackButton
+            label="Retour au site"
+            href="/"
+            variant="secondary"
+            className="bg-white text-primary hover:bg-white/90 border-transparent shadow-sm"
+          />
         </div>
       </header>
 
