@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { Car, CheckCircle2, MapPin, PhoneCall, ShieldCheck, Star } from "lucide-react";
 import { getSiteContact } from "@/lib/site-config";
 import { getServiceGroups } from "@/app/services/data";
@@ -180,10 +181,28 @@ export async function CityPage({ city }: Props) {
     ...svc,
     description: describeService(serviceKey(svc.title ?? `svc-${idx}`), city),
   }));
-  const baseUrl =
+  let apiBase: string | null = null;
+  try {
+    const hdrs = await headers();
+    const host = hdrs.get("host");
+    const protoHeader = hdrs.get("x-forwarded-proto");
+    const protocol =
+      process.env.NEXT_PUBLIC_APP_URL?.startsWith("https") ||
+      process.env.VERCEL_URL ||
+      protoHeader === "https"
+        ? "https"
+        : "http";
+    apiBase = host ? `${protocol}://${host}` : null;
+  } catch {
+    // headers() non dispo (tests), fallback ci-dessous
+  }
+  apiBase =
+    apiBase ??
     process.env.NEXT_PUBLIC_APP_URL ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-  const canonical = `${baseUrl}/${city.slug}`;
+
+  const canonical = `${apiBase}/${city.slug}`;
+  const baseUrl = apiBase;
 
   const formatEuro = (cents?: number | null) => {
     if (!Number.isFinite(cents)) return null;
@@ -196,7 +215,7 @@ export async function CityPage({ city }: Props) {
   let apiPoiPrices: { label: string; price: string }[] | null = null;
   try {
     // Appel interne en relatif pour éviter les soucis de DNS/SSL en prod
-    const res = await fetch("/api/featured-trips/public?slot=ZONE&withPrices=1", {
+    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
       cache: "no-store",
     });
     if (res.ok) {

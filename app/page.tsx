@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { headers } from "next/headers";
 import {
   ArrowRight,
   BadgeCheck,
@@ -91,7 +92,23 @@ export default async function Home() {
   }, ${contact.address.postalCode} ${contact.address.city}`;
   const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
 
-  const baseUrl =
+  let apiBase: string | null = null;
+  try {
+    const hdrs = await headers();
+    const host = hdrs.get("host");
+    const protoHeader = hdrs.get("x-forwarded-proto");
+    const protocol =
+      process.env.NEXT_PUBLIC_APP_URL?.startsWith("https") ||
+      process.env.VERCEL_URL ||
+      protoHeader === "https"
+        ? "https"
+        : "http";
+    apiBase = host ? `${protocol}://${host}` : null;
+  } catch {
+    // headers() non dispo (tests), fallback ci-dessous
+  }
+  apiBase =
+    apiBase ??
     process.env.NEXT_PUBLIC_APP_URL ??
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
@@ -110,7 +127,7 @@ export default async function Home() {
   let featuredType: FeaturedPublic | null = null;
 
   try {
-    const res = await fetch(`/api/featured-trips/public?slot=TYPE`, {
+    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=TYPE`, {
       next: { tags: ["featured-trips"] },
     });
     if (res.ok) {
@@ -161,7 +178,7 @@ export default async function Home() {
   }[] = [];
 
   try {
-    const res = await fetch(`/api/featured-trips/public?slot=ZONE&withPrices=1`, {
+    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
       next: { tags: ["featured-trips"] },
     });
     if (res.ok) {
