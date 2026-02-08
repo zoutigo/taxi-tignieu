@@ -1,9 +1,13 @@
 import { MetadataRoute } from "next";
 import { cities } from "@/lib/data/cities";
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+const baseUrl = (() => {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!envUrl) {
+    throw new Error("Sitemap: NEXT_PUBLIC_APP_URL doit être défini pour générer des URLs valides.");
+  }
+  return envUrl.replace(/\/+$/, "");
+})();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
