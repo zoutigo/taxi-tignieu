@@ -101,9 +101,13 @@ export async function PATCH(req: Request) {
   return NextResponse.json(updated, { status: 200 });
 }
 
-const baseUrl =
-  process.env.NEXT_PUBLIC_APP_URL ??
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+// Pour les appels internes serveur->serveur, on cible l'instance locale de Next
+// afin d'éviter les échecs de résolution ou de TLS sur l'URL publique.
+const internalBaseUrl = (() => {
+  const port = process.env.PORT ?? "3000";
+  const host = process.env.INTERNAL_APP_HOST ?? "127.0.0.1";
+  return `http://${host}:${port}`;
+})();
 
 type Coords = { lat: number; lng: number };
 
@@ -118,7 +122,7 @@ const ensureCoords = async (address: {
   }
 
   // Geocode via internal API (forecast/geocode)
-  const geoRes = await fetch(`${baseUrl}/api/forecast/geocode`, {
+  const geoRes = await fetch(`${internalBaseUrl}/api/forecast/geocode`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ address: address.label }),
@@ -160,7 +164,7 @@ const ensureCoords = async (address: {
 };
 
 const quotePoi = async (from: Coords, to: Coords) => {
-  const res = await fetch(`${baseUrl}/api/forecast/quote`, {
+  const res = await fetch(`${internalBaseUrl}/api/forecast/quote`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
