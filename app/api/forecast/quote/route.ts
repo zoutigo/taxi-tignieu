@@ -80,23 +80,6 @@ export async function POST(request: Request) {
       cfg
     );
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[forecast/quote]", {
-        pickup: from,
-        dropoff: to,
-        tariff,
-        passengers,
-        baggageCount,
-        fifthPassenger,
-        waitMinutes,
-        distanceKm,
-        durationMinutes,
-        price,
-        date: body.date,
-        time: body.time,
-      });
-    }
-
     return NextResponse.json({ distanceKm, durationMinutes, price });
   } catch (error) {
     return NextResponse.json({ error: "Erreur interne", details: String(error) }, { status: 500 });

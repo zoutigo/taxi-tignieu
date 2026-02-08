@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -84,9 +85,9 @@ export default async function ClientBookingsPage(props: PageProps) {
             Gérez vos demandes, ajustez une adresse ou annulez une course à venir.
           </p>
         </div>
-        <a href="/reserver" className="btn btn-primary">
+        <Link href="/reserver" className="btn btn-primary">
           Nouvelle demande
-        </a>
+        </Link>
       </div>
 
       <BookingsManager

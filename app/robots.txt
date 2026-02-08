@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Bloque l'indexation du dashboard et des API
+Disallow: /dashboard/
+Disallow: /api/
+
+Sitemap: https://localhost:3000/sitemap.xml

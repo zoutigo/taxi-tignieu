@@ -3,6 +3,7 @@ import { Mail, MapPin, PhoneCall } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 import { getSiteContact } from "@/lib/site-config";
 import { SiteLogo } from "@/components/site-logo";
+import { cities } from "@/lib/data/cities";
 
 const quickLinks = [
   { label: "Réserver un trajet", href: "/reserver" },
@@ -110,6 +111,20 @@ export async function SiteFooter() {
             <ThemeToggle />
             <p className="mt-2 text-xs text-white/60">Choisissez le mode clair ou nuit.</p>
           </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap gap-3 text-xs text-white/70">
+          {cities.map((city) => (
+            <Link
+              key={city.slug}
+              href={`/${city.slug}`}
+              className="rounded-full border border-white/15 px-3 py-1 hover:border-primary hover:text-white"
+            >
+              {city.name}
+            </Link>
+          ))}
         </div>
       </div>
 

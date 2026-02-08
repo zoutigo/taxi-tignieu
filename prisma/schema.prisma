@@ -145,6 +145,9 @@ model Address {
   pickupBookings  Booking[]   @relation("PickupAddress")
   dropoffBookings Booking[]   @relation("DropoffAddress")
   userAddresses   UserAddress[]
+  featuredPickupTrips  FeaturedTrip[] @relation("FeaturedPickup")
+  featuredDropoffTrips FeaturedTrip[] @relation("FeaturedDropoff")
+  featuredPoiDropoffs FeaturedPoi[] @relation("FeaturedPoiDropoff")
 }
 
 model BookingNote {
@@ -301,4 +304,51 @@ model RolePermission {
   updatedAt  DateTime @updatedAt
 
   @@unique([module, role], name: "module_role")
+}
+
+enum FeaturedSlot {
+  TYPE   // Trajet type (hero/landing)
+  ZONE   // Zones desservies
+}
+
+model FeaturedTrip {
+  id               String   @id @default(uuid())
+  slug             String   @unique
+  title            String
+  summary          String?
+  featuredSlot     FeaturedSlot?
+  pickupLabel      String
+  dropoffLabel     String?
+  pickupAddressId  String?
+  dropoffAddressId String?
+  pickupAddress    Address? @relation("FeaturedPickup", fields: [pickupAddressId], references: [id])
+  dropoffAddress   Address? @relation("FeaturedDropoff", fields: [dropoffAddressId], references: [id])
+  distanceKm       Decimal? @db.Decimal(8, 2)
+  durationMinutes  Int?
+  basePriceCents   Int?
+  priority         Int      @default(100)
+  active           Boolean  @default(true)
+  heroImageUrl     String?
+  badge            String?
+  zoneLabel        String?
+  poiDestinations  FeaturedPoi[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model FeaturedPoi {
+  id               String   @id @default(uuid())
+  label            String
+  dropoffAddressId String?
+  dropoffAddress   Address? @relation("FeaturedPoiDropoff", fields: [dropoffAddressId], references: [id])
+  distanceKm       Decimal? @db.Decimal(8, 2)
+  durationMinutes  Int?
+  priceCents       Int?
+  order            Int      @default(0)
+  tripId           String
+  trip             FeaturedTrip @relation(fields: [tripId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tripId, order])
 }
