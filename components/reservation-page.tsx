@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ReservationWizard, type SavedAddressOption } from "@/components/reservation-wizard";
 import type { Address } from "@prisma/client";
+import { getSiteContact } from "@/lib/site-config";
 
 export const metadata: Metadata = {
   title: "Réserver un taxi | Taxi Tignieu",
@@ -15,7 +16,7 @@ const formatAddressLine = (address: Address) =>
     .join(" ");
 
 export default async function ReserverPage() {
-  const session = await auth();
+  const [session, contact] = await Promise.all([auth(), getSiteContact()]);
   let savedAddresses: SavedAddressOption[] = [];
 
   if (session?.user?.id) {
@@ -57,6 +58,8 @@ export default async function ReserverPage() {
       successRedirect="/espace-client/bookings"
       useStore
       savedAddresses={savedAddresses}
+      supportPhone={contact.phone}
+      supportEmail={contact.email}
     />
   );
 }

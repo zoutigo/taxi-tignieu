@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { Car, ArrowLeft, PhoneCall } from "lucide-react";
+import { getSiteContact } from "@/lib/site-config";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const contact = await getSiteContact();
+  const phone = contact.phone.trim() || "04 95 78 54 00";
+  const phoneHref = `tel:${phone.replace(/\s+/g, "")}`;
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-sidebar via-sidebar/95 to-background text-sidebar-foreground">
       <div className="mx-auto flex max-w-5xl flex-col gap-10 px-4 py-16 sm:px-6 lg:px-8">
@@ -38,11 +43,11 @@ export default function NotFound() {
                 Réserver un trajet
               </Link>
               <a
-                href="tel:+33495785400"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-primary/70 hover:text-primary"
+                href={phoneHref}
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-primary/70 hover:text-primary"
               >
                 <PhoneCall className="h-4 w-4" />
-                Appeler le 04 95 78 54 00
+                Appeler le {phone}
               </a>
             </div>
           </div>

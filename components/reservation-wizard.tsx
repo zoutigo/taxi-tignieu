@@ -85,6 +85,8 @@ type Props = {
   successRedirect?: string;
   useStore?: boolean;
   savedAddresses?: SavedAddressOption[];
+  supportPhone?: string;
+  supportEmail?: string;
 };
 
 export function ReservationWizard({
@@ -95,7 +97,12 @@ export function ReservationWizard({
   successRedirect = "/espace-client/bookings",
   useStore = true,
   savedAddresses = [],
+  supportPhone = "04 95 78 54 00",
+  supportEmail = "contact@taxitignieu.fr",
 }: Props) {
+  const normalizedSupportPhone = supportPhone.trim() || "04 95 78 54 00";
+  const normalizedSupportEmail = supportEmail.trim() || "contact@taxitignieu.fr";
+  const supportPhoneHref = `tel:${normalizedSupportPhone.replace(/\s+/g, "")}`;
   const storePrice = useBookingStore((state) => state.estimatedPrice);
   const storeEstimate = useBookingStore((state) => state.estimate);
   const defaultValues = useMemo<BookingEstimateInput>(() => {
@@ -905,8 +912,8 @@ export function ReservationWizard({
             </div>
             <div className="mt-8 rounded-2xl border border-border/70 bg-muted/40 px-5 py-4 text-sm text-muted-foreground">
               Une question ? Appelez le{" "}
-              <a href="tel:+33495785400" className="cursor-pointer font-semibold text-primary">
-                04 95 78 54 00
+              <a href={supportPhoneHref} className="cursor-pointer font-semibold text-primary">
+                {normalizedSupportPhone}
               </a>
               .
             </div>
@@ -1462,8 +1469,8 @@ export function ReservationWizard({
                 Notre équipe vous répond 24/7 pour ajuster le trajet ou confirmer la réservation.
               </p>
               <div className="mt-6 space-y-2 text-sm text-white/90">
-                <p>☎ 04 95 78 54 00</p>
-                <p>✉ contact@taxitignieu.fr</p>
+                <p>☎ {normalizedSupportPhone}</p>
+                <p>✉ {normalizedSupportEmail}</p>
               </div>
             </div>
 

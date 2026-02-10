@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ReservationWizard, type SavedAddressOption } from "@/components/reservation-wizard";
 import type { Address } from "@prisma/client";
+import { getSiteContact } from "@/lib/site-config";
 
 type PageProps = {
   params: Promise<{ id: string }> | { id: string };
@@ -17,7 +18,7 @@ export default async function EditBookingPage(props: PageProps) {
   const params = await Promise.resolve(props.params);
   const id = params.id;
 
-  const session = await auth();
+  const [session, contact] = await Promise.all([auth(), getSiteContact()]);
   if (!session?.user?.id) {
     redirect("/");
   }
@@ -110,6 +111,8 @@ export default async function EditBookingPage(props: PageProps) {
       successRedirect="/espace-client/bookings"
       useStore={false}
       savedAddresses={savedAddresses}
+      supportPhone={contact.phone}
+      supportEmail={contact.email}
     />
   );
 }

@@ -2,6 +2,20 @@
 import React from "react";
 import { TextDecoder, TextEncoder } from "util";
 
+jest.mock("@/lib/site-config", () => ({
+  getSiteContact: jest.fn(async () => ({
+    phone: "01 23 45 67 89",
+    email: "contact@example.com",
+    address: {
+      street: "Rue de Test",
+      streetNumber: "1",
+      postalCode: "69000",
+      city: "Lyon",
+      country: "France",
+    },
+  })),
+}));
+
 type GlobalPatch = {
   MessageChannel?: unknown;
   TextEncoder?: unknown;
@@ -24,10 +38,12 @@ describe("NotFound page", () => {
 
     const { renderToStaticMarkup } = await import("react-dom/server");
     const { default: NotFound } = await import("@/app/not-found");
-    const html = renderToStaticMarkup(<NotFound />);
+    const page = await NotFound();
+    const html = renderToStaticMarkup(page);
     expect(html).toContain("Oups");
     expect(html).toContain("Réserver un trajet");
     expect(html).toContain("Retour à l");
+    expect(html).toContain("01 23 45 67 89");
   });
 
   afterAll(() => {

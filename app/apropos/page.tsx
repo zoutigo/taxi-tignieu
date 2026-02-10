@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { CheckCircle2, Clock3, ShieldCheck, Star } from "lucide-react";
 import Link from "next/link";
+import { getSiteContact } from "@/lib/site-config";
 
 const points = [
   {
@@ -28,7 +29,11 @@ const stats = [
   { label: "Disponibilité", value: "7j/7 - 24h/24" },
 ];
 
-export default function AproposPage() {
+export default async function AproposPage() {
+  const contact = await getSiteContact();
+  const phone = contact.phone.trim() || "04 95 78 54 00";
+  const phoneHref = `tel:${phone.replace(/\s+/g, "")}`;
+
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
@@ -103,8 +108,8 @@ export default function AproposPage() {
               Réserver un trajet
             </Link>
             <Link
-              href="tel:+33612345678"
-              className="inline-flex items-center justify-center rounded-full border border-primary/30 px-5 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10"
+              href={phoneHref}
+              className="inline-flex cursor-pointer items-center justify-center rounded-full border border-primary/30 px-5 py-3 text-sm font-semibold text-primary transition hover:bg-primary/10"
             >
               Appeler un chauffeur
             </Link>

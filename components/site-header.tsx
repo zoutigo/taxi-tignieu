@@ -18,7 +18,11 @@ const navLinks = [
   { label: "Contact", href: "/contact" },
 ];
 
-export function SiteHeader() {
+type Props = {
+  phone?: string;
+};
+
+export function SiteHeader({ phone }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -31,6 +35,8 @@ export function SiteHeader() {
     (data?.user as { isAdmin?: boolean; isManager?: boolean } | undefined)?.isAdmin ||
       (data?.user as { isAdmin?: boolean; isManager?: boolean } | undefined)?.isManager
   );
+  const supportPhone = phone?.trim() || "04 95 78 54 00";
+  const supportPhoneHref = `tel:${supportPhone.replace(/\s+/g, "")}`;
 
   const toggleMenu = () =>
     setMenuOpen((prev) => {
@@ -174,7 +180,7 @@ export function SiteHeader() {
               type="button"
               onClick={toggleMenu}
               aria-label="Ouvrir le menu"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 text-white transition hover:border-primary/80 hover:text-primary md:hidden"
+              className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-2xl border border-white/20 text-white transition hover:border-primary/80 hover:text-primary md:hidden"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -202,7 +208,7 @@ export function SiteHeader() {
                 <button
                   onClick={closeMenu}
                   aria-label="Fermer le menu"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/25 text-white transition hover:border-primary/70 hover:text-primary"
+                  className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-2xl border border-white/25 text-white transition hover:border-primary/70 hover:text-primary"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -280,8 +286,8 @@ export function SiteHeader() {
                   </button>
                 )}
                 <a
-                  href="tel:+33495785400"
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:border-primary/70 hover:text-primary"
+                  href={supportPhoneHref}
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:border-primary/70 hover:text-primary"
                   onClick={closeMenu}
                 >
                   <PhoneCall className="h-4 w-4" />
