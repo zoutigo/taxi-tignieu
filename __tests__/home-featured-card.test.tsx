@@ -1,11 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * @jest-environment node
  */
 import { renderToStaticMarkup } from "react-dom/server";
+import { Prisma } from "@prisma/client";
 import Home from "@/app/page";
 import { prisma } from "@/lib/prisma";
 import { getSiteContact } from "@/lib/site-config";
+import {
+  getPublicFeaturedTypeTrips,
+  getPublicFeaturedZoneTrips,
+} from "@/lib/featured-trips-public";
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
@@ -22,6 +26,11 @@ jest.mock("@/lib/site-config", () => ({
   getSiteContact: jest.fn(),
 }));
 
+jest.mock("@/lib/featured-trips-public", () => ({
+  getPublicFeaturedTypeTrips: jest.fn(),
+  getPublicFeaturedZoneTrips: jest.fn(),
+}));
+
 const mockedFindMany = prisma.review.findMany as unknown as jest.MockedFunction<
   typeof prisma.review.findMany
 >;
@@ -29,20 +38,20 @@ const mockedFaqFindMany = prisma.faq.findMany as unknown as jest.MockedFunction<
   typeof prisma.faq.findMany
 >;
 const mockedGetSiteContact = getSiteContact as jest.MockedFunction<typeof getSiteContact>;
-
-const makeResponse = (data: any, ok = true) =>
-  ({
-    ok,
-    json: async () => data,
-  }) as Response;
+const mockedGetPublicFeaturedTypeTrips = getPublicFeaturedTypeTrips as jest.MockedFunction<
+  typeof getPublicFeaturedTypeTrips
+>;
+const mockedGetPublicFeaturedZoneTrips = getPublicFeaturedZoneTrips as jest.MockedFunction<
+  typeof getPublicFeaturedZoneTrips
+>;
 
 describe("Landing page – carte Trajet type", () => {
-  const realFetch = global.fetch;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockedFindMany.mockResolvedValue([]);
     mockedFaqFindMany.mockResolvedValue([]);
+    mockedGetPublicFeaturedTypeTrips.mockResolvedValue([]);
+    mockedGetPublicFeaturedZoneTrips.mockResolvedValue([]);
     mockedGetSiteContact.mockResolvedValue({
       phone: "04 95 78 54 00",
       email: "contact@test.fr",
@@ -56,33 +65,25 @@ describe("Landing page – carte Trajet type", () => {
     });
   });
 
-  afterEach(() => {
-    global.fetch = realFetch;
-  });
-
   it("affiche les données issues de l'API quand un trajet type est disponible", async () => {
-    global.fetch = jest.fn(async (url: string) => {
-      if (url.includes("slot=TYPE")) {
-        return makeResponse({
-          trips: [
-            {
-              title: "API Titre",
-              summary: "API résumé",
-              pickupLabel: "Tignieu",
-              dropoffLabel: "Aéroport Lyon",
-              basePriceCents: 4200,
-              distanceKm: 25,
-              durationMinutes: 35,
-              badge: "API badge",
-            },
-          ],
-        });
-      }
-      if (url.includes("slot=ZONE")) {
-        return makeResponse({ trips: [] });
-      }
-      return makeResponse({});
-    }) as any;
+    mockedGetPublicFeaturedTypeTrips.mockResolvedValue([
+      {
+        id: "trip-1",
+        slug: "trip-1",
+        title: "API Titre",
+        summary: "API résumé",
+        featuredSlot: "TYPE",
+        pickupLabel: "Tignieu",
+        dropoffLabel: "Aéroport Lyon",
+        distanceKm: new Prisma.Decimal(25),
+        durationMinutes: 35,
+        basePriceCents: 4200,
+        badge: "API badge",
+        zoneLabel: null,
+        priority: 0,
+        active: true,
+      },
+    ]);
 
     const html = renderToStaticMarkup(await Home());
 
@@ -93,12 +94,8 @@ describe("Landing page – carte Trajet type", () => {
   });
 
   it("utilise le fallback statique quand l'API ne renvoie rien", async () => {
-    global.fetch = jest.fn(async (url: string) => {
-      if (url.includes("slot=TYPE") || url.includes("slot=ZONE")) {
-        return makeResponse({ trips: [] });
-      }
-      return makeResponse({});
-    }) as any;
+    mockedGetPublicFeaturedTypeTrips.mockResolvedValue([]);
+    mockedGetPublicFeaturedZoneTrips.mockResolvedValue([]);
 
     const html = renderToStaticMarkup(await Home());
 

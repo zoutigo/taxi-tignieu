@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { Car, CheckCircle2, MapPin, PhoneCall, ShieldCheck, Star } from "lucide-react";
 import { getSiteContact } from "@/lib/site-config";
 import { getServiceGroups } from "@/app/services/data";
 import type { CityInfo } from "@/lib/data/cities";
+import { getPublicFeaturedZoneTrips } from "@/lib/featured-trips-public";
 import React from "react";
 
 type Props = {
@@ -174,35 +174,21 @@ const describeService = (slug: string, city: CityInfo): string => {
 };
 
 export async function CityPage({ city }: Props) {
-  const contact = await getSiteContact();
+  const [contact, featuredZoneTrips] = await Promise.all([
+    getSiteContact(),
+    getPublicFeaturedZoneTrips(),
+  ]);
   const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
   const featuredRaw = await pickFeaturedServices();
   const featured = featuredRaw.map((svc, idx) => ({
     ...svc,
     description: describeService(serviceKey(svc.title ?? `svc-${idx}`), city),
   }));
-  let apiBase: string | null = null;
-  try {
-    const hdrs = await headers();
-    const host = hdrs.get("host");
-    const protoHeader = hdrs.get("x-forwarded-proto");
-    const protocol =
-      process.env.NEXT_PUBLIC_APP_URL?.startsWith("https") ||
-      process.env.VERCEL_URL ||
-      protoHeader === "https"
-        ? "https"
-        : "http";
-    apiBase = host ? `${protocol}://${host}` : null;
-  } catch {
-    // headers() non dispo (tests), fallback ci-dessous
-  }
-  apiBase =
-    apiBase ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-
-  const canonical = `${apiBase}/${city.slug}`;
-  const baseUrl = apiBase;
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://taxi-tignieu-charvieu.fr").replace(
+    /\/+$/,
+    ""
+  );
+  const canonical = `${baseUrl}/${city.slug}`;
 
   const formatEuro = (cents?: number | null) => {
     if (!Number.isFinite(cents)) return null;
@@ -213,27 +199,14 @@ export async function CityPage({ city }: Props) {
   };
 
   let apiPoiPrices: { label: string; price: string }[] | null = null;
-  try {
-    // Appel interne en relatif pour éviter les soucis de DNS/SSL en prod
-    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const trip = (data?.trips ?? []).find(
-        (t: { slug?: string; id?: string }) => t.slug === city.slug || t.id === city.slug
-      );
-      if (trip?.poiDestinations?.length) {
-        apiPoiPrices = trip.poiDestinations
-          .map((p: { label?: string; priceCents?: number | null }) => {
-            const price = formatEuro(p.priceCents ?? null);
-            return p.label && price ? { label: p.label, price } : null;
-          })
-          .filter(Boolean) as { label: string; price: string }[];
-      }
-    }
-  } catch {
-    // ignore API errors, fallback below
+  const trip = featuredZoneTrips.find((t) => t.slug === city.slug || t.id === city.slug);
+  if (trip?.poiDestinations?.length) {
+    apiPoiPrices = trip.poiDestinations
+      .map((p) => {
+        const price = formatEuro(p.priceCents ?? null);
+        return p.label && price ? { label: p.label, price } : null;
+      })
+      .filter(Boolean) as { label: string; price: string }[];
   }
 
   const poiPrices = apiPoiPrices?.length ? apiPoiPrices : city.poiPrices;

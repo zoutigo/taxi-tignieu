@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { headers } from "next/headers";
 import {
   ArrowRight,
   BadgeCheck,
@@ -21,6 +20,10 @@ import { getSiteContact } from "@/lib/site-config";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cities } from "@/lib/data/cities";
 import { FAQ_CATEGORIES, FAQ_ITEMS } from "@/lib/data/seed-static-data";
+import {
+  getPublicFeaturedTypeTrips,
+  getPublicFeaturedZoneTrips,
+} from "@/lib/featured-trips-public";
 
 export const dynamic = "force-dynamic";
 
@@ -48,17 +51,23 @@ const services = [
 ];
 
 export default async function Home() {
-  const latestReviews = await prisma.review.findMany({
-    where: { status: "APPROVED" },
-    orderBy: { createdAt: "desc" },
-    include: { user: { select: { name: true, image: true } } },
-    take: 3,
-  });
-  const featuredFaqs = await prisma.faq.findMany({
-    where: { isFeatured: true, isValidated: true },
-    include: { category: { select: { name: true, order: true } } },
-    orderBy: [{ category: { order: "asc" } }, { createdAt: "desc" }],
-  });
+  const [latestReviews, featuredFaqs, contact, featuredTypeTrips, featuredZoneTrips] =
+    await Promise.all([
+      prisma.review.findMany({
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
+        include: { user: { select: { name: true, image: true } } },
+        take: 3,
+      }),
+      prisma.faq.findMany({
+        where: { isFeatured: true, isValidated: true },
+        include: { category: { select: { name: true, order: true } } },
+        orderBy: [{ category: { order: "asc" } }, { createdAt: "desc" }],
+      }),
+      getSiteContact(),
+      getPublicFeaturedTypeTrips(),
+      getPublicFeaturedZoneTrips(),
+    ]);
   const seenCategories = new Set<string>();
   const curatedFaqs =
     featuredFaqs
@@ -86,31 +95,10 @@ export default async function Home() {
   });
 
   const faqs = curatedFaqs.length ? curatedFaqs : fallbackFaqs;
-  const contact = await getSiteContact();
   const addressLine = `${contact.address.streetNumber ? `${contact.address.streetNumber} ` : ""}${
     contact.address.street
   }, ${contact.address.postalCode} ${contact.address.city}`;
   const phoneHref = `tel:${contact.phone.replace(/\s+/g, "")}`;
-
-  let apiBase: string | null = null;
-  try {
-    const hdrs = await headers();
-    const host = hdrs.get("host");
-    const protoHeader = hdrs.get("x-forwarded-proto");
-    const protocol =
-      process.env.NEXT_PUBLIC_APP_URL?.startsWith("https") ||
-      process.env.VERCEL_URL ||
-      protoHeader === "https"
-        ? "https"
-        : "http";
-    apiBase = host ? `${protocol}://${host}` : null;
-  } catch {
-    // headers() non dispo (tests), fallback ci-dessous
-  }
-  apiBase =
-    apiBase ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
   type FeaturedPublic = {
     title: string | null;
@@ -124,19 +112,7 @@ export default async function Home() {
     zoneLabel: string | null;
   };
 
-  let featuredType: FeaturedPublic | null = null;
-
-  try {
-    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=TYPE`, {
-      next: { tags: ["featured-trips"] },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      featuredType = (data.trips?.[0] as FeaturedPublic) ?? null;
-    }
-  } catch {
-    featuredType = null;
-  }
+  const featuredType = (featuredTypeTrips[0] as FeaturedPublic | undefined) ?? null;
 
   const fallbackFeatured = {
     title: "Tignieu → Aéroport",
@@ -175,41 +151,15 @@ export default async function Home() {
     name: string;
     heroSubtitle: string;
     poiPrices: { label: string; price: string }[];
-  }[] = [];
-
-  try {
-    const res = await fetch(`${apiBase}/api/featured-trips/public?slot=ZONE&withPrices=1`, {
-      next: { tags: ["featured-trips"] },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      zones =
-        data.trips?.map(
-          (t: {
-            slug?: string;
-            id?: string;
-            title?: string;
-            summary?: string;
-            zoneLabel?: string;
-            pickupLabel?: string;
-            poiDestinations?: { label: string; priceCents?: number }[];
-          }) => ({
-            slug: t.slug ?? t.id ?? "",
-            name: t.title ?? "Zone",
-            heroSubtitle: t.summary ?? t.zoneLabel ?? t.pickupLabel ?? "",
-            poiPrices: (t.poiDestinations ?? []).map((p) => ({
-              label: p.label,
-              price:
-                p.priceCents != null
-                  ? `${(Number(p.priceCents) / 100).toFixed(0)} €`
-                  : (p.label ?? ""),
-            })),
-          })
-        ) ?? [];
-    }
-  } catch {
-    zones = [];
-  }
+  }[] = featuredZoneTrips.map((t) => ({
+    slug: t.slug ?? t.id ?? "",
+    name: t.title ?? "Zone",
+    heroSubtitle: t.summary ?? t.zoneLabel ?? t.pickupLabel ?? "",
+    poiPrices: (t.poiDestinations ?? []).map((p) => ({
+      label: p.label,
+      price: p.priceCents != null ? `${(Number(p.priceCents) / 100).toFixed(0)} €` : p.label,
+    })),
+  }));
 
   if (!zones.length) {
     zones = cities.map((c) => ({

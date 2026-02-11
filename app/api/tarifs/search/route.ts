@@ -54,31 +54,39 @@ const normalize = (text: string) =>
     .trim()
     .replace(/\s+/g, " ");
 
-const enrichWithGeocode = async (text: string): Promise<Partial<ScoreEntry>> => {
+const enrichWithGeocode = async (text: string, apiKey?: string): Promise<Partial<ScoreEntry>> => {
+  if (!apiKey) return {};
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/api/tarifs/geocode?q=${encodeURIComponent(
-        text
-      )}`
-    );
+    const params = new URLSearchParams({
+      address: text,
+      key: apiKey,
+      components: "country:FR",
+      language: "fr",
+      region: "fr",
+    });
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${params}`);
     if (!res.ok) return {};
     const data = (await res.json()) as {
-      streetNumber?: string;
-      street?: string;
-      postcode?: string;
-      city?: string;
-      country?: string;
-      lat?: number;
-      lng?: number;
+      status?: string;
+      results?: Array<{
+        geometry?: { location?: { lat?: number; lng?: number } };
+        address_components?: Array<{ long_name: string; types: string[] }>;
+      }>;
     };
+    if (data.status !== "OK" || !data.results?.length) return {};
+    const first = data.results[0];
+    const comps = first.address_components ?? [];
+    const pick = (type: string) => comps.find((c) => c.types.includes(type))?.long_name;
+
     return {
-      streetNumber: data.streetNumber,
-      street: data.street,
-      postcode: data.postcode,
-      city: data.city,
-      country: data.country,
-      lat: data.lat,
-      lng: data.lng,
+      streetNumber: pick("street_number"),
+      street: pick("route"),
+      postcode: pick("postal_code"),
+      city:
+        pick("locality") ?? pick("postal_town") ?? pick("administrative_area_level_2") ?? undefined,
+      country: pick("country"),
+      lat: first.geometry?.location?.lat,
+      lng: first.geometry?.location?.lng,
     };
   } catch {
     return {};
@@ -243,7 +251,7 @@ export async function GET(request: Request) {
 
           // Enrich if number or postcode missing
           if (!streetNumber || !postcode) {
-            const enrich = await enrichWithGeocode(q);
+            const enrich = await enrichWithGeocode(q, process.env.GOOGLE_MAPS_API_KEY);
             if (enrich.streetNumber) streetNumber = String(enrich.streetNumber);
             if (enrich.postcode) postcode = String(enrich.postcode);
             if (enrich.street) street = enrich.street;
