@@ -29,8 +29,9 @@ export default async function ServicesPage() {
                 Des trajets sur-mesure pour chaque besoin
               </h1>
               <p className="max-w-3xl text-sm text-white/80">
-                Aéroport, longue distance, VSL ou navettes entreprises : nos chauffeurs couvrent
-                toutes vos demandes avec suivi en temps réel et confort premium.
+                Aéroport, longue distance, trajets conventionnés CPAM, navettes entreprises ou mises
+                à disposition : nos chauffeurs couvrent toutes vos demandes avec suivi en temps réel
+                et confort premium.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -63,7 +64,7 @@ export default async function ServicesPage() {
               </p>
               <h2 className="font-display text-3xl text-foreground">Toutes nos expertises</h2>
               <p className="text-sm text-muted-foreground">
-                Un seul partenaire pour vos déplacements quotidiens, professionnels, médicaux ou
+                Un seul partenaire pour vos déplacements quotidiens, professionnels, touristiques ou
                 événementiels.
               </p>
             </div>
@@ -120,8 +121,8 @@ export default async function ServicesPage() {
                 24/7, même en dernière minute
               </h3>
               <p className="mt-3 text-sm text-muted-foreground">
-                Chauffeur dédié, suivi d&apos;arrivée, paiement sécurisé et véhicule adapté
-                (berline, van, PMR).
+                Chauffeur dédié, suivi d&apos;arrivée, paiement sécurisé et véhicule adapté (berline
+                ou van).
               </p>
               <Link
                 href="/contact"
@@ -138,7 +139,7 @@ export default async function ServicesPage() {
               <div className="mt-3 space-y-2 text-foreground">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-primary" />
-                  Chauffeurs agréés et formés PMR & VSL
+                  Chauffeurs agréés, assurés et expérimentés
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-primary" />

@@ -127,7 +127,7 @@ export default async function ServiceDetailPage({ params }: { params: Params }) 
               </p>
               <h3 className="mt-3 font-display text-2xl text-foreground">Réactifs 24/7</h3>
               <p className="mt-3 text-sm text-muted-foreground">
-                Confirmation rapide, suivi en temps réel et véhicule adapté (berline, van ou PMR).
+                Confirmation rapide, suivi en temps réel et véhicule adapté (berline ou van).
               </p>
               <Link
                 href="/contact"

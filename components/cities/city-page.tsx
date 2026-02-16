@@ -33,8 +33,6 @@ const serviceKey = (title: string): string => {
   if (norm.includes("seminaire")) return "seminaires";
   if (norm.includes("hotel")) return "hotels";
   if (norm.includes("scolaire")) return "scolaire";
-  if (norm.includes("vsl") || norm.includes("cpam")) return "vsl-cpam";
-  if (norm.includes("pmr")) return "pmr";
   return norm;
 };
 
@@ -54,8 +52,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
       "Prise en charge hôtels/gîtes autour de Tignieu, transferts tôt le matin vers l’aéroport.",
     scolaire:
       "Ramassages scolaires Tignieu et hameaux, chauffeurs identifiés, communication parents.",
-    "vsl-cpam": "VSL/CPAM vers Bourgoin ou Lyon, aide montée/descente, attente si besoin.",
-    pmr: "Aide PMR personnalisée au départ de Tignieu, conduite adaptée et installation sécurisée.",
   },
   "charvieu-chavagneux": {
     "trajets-classiques":
@@ -71,8 +67,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
     hotels: "Transferts hôtels/résidences autour de Charvieu, service 24/7 pour vols matinaux.",
     scolaire:
       "Parcours scolaires stables à Charvieu-Chavagneux, chauffeurs référencés, suivi parents.",
-    "vsl-cpam": "Courses santé vers Bourgoin/Lyon, VSL conventionné, accompagnement discret.",
-    pmr: "Prise en charge PMR locale, aide fauteuil, conduite douce jusqu’à destination.",
   },
   "pont-de-cheruy": {
     "trajets-classiques":
@@ -87,8 +81,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
       "Déplacements salons Eurexpo/OL Vallée, multi-pickup Pont-de-Chéruy et communes voisines.",
     hotels: "Pick-up hôtels/Airbnb locaux, trajets matin/nuit vers aéroport et gares.",
     scolaire: "Transports scolaires Pont-de-Chéruy, chauffeurs identifiés et horaires fiables.",
-    "vsl-cpam": "VSL/CPAM vers centres de soins Nord-Isère, assistance à l’installation.",
-    pmr: "Mobilité PMR : aide fauteuil, installation sécurisée et conduite douce.",
   },
   cremieu: {
     "trajets-classiques":
@@ -102,8 +94,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
       "Groupes vers Eurexpo ou lieux événementiels, coordination multi-stops Crémieu et villages.",
     hotels: "Hôtels de charme et gîtes de Crémieu, transferts 24/7 vers aéroport/gares.",
     scolaire: "Trajets scolaires Crémieu et villages proches, communication parentale régulière.",
-    "vsl-cpam": "Courses santé vers Bourgoin ou Lyon, VSL/CPAM avec aide montée/descente.",
-    pmr: "Prise en charge PMR au départ de Crémieu, aide fauteuil et conduite souple.",
   },
   meyzieu: {
     "trajets-classiques":
@@ -116,8 +106,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
     seminaires: "Multi-pickup Meyzieu–Décines–Genas pour Eurexpo, gestion horaires de groupe.",
     hotels: "Hôtels OL Vallée et alentours, transferts tôt/ tard vers gares/aéroport.",
     scolaire: "Transports scolaires Meyzieu/Décines, chauffeurs identifiés pour vos enfants.",
-    "vsl-cpam": "Courses VSL vers HCL, Médipôle ou cliniques Est lyonnais, assistance à bord.",
-    pmr: "Aide PMR locale, embarquement sécurisé et conduite adaptée.",
   },
   pusignan: {
     "trajets-classiques":
@@ -126,13 +114,11 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
       "Aéroport à quelques minutes : suivi des vols, pancarte et transfert Part-Dieu/Perrache.",
     "longue-distance": "Départs Pusignan vers Grenoble, Annecy ou Genève, confort berline ou van.",
     entreprises:
-      "Navettes pour parcs logistiques et zones industrielles de l’Est lyonnais, facturation entreprise.",
+      "Navettes pour parcs logistiques et zones industrielles du Nord Isère, facturation entreprise.",
     seminaires:
       "Coordination groupes pour Eurexpo et OL Vallée, multi-stops Pusignan/Saint-Laurent.",
     hotels: "Hôtels et résidences proches, trajets 24/7 pour vols matinaux.",
     scolaire: "Ramassages scolaires locaux, itinéraires réguliers et suivi parents.",
-    "vsl-cpam": "VSL/CPAM vers hôpitaux/centres de soins, aide installation et dossiers.",
-    pmr: "Prise en charge PMR, aide fauteuil et accompagnement vers rendez-vous médicaux.",
   },
   chavanoz: {
     "trajets-classiques":
@@ -145,8 +131,6 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
     seminaires: "Eurexpo/Groupama : multi-pickup Chavanoz–Pont-de-Chéruy, coordination horaire.",
     hotels: "Hôtels/Airbnb locaux, transferts tôt et tard vers aéroport et gares.",
     scolaire: "Scolaire Chavanoz et hameaux, chauffeurs référencés et horaires fiables.",
-    "vsl-cpam": "VSL conventionné vers centres de soins Nord-Isère, assistance aux patients.",
-    pmr: "Mobilité PMR : aide fauteuil, installation sécurisée et conduite douce.",
   },
   janneyrias: {
     "trajets-classiques":
@@ -161,15 +145,42 @@ const cityServiceCopy: Record<string, Record<string, string>> = {
     hotels:
       "Hôtels/résidences proches de l’aéroport, transferts 24/7 vers gares/centres d’affaires.",
     scolaire: "Transports scolaires Janneyrias et communes voisines, chauffeurs identifiés.",
-    "vsl-cpam": "VSL/CPAM vers hôpitaux lyonnais ou Nord-Isère, assistance montée/descente.",
-    pmr: "Prise en charge PMR locale, aide fauteuil et conduite adaptée jusqu’au lieu médical.",
+  },
+  loyettes: {
+    "trajets-classiques":
+      "Courses locales Loyettes, centres-bourgs voisins et zones d’activités, avec suivi d’approche en temps réel.",
+    "aeroport-gare":
+      "Transferts directs vers Saint-Exupéry et gares lyonnaises depuis Loyettes, assistance bagages incluse.",
+    "longue-distance":
+      "Liaisons Loyettes vers Lyon, Grenoble ou Genève, pauses planifiées et conduite souple.",
+    entreprises:
+      "Navettes pro pour vos équipes entre Loyettes, PIPA et l’agglomération lyonnaise, facturation claire.",
+    seminaires:
+      "Coordination multi-pickup Loyettes–Saint-Romain–Pont-de-Chéruy pour Eurexpo et événements d’entreprise.",
+    hotels:
+      "Transferts hôtels et résidences locales, service 24/7 pour départs matinaux ou retours tardifs.",
+    scolaire: "Accompagnements scolaires loyettois, chauffeurs identifiés et horaires fiables.",
+  },
+  "saint-romain-de-jalionas": {
+    "trajets-classiques":
+      "Courses quotidiennes Saint-Romain-de-Jalionas, villages proches et rendez-vous en Nord Isère.",
+    "aeroport-gare":
+      "Saint-Exupéry, Part-Dieu ou Perrache avec chauffeur local, ponctualité et assistance bagages.",
+    "longue-distance":
+      "Trajets longue distance depuis Saint-Romain vers Rhône-Alpes et Suisse, confort berline/van.",
+    entreprises:
+      "Transferts professionnels pour zones d’affaires et sites logistiques en Nord Isère et autour de Lyon.",
+    seminaires: "Navettes séminaires et salons avec multi-stops Saint-Romain–Pusignan–Meyzieu.",
+    hotels:
+      "Prise en charge hôtels/résidences autour de Saint-Romain, disponible de jour comme de nuit.",
+    scolaire: "Transport scolaire avec suivi parents et conducteurs référencés sur demande.",
   },
 };
 
 const describeService = (slug: string, city: CityInfo): string => {
   const cityCopy = cityServiceCopy[city.slug]?.[slug];
   if (cityCopy) return cityCopy;
-  const base = `${city.name} et l'Est lyonnais`;
+  const base = `${city.name} et le Nord Isère`;
   return `Service disponible sur ${base}, avec réservation simple et chauffeurs locaux.`;
 };
 
@@ -345,7 +356,7 @@ export async function CityPage({ city }: Props) {
           <div className="rounded-[24px] border border-border/70 bg-card p-6 shadow-[0_30px_55px_rgba(5,15,35,0.08)] sm:p-8">
             <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">À propos</p>
             <h3 className="mt-2 font-display text-2xl text-foreground">
-              Chauffeurs agréés, ancrés dans l&apos;Est lyonnais
+              Chauffeurs agréés, ancrés dans le Nord Isère
             </h3>
             <p className="mt-3 text-sm text-muted-foreground">
               Conduite souple, accueil soigné et suivi proactif avant l&apos;arrivée. Nous
@@ -355,7 +366,7 @@ export async function CityPage({ city }: Props) {
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
                 <ShieldCheck className="h-4 w-4 text-primary" />
-                Chauffeurs assurés & VSL/CPAM disponibles
+                Chauffeurs assurés, accompagnement personnalisé et CPAM sur demande
               </div>
               <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
                 <Star className="h-4 w-4 text-primary" />

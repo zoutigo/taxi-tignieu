@@ -17,7 +17,7 @@ const sections = [
     content: [
       "Taxi Tignieu Charvieu",
       "Entreprise de taxi – Service de transport de personnes",
-      "Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Est Lyonnais",
+      "Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Nord Isère",
     ],
   },
   {
@@ -156,7 +156,7 @@ export default async function PrivacyPolicyPage() {
                 </a>
               </p>
               <p className="text-xs">
-                Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Est Lyonnais
+                Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Nord Isère
               </p>
             </div>
           </div>

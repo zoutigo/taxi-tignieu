@@ -35,8 +35,8 @@ export async function SiteFooter() {
             </div>
           </div>
           <p className="text-sm text-white/75">
-            Trajets aéroports, longues distances, VSL/CPAM et mises à disposition. Chauffeurs
-            ponctuels et réservation simple 7j/7.
+            Trajets aéroports, longues distances, navettes entreprises, courses conventionnées CPAM
+            et mises à disposition. Chauffeurs ponctuels et réservation simple 7j/7.
           </p>
         </div>
 

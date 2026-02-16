@@ -15,7 +15,7 @@ export const cities: CityInfo[] = [
     heroTitle: "Taxi à Tignieu-Jameyzieu",
     heroSubtitle: "Aéroport, gares et trajets du quotidien en quelques minutes",
     description:
-      "Chauffeur implanté à Tignieu-Jameyzieu : prise en charge rapide vers Saint-Exupéry, Part-Dieu ou vos rendez-vous locaux. Suivi temps réel, confort berline ou van, VSL/CPAM sur demande.",
+      "Chauffeur implanté à Tignieu-Jameyzieu : prise en charge rapide vers Saint-Exupéry, Part-Dieu ou vos rendez-vous locaux. Suivi temps réel, confort berline ou van, assistance bagages et trajets CPAM sur demande.",
     poiPrices: [
       { label: "Aéroport Lyon Saint-Exupéry", price: "35 €" },
       { label: "Gare Part-Dieu", price: "69 €" },
@@ -24,14 +24,14 @@ export const cities: CityInfo[] = [
     highlights: [
       "Chauffeur local disponible 24/7",
       "Confirmation SMS et suivi d'approche",
-      "Options van ou VSL/CPAM selon besoin",
+      "Options berline/van et trajets CPAM selon besoin",
     ],
   },
   {
     slug: "charvieu-chavagneux",
     name: "Charvieu-Chavagneux",
     heroTitle: "Taxi à Charvieu-Chavagneux",
-    heroSubtitle: "Transferts rapides vers Lyon et l’Est lyonnais",
+    heroSubtitle: "Transferts rapides vers Lyon et le Nord Isère",
     description:
       "Départs express depuis Charvieu-Chavagneux vers Saint-Exupéry, Eurexpo ou les gares lyonnaises. Accueil pancarte en arrivée, assistance bagages et horaires souples pour vos équipes.",
     poiPrices: [
@@ -51,7 +51,7 @@ export const cities: CityInfo[] = [
     heroTitle: "Taxi à Pont-de-Chéruy",
     heroSubtitle: "Vos trajets pro et perso, en confiance",
     description:
-      "Prise en charge depuis Pont-de-Chéruy pour vos trajets professionnels, familiaux ou médicaux. Chauffeurs référencés, ponctualité et confort premium.",
+      "Prise en charge depuis Pont-de-Chéruy pour vos trajets professionnels, familiaux ou longue distance. Chauffeurs référencés, ponctualité et confort premium.",
     poiPrices: [
       { label: "Aéroport Lyon Saint-Exupéry", price: "38 €" },
       { label: "Gare Part-Dieu", price: "75 €" },
@@ -59,7 +59,7 @@ export const cities: CityInfo[] = [
     ],
     highlights: [
       "Accueil pancarte à l'aéroport",
-      "Transport VSL/CPAM disponible",
+      "Accompagnement personnalisé et trajets CPAM",
       "Support WhatsApp/SMS en temps réel",
     ],
   },
@@ -123,7 +123,7 @@ export const cities: CityInfo[] = [
     heroTitle: "Taxi à Chavanoz",
     heroSubtitle: "Trajets quotidiens, aéroports et santé",
     description:
-      "Depuis Chavanoz, navettes vers aéroports, gares ou rendez-vous médicaux. Chauffeurs agréés, VSL/CPAM et accompagnement des proches.",
+      "Depuis Chavanoz, navettes vers aéroports, gares ou rendez-vous importants. Chauffeurs agréés et accompagnement des proches.",
     poiPrices: [
       { label: "Aéroport Lyon Saint-Exupéry", price: "34 €" },
       { label: "Gare Part-Dieu", price: "72 €" },
@@ -151,6 +151,42 @@ export const cities: CityInfo[] = [
       "Temps d’approche réduit",
       "Accueil pancarte sur demande",
       "Paiement sécurisé & facture instantanée",
+    ],
+  },
+  {
+    slug: "loyettes",
+    name: "Loyettes",
+    heroTitle: "Taxi à Loyettes",
+    heroSubtitle: "Trajets rapides vers aéroport, gares et zones d’activités",
+    description:
+      "Depuis Loyettes, prise en charge vers Saint-Exupéry, les gares lyonnaises et vos rendez-vous professionnels. Service fiable, suivi en temps réel et confort berline ou van.",
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "33 €" },
+      { label: "Gare Part-Dieu", price: "72 €" },
+      { label: "Gare Lyon Perrache", price: "76 €" },
+    ],
+    highlights: [
+      "Réservation simple 24/7",
+      "Assistance bagages à la demande",
+      "Facturation claire et confirmation rapide",
+    ],
+  },
+  {
+    slug: "saint-romain-de-jalionas",
+    name: "Saint-Romain-de-Jalionas",
+    heroTitle: "Taxi à Saint-Romain-de-Jalionas",
+    heroSubtitle: "Chauffeur local pour vos transferts pro et personnels",
+    description:
+      "Départs depuis Saint-Romain-de-Jalionas vers l’aéroport, Eurexpo, les gares et les trajets longue distance. Ponctualité, conduite souple et communication proactive avant la prise en charge.",
+    poiPrices: [
+      { label: "Aéroport Lyon Saint-Exupéry", price: "30 €" },
+      { label: "Gare Part-Dieu", price: "68 €" },
+      { label: "Eurexpo", price: "49 €" },
+    ],
+    highlights: [
+      "Suivi d'approche SMS/WhatsApp",
+      "Chauffeurs agréés et assurés",
+      "Options berline et van selon le besoin",
     ],
   },
 ];

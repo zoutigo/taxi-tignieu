@@ -1478,7 +1478,7 @@ export function ReservationWizard({
               <p className="font-semibold text-foreground">Délais moyens</p>
               <ul className="mt-3 space-y-2">
                 <li>• Confirmation sous 15 min</li>
-                <li>• Chauffeurs agréés CPAM</li>
+                <li>• Chauffeurs agréés, assurés et conventionnés CPAM</li>
                 <li>• Suivi de course en temps réel</li>
               </ul>
             </div>

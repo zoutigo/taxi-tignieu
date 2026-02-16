@@ -52,7 +52,7 @@ describe("Landing credibility banner", () => {
 
     expect(mockedGetSiteContact).toHaveBeenCalled();
     expect(html).toContain("Confiance locale");
-    expect(html).toContain("Au service de l&#x27;Est lyonnais depuis 2010");
+    expect(html).toContain("Au service du Nord Isère depuis 2010");
     expect(html).toContain("12 000 trajets réalisés");
     expect(html).toContain("Note moyenne 4.9 / 5");
     expect(html).toContain("Chauffeurs agréés");

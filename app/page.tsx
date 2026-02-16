@@ -3,8 +3,8 @@ import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
+  Briefcase,
   Clock,
-  Hospital,
   MapPin,
   Navigation,
   PhoneCall,
@@ -44,9 +44,9 @@ const services = [
     Icon: Users,
   },
   {
-    title: "VSL / CPAM",
-    description: "Transport assis professionnalisé conventionné CPAM.",
-    Icon: Hospital,
+    title: "Entreprises",
+    description: "Navettes pro, séminaires et transferts équipes sur mesure.",
+    Icon: Briefcase,
   },
 ];
 
@@ -193,8 +193,9 @@ export default async function Home() {
                 À votre service pour tous vos trajets
               </h1>
               <p className="hidden max-w-2xl text-lg text-white/80 sm:block">
-                Transferts aéroport, longues distances, VSL/CPAM, navettes entreprises. Des
-                chauffeurs ponctuels, un suivi en temps réel et un confort haut de gamme.
+                Transferts aéroport, longues distances, trajets conventionnés CPAM et navettes
+                entreprises. Des chauffeurs ponctuels, un suivi en temps réel et un confort haut de
+                gamme.
               </p>
             </div>
 
@@ -220,7 +221,7 @@ export default async function Home() {
           <p className="font-semibold text-foreground">Pourquoi nous choisir ?</p>
           <div className="mt-3 grid gap-2">
             <div>• Chauffeurs disponibles 24/7</div>
-            <div>• Transferts aéroports, longues distances, VSL/CPAM</div>
+            <div>• Transferts aéroports, longues distances, CPAM et navettes entreprises</div>
             <div>• Suivi en temps réel et paiement sécurisé</div>
           </div>
         </div>
@@ -318,7 +319,7 @@ export default async function Home() {
               Confiance locale
             </p>
             <h2 className="font-display text-3xl text-white sm:text-4xl">
-              Au service de l&apos;Est lyonnais depuis 2010
+              Au service du Nord Isère depuis 2010
             </h2>
             <p className="text-sm text-white/80">
               Entreprises, particuliers, établissements de santé : une équipe de chauffeurs
@@ -333,7 +334,7 @@ export default async function Home() {
                 <p className="text-sm font-semibold">+12 000 trajets réalisés</p>
               </div>
               <p className="mt-1 text-xs text-white/70">
-                Navettes aéroport, longues distances, VSL
+                Navettes aéroport, longues distances, CPAM et transferts entreprises
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
@@ -346,7 +347,9 @@ export default async function Home() {
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur">
               <div className="flex items-center gap-3 text-white">
                 <ShieldCheck className="h-5 w-5 text-primary" />
-                <p className="text-sm font-semibold">Chauffeurs agréés & CPAM</p>
+                <p className="text-sm font-semibold">
+                  Chauffeurs agréés, assurés & conventionnés CPAM
+                </p>
               </div>
               <p className="mt-1 text-xs text-white/70">Professionnels, discrets, assurés</p>
             </div>
@@ -451,7 +454,7 @@ export default async function Home() {
             <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
               Zones desservies
             </p>
-            <h2 className="font-display text-3xl text-foreground">L&apos;Est lyonnais en direct</h2>
+            <h2 className="font-display text-3xl text-foreground">Le Nord Isère en direct</h2>
             <p className="text-sm text-muted-foreground">
               Villes couvertes avec prise en charge rapide et tarifs annoncés. Cliquez pour la page
               dédiée.

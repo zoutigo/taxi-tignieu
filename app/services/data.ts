@@ -23,7 +23,7 @@ export const serviceGroups: ServiceGroup[] = [
       {
         title: "Trajets classiques",
         description:
-          "Nous assurons tous vos déplacements du quotidien : travail, rendez-vous, courses, visites familiales ou sorties.\n\nTaxi Tignieu-Chavanoz intervient rapidement à Tignieu, Charvieu, Pont-de-Chéruy et dans tout l'Est Lyonnais. Ponctualité, confort et sécurité sont nos priorités.\n\nCourses locales, accompagnement enfants ou seniors, horaires souples et suivi SMS.",
+          "Nous assurons tous vos déplacements du quotidien : travail, rendez-vous, courses, visites familiales ou sorties.\n\nTaxi Tignieu-Chavanoz intervient rapidement à Tignieu, Charvieu, Pont-de-Chéruy et dans tout le Nord Isère. Ponctualité, confort et sécurité sont nos priorités.\n\nCourses locales, accompagnement enfants ou seniors, horaires souples et suivi SMS.",
         highlights: [
           "Suivi d'approche par SMS/WhatsApp",
           "Aide bagages et installation passager",
@@ -94,7 +94,7 @@ export const serviceGroups: ServiceGroup[] = [
     slug: "specialises",
     title: "Spécialisés",
     summary:
-      "Sécurité et confort sont au cœur de nos engagements. Accompagnement sécurisé et adapté : scolaire, santé et mobilité réduite.",
+      "Sécurité et confort sont au cœur de nos engagements. Accompagnement sécurisé et adapté : scolaire, seniors et trajets conventionnés CPAM.",
     items: [
       {
         title: "Scolaire",
@@ -107,23 +107,23 @@ export const serviceGroups: ServiceGroup[] = [
         ],
       },
       {
-        title: "VSL / CPAM",
+        title: "Accompagnement seniors & CPAM",
         description:
-          "Transport de patients vers les hôpitaux, cliniques, centres de soins et consultations. Véhicule conventionné, prise en charge possible par la Sécurité sociale, accompagnement professionnel.",
+          "Accompagnement des seniors pour rendez-vous, visites familiales et trajets du quotidien. Nous proposons aussi des trajets conventionnés CPAM sur demande.",
         highlights: [
-          "Convention CPAM",
-          "Conduite souple et assistance montée/descente",
-          "Dossiers de course fournis",
+          "Aide à la montée et descente",
+          "Conduite souple et rassurante",
+          "Convention CPAM sur demande",
         ],
       },
       {
-        title: "PMR",
+        title: "Assistance bagages",
         description:
-          "Transport adapté pour seniors et personnes à mobilité réduite : assistance personnalisée, sécurité renforcée et prise en charge confortable pour chaque déplacement.",
+          "Prise en charge avec assistance bagages et équipements volumineux pour aéroports, gares et longues distances.",
         highlights: [
-          "Aide à l'embarquement et ceinture",
-          "Temps supplémentaire prévu",
-          "Trajets préparés avec étapes sécurisées",
+          "Aide chargement/déchargement",
+          "Gestion des bagages volumineux",
+          "Confort préservé pendant le trajet",
         ],
       },
     ],

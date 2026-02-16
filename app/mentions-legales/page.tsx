@@ -22,7 +22,7 @@ const sections = [
     items: [
       "Taxi Tignieu Charvieu",
       "Activité : Taxi – Transport de personnes",
-      "Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux, Est Lyonnais",
+      "Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux, Nord Isère",
       "Statut juridique : À compléter (Auto-entrepreneur / EI ou Société)",
       "Numéro SIRET : À compléter",
       "Code APE / NAF : À compléter (ex : 4932Z – Transports de voyageurs par taxis)",
@@ -135,7 +135,7 @@ export default async function MentionsLegalesPage() {
                 </a>
               </p>
               <p className="text-xs">
-                Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Est Lyonnais
+                Zone d’intervention : Tignieu-Jameyzieu, Charvieu-Chavagneux et Nord Isère
               </p>
             </div>
           </div>

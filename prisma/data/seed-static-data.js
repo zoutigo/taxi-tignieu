@@ -47,7 +47,7 @@ export const REVIEW_COMMENTS = [
   "Super contact humain, et prix estimé respecté. Je referai appel à vous.",
   "Conduite souple, respect des limitations, on se sent en sécurité.",
   "Quelques minutes de retard mais chauffeur très aimable et excuse présenté.",
-  "Très bon service VSL, aide pour l’installation et respect des consignes médicales.",
+  "Très bon service, aide pour l’installation et respect des consignes demandées.",
   "Voiture propre et spacieuse, prise en charge efficace à la gare.",
   "Excellent rapport qualité/prix, réservation simple et confirmation rapide.",
   "Connaissance parfaite de la région, itinéraire optimisé malgré les travaux.",
@@ -57,7 +57,7 @@ export const REVIEW_COMMENTS = [
   "Aide avec les bagages, installation siège enfant impeccable.",
   "Bonne expérience globale, juste un peu de musique trop forte au départ.",
   "Toujours ponctuels et professionnels, je recommande pour les trajets pro.",
-  "VSL bien équipé, prise en charge rassurante, merci pour la patience.",
+  "Véhicule bien équipé, prise en charge rassurante, merci pour la patience.",
   "Chauffeur courtois, véhicule récent, confort au top pour longue distance.",
   "Disponible tard le soir, conduite sereine et respectueuse.",
   "Prise en charge rapide, confirmation SMS utile, bon suivi.",
@@ -89,7 +89,7 @@ export const FAQ_ITEMS = {
     {
       question: "Jusqu’où vous déplacez-vous ?",
       answer:
-        "Nous partons de l’Est lyonnais et pouvons aller partout en France, selon disponibilité et devis.",
+        "Nous partons du Nord Isère et pouvons aller partout en France, selon disponibilité et devis.",
     },
     {
       question: "Combien de temps pour rejoindre l’aéroport depuis Tignieu ?",
@@ -109,9 +109,9 @@ export const FAQ_ITEMS = {
         "Oui, c’est l’une de nos liaisons principales. Nous déposons aux terminaux et halls TGV.",
     },
     {
-      question: "Êtes-vous taxi conventionné CPAM / VSL ?",
+      question: "Proposez-vous des trajets conventionnés CPAM ?",
       answer:
-        "Oui, nous sommes conventionnés CPAM pour les transports assis. Pensez à votre bon de transport.",
+        "Oui, des trajets conventionnés CPAM sont possibles selon la demande. Contactez-nous pour confirmer les modalités.",
     },
     {
       question: "Proposez-vous le transport scolaire ?",
@@ -214,7 +214,7 @@ export const FEATURED_ZONE_SEED = [
   {
     slug: "charvieu-chavagneux",
     name: "Charvieu-Chavagneux",
-    summary: "Transferts rapides vers Lyon et l’Est lyonnais",
+    summary: "Transferts rapides vers Lyon et le Nord Isère",
     badge: "Zone desservie",
     priority: 2,
     poiPrices: [
