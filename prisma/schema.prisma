@@ -20,6 +20,7 @@ model User {
   isAdmin        Boolean   @default(false)
   isManager      Boolean   @default(false)
   isDriver       Boolean   @default(false)
+  isActive       Boolean   @default(true)
   passwordHash   String?
   emailVerified  DateTime?
   accounts       Account[]

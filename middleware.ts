@@ -12,7 +12,8 @@ export default auth((req) => {
   const needsAuth =
     pathname.startsWith("/espace-client") || pathname.startsWith("/profil/completer-telephone");
 
-  if (needsAuth && !req.auth) {
+  const isInactive = req.auth?.user && req.auth.user.isActive === false;
+  if (needsAuth && (!req.auth || isInactive)) {
     return NextResponse.redirect(new URL("/", origin));
   }
 

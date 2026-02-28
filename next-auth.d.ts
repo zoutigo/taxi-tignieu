@@ -8,6 +8,7 @@ declare module "next-auth" {
       isAdmin?: boolean;
       isManager?: boolean;
       isDriver?: boolean;
+      isActive?: boolean;
     };
   }
 
@@ -16,5 +17,6 @@ declare module "next-auth" {
     isAdmin?: boolean;
     isManager?: boolean;
     isDriver?: boolean;
+    isActive?: boolean;
   }
 }

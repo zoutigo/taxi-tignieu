@@ -15,32 +15,39 @@ export type SiteContact = {
 
 type SiteConfigWithExtras = PrismaSiteConfig & { siret?: string | null; ape?: string | null };
 
-export const getSiteContact = cache(
-  async (): Promise<SiteContact> => {
-    try {
-      const cfg = (await prisma.siteConfig.findFirst({
-        include: { address: true },
-      })) as (SiteConfigWithExtras & { address: Address }) | null;
-      if (!cfg || !cfg.address) return fallbackContact;
-      return {
-        name: cfg.name ?? fallbackContact.name ?? "",
-        ownerName: cfg.ownerName ?? fallbackContact.ownerName ?? "",
-        siret: cfg.siret ?? fallbackContact.siret ?? "",
-        ape: cfg.ape ?? fallbackContact.ape ?? "",
-        phone: cfg.phone ?? "",
-        email: cfg.email ?? "",
-        address: {
-          street: cfg.address.street ?? "",
-          streetNumber: cfg.address.streetNumber ?? "",
-          postalCode: cfg.address.postalCode ?? "",
-          city: cfg.address.city ?? "",
-          country: cfg.address.country ?? "",
-        },
-      };
-    } catch {
-      return fallbackContact;
-    }
-  },
+const readSiteContact = async (): Promise<SiteContact> => {
+  try {
+    const cfg = (await prisma.siteConfig.findFirst({
+      include: { address: true },
+    })) as (SiteConfigWithExtras & { address: Address }) | null;
+    if (!cfg || !cfg.address) return fallbackContact;
+    return {
+      name: cfg.name ?? fallbackContact.name ?? "",
+      ownerName: cfg.ownerName ?? fallbackContact.ownerName ?? "",
+      siret: cfg.siret ?? fallbackContact.siret ?? "",
+      ape: cfg.ape ?? fallbackContact.ape ?? "",
+      phone: cfg.phone ?? "",
+      email: cfg.email ?? "",
+      address: {
+        street: cfg.address.street ?? "",
+        streetNumber: cfg.address.streetNumber ?? "",
+        postalCode: cfg.address.postalCode ?? "",
+        city: cfg.address.city ?? "",
+        country: cfg.address.country ?? "",
+      },
+    };
+  } catch {
+    return fallbackContact;
+  }
+};
+
+const getSiteContactCached = cache(
+  async (): Promise<SiteContact> => readSiteContact(),
   ["site-config"],
   { revalidate: 3600, tags: ["site-config"] } // cache for 1h unless revalidated
 );
+
+export async function getSiteContact(options?: { fresh?: boolean }): Promise<SiteContact> {
+  if (options?.fresh) return readSiteContact();
+  return getSiteContactCached();
+}

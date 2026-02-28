@@ -62,6 +62,7 @@ describe("ClientDashboardPage workflow", () => {
       isAdmin: false,
       isManager: false,
       isDriver: false,
+      isActive: true,
       createdAt: new Date(),
     } satisfies User);
 
@@ -84,6 +85,7 @@ describe("ClientDashboardPage workflow", () => {
       isAdmin: false,
       isManager: false,
       isDriver: false,
+      isActive: true,
       createdAt: new Date(),
       bookings: [
         {
@@ -124,6 +126,7 @@ describe("ClientDashboardPage workflow", () => {
       isAdmin: false,
       isManager: false,
       isDriver: false,
+      isActive: true,
       createdAt: new Date(),
       bookings: [],
     } as unknown as User);

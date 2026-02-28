@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { buildBookingEmail, sendMail } from "@/lib/mailer";
+import { resolveBookingNotificationRecipients } from "@/lib/booking-notifications";
 import { getSiteContact } from "@/lib/site-config";
 import { bookingUpdateSchema } from "@/lib/validation/booking-update";
 
@@ -131,8 +132,8 @@ export async function PATCH(req: Request) {
       }
 
       if ((isClaim || isTransfer) && driverId) {
-        const target = await prisma.user.findUnique({
-          where: { id: driverId },
+        const target = await prisma.user.findFirst({
+          where: { id: driverId, isActive: true },
           select: { isDriver: true },
         });
         if (!target?.isDriver) {
@@ -255,7 +256,7 @@ export async function PATCH(req: Request) {
       );
     if (!statusChangedToConfirmed && !statusChangedToCompleted && !isEditionSubmit) return;
 
-    const site = await getSiteContact();
+    const site = await getSiteContact({ fresh: true });
     const when = booking.dateTime.toLocaleString("fr-FR", {
       dateStyle: "full",
       timeStyle: "short",
@@ -285,7 +286,7 @@ export async function PATCH(req: Request) {
 
     if (statusChangedToConfirmed) {
       // Driver notification (if different from current user)
-      if (hasEmail(driverEmail) && driverId && driverId !== user?.id) {
+      if (hasEmail(driverEmail) && booking.driverId && booking.driverId !== user?.id) {
         const mailToDriver = buildBookingEmail({
           to: driverEmail as string,
           status: "pending",
@@ -356,48 +357,110 @@ export async function PATCH(req: Request) {
         });
         sendMail(mailToUser).catch((err) => console.error("Erreur mail confirmation client", err));
       }
+
+      const siteRecipients = resolveBookingNotificationRecipients({
+        clientEmail,
+        siteEmail: site.email,
+        driverEmail,
+        includeDriver: false,
+      }).filter((r) => r.role === "site");
+
+      for (const siteRecipient of siteRecipients) {
+        const mailToSite = buildBookingEmail({
+          to: siteRecipient.email,
+          status: "confirmed",
+          badgeLabel: "Réservation confirmée",
+          statusLabel: driverName ? `Chauffeur assigné : ${driverName}` : "Course confirmée",
+          title: "Confirmation de réservation (interne)",
+          intro: "Une réservation a été confirmée depuis le dashboard.",
+          bookingRef,
+          pickupDateTime: when,
+          pickupAddress,
+          dropoffAddress,
+          passengers,
+          luggage: luggageTxt,
+          paymentMethod: booking.priceCents
+            ? `${(booking.priceCents / 100).toFixed(2)} € (estimé)`
+            : "À confirmer",
+          manageUrl: `${siteUrl}/dashboard/bookings`,
+          contactName: clientName,
+          contactEmail: clientEmail ?? "",
+          contactPhone: clientPhone ?? "",
+          phone: site.phone,
+          email: site.email,
+          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+          preheader: "Réservation confirmée",
+          siteUrl,
+          privacyUrl,
+          legalUrl,
+          changes: parsed.data.notes ? [`Note : ${parsed.data.notes}`] : [],
+        });
+        sendMail(mailToSite).catch((err) => console.error("Erreur mail confirmation site", err));
+      }
     }
 
-    if (statusChangedToCompleted && hasEmail(clientEmail)) {
+    if (statusChangedToCompleted) {
       const reviewUrl = `${siteUrl}/avis`;
-      const mailCompleted = buildBookingEmail({
-        to: clientEmail as string,
-        status: "completed",
-        badgeLabel: "Course terminée",
-        statusLabel: "Votre course est clôturée",
-        title: "Votre course est terminée",
-        intro:
-          "Votre trajet est terminé. Vous recevrez votre facturation sous peu. Vous pouvez aussi laisser un avis sur notre site.",
-        bookingRef,
-        pickupDateTime: when,
-        pickupAddress,
-        dropoffAddress,
-        passengers,
-        luggage: luggageTxt,
-        paymentMethod: booking.priceCents
-          ? `${(booking.priceCents / 100).toFixed(2)} € (estimé)`
-          : "À confirmer",
-        manageUrl,
-        contactName: driverName || clientName,
-        contactEmail: driverEmail ?? site.email,
-        contactPhone: driverPhone || site.phone,
-        phone: site.phone,
-        email: site.email,
-        brandCity: site.address.city ?? "Tignieu-Jameyzieu",
-        preheader: "Course clôturée",
-        siteUrl,
-        privacyUrl,
-        legalUrl,
-        changes: [
-          `Note de clôture : ${completionNotes?.trim() ?? ""}`,
-          `Laisser un avis : ${reviewUrl}`,
-        ],
+      const recipients = resolveBookingNotificationRecipients({
+        clientEmail,
+        siteEmail: site.email,
+        driverEmail,
+        includeDriver: Boolean(booking.driverId),
       });
-      sendMail(mailCompleted).catch((err) => console.error("Erreur mail clôture client", err));
+
+      for (const recipient of recipients) {
+        const isSiteRecipient = recipient.role === "site";
+        const isDriverRecipient = recipient.role === "driver";
+        const mailCompleted = buildBookingEmail({
+          to: recipient.email,
+          status: "completed",
+          badgeLabel: "Course terminée",
+          statusLabel: isDriverRecipient
+            ? "Course clôturée"
+            : isSiteRecipient
+              ? "Clôture enregistrée"
+              : "Votre course est clôturée",
+          title: isSiteRecipient
+            ? "Clôture de réservation (interne)"
+            : isDriverRecipient
+              ? "Course clôturée"
+              : "Votre course est terminée",
+          intro: isSiteRecipient
+            ? "Une réservation a été clôturée depuis le dashboard."
+            : isDriverRecipient
+              ? "La course qui vous était assignée est clôturée."
+              : "Votre trajet est terminé. Vous recevrez votre facturation sous peu. Vous pouvez aussi laisser un avis sur notre site.",
+          bookingRef,
+          pickupDateTime: when,
+          pickupAddress,
+          dropoffAddress,
+          passengers,
+          luggage: luggageTxt,
+          paymentMethod: booking.priceCents
+            ? `${(booking.priceCents / 100).toFixed(2)} € (estimé)`
+            : "À confirmer",
+          manageUrl:
+            isSiteRecipient || isDriverRecipient ? `${siteUrl}/dashboard/bookings` : manageUrl,
+          contactName: driverName || clientName,
+          contactEmail: driverEmail ?? site.email,
+          contactPhone: driverPhone || site.phone,
+          phone: site.phone,
+          email: site.email,
+          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+          preheader: "Course clôturée",
+          siteUrl,
+          privacyUrl,
+          legalUrl,
+          changes: [
+            `Note de clôture : ${completionNotes?.trim() ?? ""}`,
+            `Laisser un avis : ${reviewUrl}`,
+          ],
+        });
+        sendMail(mailCompleted).catch((err) => console.error("Erreur mail clôture", err));
+      }
     }
 
-    if (isEditionSubmit && hasEmail(clientEmail)) {
-      const site = await getSiteContact();
+    if (isEditionSubmit) {
       const manageUrl =
         process.env.NEXTAUTH_URL || process.env.AUTH_URL
           ? `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/espace-client/bookings`
@@ -438,20 +501,34 @@ export async function PATCH(req: Request) {
         legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
         changes: parsed.data.notes ? [`Note : ${parsed.data.notes}`] : [],
       };
-      const mailUser = buildBookingEmail({ ...baseMail, to: clientEmail as string });
-      const adminEmail = process.env.ADMIN_EMAILS?.split(",")
-        .map((e) => e.trim())
-        .find(Boolean);
-      const mailAdmin = adminEmail
-        ? buildBookingEmail({
-            ...baseMail,
-            to: adminEmail,
-            title: "Demande de modification client",
-          })
-        : null;
-      sendMail(mailUser).catch((err) => console.error("Erreur mail modif booking user", err));
-      if (mailAdmin) {
-        sendMail(mailAdmin).catch((err) => console.error("Erreur mail modif booking admin", err));
+      const recipients = resolveBookingNotificationRecipients({
+        clientEmail,
+        siteEmail: site.email,
+        driverEmail,
+        includeDriver: Boolean(booking.driverId),
+      });
+
+      for (const recipient of recipients) {
+        const isSiteRecipient = recipient.role === "site";
+        const isDriverRecipient = recipient.role === "driver";
+        const mail = buildBookingEmail({
+          ...baseMail,
+          to: recipient.email,
+          badgeLabel: isDriverRecipient ? "Course modifiée" : baseMail.badgeLabel,
+          title: isSiteRecipient
+            ? "Demande de modification client"
+            : isDriverRecipient
+              ? "Course modifiée"
+              : baseMail.title,
+          intro: isSiteRecipient
+            ? "Une réservation a été modifiée depuis le dashboard."
+            : isDriverRecipient
+              ? "La course qui vous est assignée a été modifiée."
+              : baseMail.intro,
+          manageUrl:
+            isSiteRecipient || isDriverRecipient ? `${siteUrl}/dashboard/bookings` : manageUrl,
+        });
+        sendMail(mail).catch((err) => console.error("Erreur mail modif booking", err));
       }
     }
   };
@@ -512,7 +589,7 @@ export async function DELETE(req: Request) {
     },
   });
 
-  const site = await getSiteContact().catch(() => ({
+  const site = await getSiteContact({ fresh: true }).catch(() => ({
     phone: "",
     email: "",
     address: { city: "Tignieu-Jameyzieu" },
@@ -526,63 +603,52 @@ export async function DELETE(req: Request) {
   }) =>
     `${addr?.name ?? ""} ${addr?.street ?? ""} ${addr?.postalCode ?? ""} ${addr?.city ?? ""}`.trim();
 
-  const mailUser =
-    updated.user?.email || updated.customer?.email
-      ? buildBookingEmail({
-          status: "cancelled",
-          to: (updated.user?.email ?? updated.customer?.email) as string,
-          badgeLabel: "Réservation annulée",
-          statusLabel: "Annulée",
-          title: "Votre réservation est annulée",
-          intro: "Votre demande a été annulée. Retrouvez le détail ci-dessous.",
-          bookingRef: `CMD-${updated.id}`,
-          pickupDateTime: when,
-          pickupAddress: formatAddr(updated.pickup),
-          dropoffAddress: formatAddr(updated.dropoff),
-          passengers: `${updated.pax}`,
-          luggage: `${updated.luggage ?? 0}`,
-          paymentMethod: updated.priceCents ? `${(updated.priceCents / 100).toFixed(2)} €` : "—",
-          manageUrl: "/espace-client/bookings",
-          changes: [`Motif : ${note}`],
-          phone: site.phone,
-          email: site.email,
-          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
-          preheader: "Votre réservation a été annulée.",
-          siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
-          privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
-          legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
-        })
-      : null;
+  const siteUrl = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "";
+  const recipients = resolveBookingNotificationRecipients({
+    clientEmail: updated.user?.email ?? updated.customer?.email ?? null,
+    siteEmail: site.email,
+    driverEmail: booking.driver?.email ?? null,
+    includeDriver: Boolean(updated.driverId),
+  });
 
-  const mailDriver = booking.driver?.email
-    ? buildBookingEmail({
-        status: "cancelled",
-        to: booking.driver.email,
-        badgeLabel: "Course annulée",
-        statusLabel: "Annulée",
-        title: "Course annulée",
-        intro: "La course assignée a été annulée.",
-        bookingRef: `CMD-${updated.id}`,
-        pickupDateTime: when,
-        pickupAddress: formatAddr(updated.pickup),
-        dropoffAddress: formatAddr(updated.dropoff),
-        passengers: `${updated.pax}`,
-        luggage: `${updated.luggage ?? 0}`,
-        paymentMethod: updated.priceCents ? `${(updated.priceCents / 100).toFixed(2)} €` : "—",
-        manageUrl: "/dashboard/bookings",
-        changes: [`Motif : ${note}`],
-        phone: site.phone,
-        email: site.email,
-        brandCity: site.address.city ?? "Tignieu-Jameyzieu",
-        preheader: "Course annulée",
-        siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
-        privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
-        legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
-      })
-    : null;
-
-  if (mailUser) sendMail(mailUser).catch(() => {});
-  if (mailDriver) sendMail(mailDriver).catch(() => {});
+  for (const recipient of recipients) {
+    const isSiteRecipient = recipient.role === "site";
+    const isDriverRecipient = recipient.role === "driver";
+    const mail = buildBookingEmail({
+      status: "cancelled",
+      to: recipient.email,
+      badgeLabel: isDriverRecipient ? "Course annulée" : "Réservation annulée",
+      statusLabel: "Annulée",
+      title: isSiteRecipient
+        ? "Annulation de réservation (interne)"
+        : isDriverRecipient
+          ? "Course annulée"
+          : "Votre réservation est annulée",
+      intro: isSiteRecipient
+        ? "Une réservation a été annulée depuis le dashboard."
+        : isDriverRecipient
+          ? "La course assignée a été annulée."
+          : "Votre demande a été annulée. Retrouvez le détail ci-dessous.",
+      bookingRef: `CMD-${updated.id}`,
+      pickupDateTime: when,
+      pickupAddress: formatAddr(updated.pickup),
+      dropoffAddress: formatAddr(updated.dropoff),
+      passengers: `${updated.pax}`,
+      luggage: `${updated.luggage ?? 0}`,
+      paymentMethod: updated.priceCents ? `${(updated.priceCents / 100).toFixed(2)} €` : "—",
+      manageUrl:
+        isSiteRecipient || isDriverRecipient ? "/dashboard/bookings" : "/espace-client/bookings",
+      changes: [`Motif : ${note}`],
+      phone: site.phone,
+      email: site.email,
+      brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+      preheader: "Votre réservation a été annulée.",
+      siteUrl,
+      privacyUrl: `${siteUrl}/politique-de-confidentialite`,
+      legalUrl: `${siteUrl}/mentions-legales`,
+    });
+    sendMail(mail).catch(() => {});
+  }
 
   return NextResponse.json({ booking: updated }, { status: 200 });
 }

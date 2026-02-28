@@ -133,6 +133,7 @@ export async function PATCH(req: Request) {
       },
       include: { address: true },
     });
+    (revalidateTag as unknown as (tag: string) => void)("site-config");
     return NextResponse.json(created, { status: 200 });
   }
 

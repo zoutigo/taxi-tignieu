@@ -67,6 +67,7 @@ describe("POST /api/profile/phone", () => {
       isAdmin: false,
       isManager: false,
       isDriver: false,
+      isActive: true,
     } satisfies User);
 
     const res = await POST(makeRequest({ phone: "+33 4 95 78 54 00" }));

@@ -11,6 +11,7 @@ const users = Array.from({ length: 15 }).map((_, idx) => ({
   isAdmin: false,
   isManager: false,
   isDriver: false,
+  isActive: true,
   bookings: [],
 }));
 
