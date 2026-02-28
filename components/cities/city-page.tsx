@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Car, CheckCircle2, MapPin, PhoneCall, ShieldCheck, Star } from "lucide-react";
 import { getSiteContact } from "@/lib/site-config";
 import { getServiceGroups } from "@/app/services/data";
@@ -303,6 +304,30 @@ export async function CityPage({ city }: Props) {
               </div>
               <p className="mt-3 text-xs text-white/70">
                 Prix à titre indicatif, variables selon horaire et trafic.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden rounded-[28px] border border-border/70 bg-card p-4 shadow-[0_30px_55px_rgba(5,15,35,0.1)] sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,hsl(var(--primary)/0.22),transparent_46%),radial-gradient(circle_at_85%_85%,hsl(var(--sidebar)/0.24),transparent_50%)]" />
+          <div className="relative overflow-hidden rounded-[22px] border border-white/20 bg-sidebar/95 shadow-[0_32px_64px_rgba(5,15,35,0.35)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/25 to-transparent" />
+            <div className="pointer-events-none absolute -bottom-16 left-1/2 h-40 w-[80%] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+            <div className="relative h-[230px] sm:h-[290px] lg:h-[360px]">
+              <Image
+                src="/images/three-cars-mini.png"
+                alt={`Flotte Taxi ${city.name} disponible 24h/24`}
+                fill
+                priority
+                className="object-cover object-center"
+                sizes="(max-width: 640px) 100vw, (max-width: 1200px) 90vw, 1100px"
+              />
+            </div>
+            <div className="relative border-t border-white/15 bg-gradient-to-r from-sidebar via-sidebar/95 to-sidebar/90 px-4 py-4 text-white sm:px-6">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/95">Notre flotte</p>
+              <p className="mt-1 text-sm text-white/85 sm:text-base">
+                Berlines confort et vans spacieux pour vos trajets à {city.name}, gares et aéroport.
               </p>
             </div>
           </div>
