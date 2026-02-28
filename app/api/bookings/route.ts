@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { bookingEstimateSchema } from "@/schemas/booking";
 import { z } from "zod";
 import { buildBookingEmail, sendMail } from "@/lib/mailer";
+import { resolveBookingNotificationRecipients } from "@/lib/booking-notifications";
 import { getSiteContact } from "@/lib/site-config";
 
 const patchSchema = bookingEstimateSchema
@@ -80,27 +81,32 @@ export async function POST(req: Request) {
         : await createBookingWithNotes(prisma);
 
     const userEmail = session.user?.email ?? null;
-    if (userEmail) {
-      const when = dateTime.toLocaleString("fr-FR", {
-        dateStyle: "full",
-        timeStyle: "short",
-      });
-      const priceText =
-        priceCents !== null ? `${(priceCents / 100).toFixed(2)} € (estimé)` : "À confirmer";
-      const site = await getSiteContact();
-      const manageUrl =
-        process.env.NEXTAUTH_URL || process.env.AUTH_URL
-          ? `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/espace-client`
-          : "/espace-client";
+    const when = dateTime.toLocaleString("fr-FR", {
+      dateStyle: "full",
+      timeStyle: "short",
+    });
+    const priceText =
+      priceCents !== null ? `${(priceCents / 100).toFixed(2)} € (estimé)` : "À confirmer";
+    const site = await getSiteContact({ fresh: true });
+    const siteUrl = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "";
+    const userManageUrl = siteUrl ? `${siteUrl}/espace-client` : "/espace-client";
+    const adminManageUrl = siteUrl ? `${siteUrl}/dashboard/bookings` : "/dashboard/bookings";
+    const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
+    const recipients = resolveBookingNotificationRecipients({
+      clientEmail: userEmail,
+      siteEmail: site.email,
+    });
 
-      const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
+    for (const recipient of recipients) {
+      const isSiteRecipient = recipient.role === "site";
       const email = buildBookingEmail({
         status: "pending",
-        to: userEmail,
-        badgeLabel: "Réservation reçue",
-        title: "Votre demande est enregistrée",
-        intro:
-          "Nous vérifions la disponibilité et vous recontactons rapidement. Retrouvez le détail de votre trajet ci-dessous.",
+        to: recipient.email,
+        badgeLabel: isSiteRecipient ? "Nouvelle réservation" : "Réservation reçue",
+        title: isSiteRecipient ? "Nouvelle demande client" : "Votre demande est enregistrée",
+        intro: isSiteRecipient
+          ? "Un client vient d'envoyer une nouvelle réservation. Retrouvez le détail du trajet ci-dessous."
+          : "Nous vérifions la disponibilité et vous recontactons rapidement. Retrouvez le détail de votre trajet ci-dessous.",
         blockTitle: "Détails de votre trajet",
         bookingRef: `CMD-${booking.id}`,
         pickupDateTime: when,
@@ -111,17 +117,19 @@ export async function POST(req: Request) {
         passengers: `${passengers}`,
         luggage: `${luggage ?? 0}`,
         paymentMethod: priceText,
-        manageUrl,
+        manageUrl: isSiteRecipient ? adminManageUrl : userManageUrl,
         contactName: userInfo.name ?? "",
         contactEmail: userInfo.email ?? "",
         contactPhone: userInfo.phone ?? "",
         phone: site.phone,
         email: site.email,
         brandCity: site.address.city ?? "Tignieu-Jameyzieu",
-        preheader: "Votre réservation Taxi Tignieu est enregistrée.",
-        siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
-        privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
-        legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+        preheader: isSiteRecipient
+          ? "Nouvelle réservation reçue depuis le site."
+          : "Votre réservation Taxi Tignieu est enregistrée.",
+        siteUrl,
+        privacyUrl: `${siteUrl}/politique-de-confidentialite`,
+        legalUrl: `${siteUrl}/mentions-legales`,
       });
 
       sendMail(email).catch((err) => {
@@ -185,6 +193,9 @@ export async function PATCH(req: Request) {
     include: {
       pickup: true,
       dropoff: true,
+      user: { select: { name: true, email: true, phone: true } },
+      customer: { select: { fullName: true, phone: true, email: true } },
+      driver: { select: { id: true, name: true, email: true, phone: true } },
       bookingNotes: { orderBy: { createdAt: "asc" } },
       invoice: true,
     },
@@ -234,13 +245,30 @@ export async function PATCH(req: Request) {
   const booking = await prisma.booking.update({
     where: { id: bookingId },
     data,
-    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
+    include: {
+      pickup: true,
+      dropoff: true,
+      user: { select: { name: true, email: true, phone: true } },
+      customer: { select: { fullName: true, phone: true, email: true } },
+      driver: { select: { id: true, name: true, email: true, phone: true } },
+      bookingNotes: { orderBy: { createdAt: "asc" } },
+    },
   });
 
   try {
-    const site = await getSiteContact();
-    const userEmail = sessionUser.email;
-    const siteEmail = site.email;
+    const site = await getSiteContact({ fresh: true });
+    const clientEmail = booking.user?.email ?? booking.customer?.email ?? sessionUser.email ?? null;
+    const clientName = booking.user?.name ?? booking.customer?.fullName ?? "";
+    const clientPhone = booking.user?.phone ?? booking.customer?.phone ?? "";
+    const siteUrl = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "";
+    const userManageUrl = siteUrl ? `${siteUrl}/espace-client` : "/espace-client";
+    const adminManageUrl = siteUrl ? `${siteUrl}/dashboard/bookings` : "/dashboard/bookings";
+    const recipients = resolveBookingNotificationRecipients({
+      clientEmail,
+      siteEmail: site.email,
+      driverEmail: booking.driver?.email ?? null,
+      includeDriver: Boolean(booking.driverId),
+    });
     const formatAddress = (addr?: {
       name?: string | null;
       street?: string | null;
@@ -290,15 +318,10 @@ export async function PATCH(req: Request) {
       dateStyle: "full",
       timeStyle: "short",
     });
-    const manageUrl =
-      process.env.NEXTAUTH_URL || process.env.AUTH_URL
-        ? `${process.env.NEXTAUTH_URL || process.env.AUTH_URL}/espace-client`
-        : "/espace-client";
     const priceText =
       typeof booking.priceCents === "number"
         ? `${(booking.priceCents / 100).toFixed(2)} €`
         : "À confirmer";
-    const userInfo = (session.user as { name?: string; email?: string; phone?: string }) || {};
     const baseMail = {
       status: "pending" as const,
       badgeLabel: "Réservation modifiée",
@@ -314,40 +337,40 @@ export async function PATCH(req: Request) {
       passengers: `${booking.pax}`,
       luggage: `${booking.luggage ?? 0}`,
       paymentMethod: priceText,
-      manageUrl,
-      contactName: userInfo.name ?? "",
-      contactEmail: userInfo.email ?? "",
-      contactPhone: userInfo.phone ?? "",
+      manageUrl: userManageUrl,
+      contactName: clientName,
+      contactEmail: clientEmail ?? "",
+      contactPhone: clientPhone,
       phone: site.phone,
       email: site.email,
       brandCity: site.address.city ?? "Tignieu-Jameyzieu",
       preheader: "Votre réservation a été modifiée.",
-      siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
-      privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
-      legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
+      siteUrl,
+      privacyUrl: `${siteUrl}/politique-de-confidentialite`,
+      legalUrl: `${siteUrl}/mentions-legales`,
       changes,
     };
 
-    const mailForUser = userEmail
-      ? buildBookingEmail({
-          ...baseMail,
-          to: userEmail,
-        })
-      : null;
-    const mailForSite =
-      siteEmail && siteEmail !== userEmail
-        ? buildBookingEmail({
-            ...baseMail,
-            to: siteEmail,
-            title: "Demande de modification client",
-          })
-        : null;
-
-    if (mailForUser) {
-      sendMail(mailForUser).catch((err) => console.error("Erreur mail modif booking user", err));
-    }
-    if (mailForSite) {
-      sendMail(mailForSite).catch((err) => console.error("Erreur mail modif booking site", err));
+    for (const recipient of recipients) {
+      const isSiteRecipient = recipient.role === "site";
+      const isDriverRecipient = recipient.role === "driver";
+      const mail = buildBookingEmail({
+        ...baseMail,
+        to: recipient.email,
+        badgeLabel: isDriverRecipient ? "Course modifiée" : baseMail.badgeLabel,
+        title: isSiteRecipient
+          ? "Demande de modification client"
+          : isDriverRecipient
+            ? "Course modifiée par le client"
+            : baseMail.title,
+        intro: isSiteRecipient
+          ? "Une réservation a été modifiée depuis l'espace client."
+          : isDriverRecipient
+            ? "La course qui vous est assignée a été modifiée."
+            : baseMail.intro,
+        manageUrl: isSiteRecipient || isDriverRecipient ? adminManageUrl : userManageUrl,
+      });
+      sendMail(mail).catch((err) => console.error("Erreur mail modif booking", err));
     }
   } catch (err) {
     console.error("Erreur envoi mail modification booking", err);
@@ -370,7 +393,12 @@ export async function DELETE(req: Request) {
 
   const existing = await prisma.booking.findUnique({
     where: { id },
-    include: { invoice: true, driver: { select: { email: true, name: true, phone: true } } },
+    include: {
+      invoice: true,
+      user: { select: { name: true, email: true, phone: true } },
+      customer: { select: { fullName: true, phone: true, email: true } },
+      driver: { select: { id: true, name: true, email: true, phone: true } },
+    },
   });
   const isOwner = existing?.userId === session.user.id;
   const adminList =
@@ -395,11 +423,17 @@ export async function DELETE(req: Request) {
   const booking = await prisma.booking.update({
     where: { id },
     data: { status: "CANCELLED" },
-    include: { pickup: true, dropoff: true, bookingNotes: { orderBy: { createdAt: "asc" } } },
+    include: {
+      pickup: true,
+      dropoff: true,
+      user: { select: { name: true, email: true, phone: true } },
+      customer: { select: { fullName: true, phone: true, email: true } },
+      driver: { select: { id: true, name: true, email: true, phone: true } },
+      bookingNotes: { orderBy: { createdAt: "asc" } },
+    },
   });
 
-  const userEmail = session.user.email;
-  const driverEmail = existing.driver?.email;
+  const clientEmail = booking.user?.email ?? booking.customer?.email ?? null;
   const when = booking.dateTime.toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
   const formatAddr = (addr?: {
     name?: string | null;
@@ -408,54 +442,58 @@ export async function DELETE(req: Request) {
     postalCode?: string | null;
   }) =>
     `${addr?.name ?? ""} ${addr?.street ?? ""} ${addr?.postalCode ?? ""} ${addr?.city ?? ""}`.trim();
-  const site = await getSiteContact().catch(() => ({
+  const site = await getSiteContact({ fresh: true }).catch(() => ({
     phone: "",
     email: "",
     address: { city: "Tignieu-Jameyzieu" },
   }));
+  const siteUrl = process.env.NEXTAUTH_URL || process.env.AUTH_URL || "";
+  const userManageUrl = siteUrl ? `${siteUrl}/espace-client/bookings` : "/espace-client/bookings";
+  const adminManageUrl = siteUrl ? `${siteUrl}/dashboard/bookings` : "/dashboard/bookings";
+  const recipients = resolveBookingNotificationRecipients({
+    clientEmail,
+    siteEmail: site.email,
+    driverEmail: booking.driver?.email ?? null,
+    includeDriver: Boolean(booking.driverId),
+  });
 
-  const buildMail = (to: string | null | undefined, title: string, intro: string) =>
-    to
-      ? buildBookingEmail({
-          status: "cancelled",
-          to,
-          badgeLabel: "Réservation annulée",
-          statusLabel: "Annulée",
-          title,
-          intro,
-          bookingRef: `CMD-${booking.id}`,
-          pickupDateTime: when,
-          pickupAddress: formatAddr(booking.pickup),
-          dropoffAddress: formatAddr(booking.dropoff),
-          passengers: `${booking.pax}`,
-          luggage: `${booking.luggage ?? 0}`,
-          paymentMethod: booking.priceCents ? `${(booking.priceCents / 100).toFixed(2)} €` : "—",
-          manageUrl: "/espace-client/bookings",
-          changes: [`Motif : ${note}`],
-          phone: site.phone,
-          email: site.email,
-          brandCity: site.address.city ?? "Tignieu-Jameyzieu",
-          preheader: "Votre réservation a été annulée",
-          siteUrl: process.env.NEXTAUTH_URL || process.env.AUTH_URL || "",
-          privacyUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/politique-de-confidentialite`,
-          legalUrl: `${process.env.NEXTAUTH_URL || process.env.AUTH_URL || ""}/mentions-legales`,
-        })
-      : null;
-
-  const mailUser = buildMail(
-    userEmail,
-    "Votre réservation a été annulée",
-    "Votre demande est annulée. Détails ci-dessous."
-  );
-  const mailDriver = driverEmail
-    ? buildMail(
-        driverEmail,
-        "Course annulée",
-        "La course qui vous était assignée a été annulée par le client."
-      )
-    : null;
-  if (mailUser) sendMail(mailUser).catch(() => {});
-  if (mailDriver) sendMail(mailDriver).catch(() => {});
+  for (const recipient of recipients) {
+    const isSiteRecipient = recipient.role === "site";
+    const isDriverRecipient = recipient.role === "driver";
+    const mail = buildBookingEmail({
+      status: "cancelled",
+      to: recipient.email,
+      badgeLabel: isDriverRecipient ? "Course annulée" : "Réservation annulée",
+      statusLabel: "Annulée",
+      title: isSiteRecipient
+        ? "Annulation de réservation"
+        : isDriverRecipient
+          ? "Course annulée"
+          : "Votre réservation a été annulée",
+      intro: isSiteRecipient
+        ? "Une réservation a été annulée depuis l'espace client."
+        : isDriverRecipient
+          ? "La course qui vous était assignée a été annulée par le client."
+          : "Votre demande est annulée. Détails ci-dessous.",
+      bookingRef: `CMD-${booking.id}`,
+      pickupDateTime: when,
+      pickupAddress: formatAddr(booking.pickup),
+      dropoffAddress: formatAddr(booking.dropoff),
+      passengers: `${booking.pax}`,
+      luggage: `${booking.luggage ?? 0}`,
+      paymentMethod: booking.priceCents ? `${(booking.priceCents / 100).toFixed(2)} €` : "—",
+      manageUrl: isSiteRecipient || isDriverRecipient ? adminManageUrl : userManageUrl,
+      changes: [`Motif : ${note}`],
+      phone: site.phone,
+      email: site.email,
+      brandCity: site.address.city ?? "Tignieu-Jameyzieu",
+      preheader: "Votre réservation a été annulée",
+      siteUrl,
+      privacyUrl: `${siteUrl}/politique-de-confidentialite`,
+      legalUrl: `${siteUrl}/mentions-legales`,
+    });
+    sendMail(mail).catch(() => {});
+  }
 
   return NextResponse.json({ booking }, { status: 200 });
 }

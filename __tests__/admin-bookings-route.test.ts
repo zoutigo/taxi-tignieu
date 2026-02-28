@@ -21,6 +21,7 @@ jest.mock("@/lib/prisma", () => ({
     },
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     bookingNote: {
       create: jest.fn(),
@@ -62,7 +63,7 @@ const mockedFindUnique = prisma.booking.findUnique as jest.MockedFunction<
   typeof prisma.booking.findUnique
 >;
 const mockedUpdate = prisma.booking.update as jest.MockedFunction<typeof prisma.booking.update>;
-const mockedFindUser = prisma.user.findUnique as jest.MockedFunction<typeof prisma.user.findUnique>;
+const mockedFindUser = prisma.user.findFirst as jest.MockedFunction<typeof prisma.user.findFirst>;
 const mockedBuildBookingEmail = buildBookingEmail as jest.MockedFunction<typeof buildBookingEmail>;
 const mockedSendMail = sendMail as jest.MockedFunction<typeof sendMail>;
 (prisma as unknown as { $transaction: typeof prisma.$transaction }).$transaction = (
@@ -144,16 +145,25 @@ describe("api/admin/bookings", () => {
 
   it("supprime une réservation", async () => {
     mockedAuth.mockResolvedValue({ user: { isManager: true } });
-    mockedFindUnique.mockResolvedValue({ ...bookingStub, status: "PENDING", invoice: null });
-    mockedUpdate.mockResolvedValue({ ...bookingStub, status: "CANCELLED" });
+    mockedFindUnique.mockResolvedValue({
+      ...bookingStub,
+      status: "PENDING",
+      invoice: null,
+      driverId: "d1",
+    });
+    mockedUpdate.mockResolvedValue({ ...bookingStub, status: "CANCELLED", driverId: "d1" });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
       method: "DELETE",
       body: JSON.stringify({ id: 1, note: "annulation" }),
     });
     const res = await mod.DELETE(req);
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
     expect(res.status).toBe(200);
     expect(mockedUpdate).toHaveBeenCalled();
+    expect(recipients).toEqual(
+      expect.arrayContaining(["user@test.fr", "driver@test.fr", "contact@test.fr"])
+    );
   });
 
   it("refuse de supprimer une réservation terminée ou facturée", async () => {
@@ -201,12 +211,22 @@ describe("api/admin/bookings", () => {
 
   it("confirme avec chauffeur et note, envoie des mails et ajoute une note", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: true, id: "admin" } });
-    mockedFindUnique.mockResolvedValue({
-      ...bookingStub,
-      status: "PENDING",
-      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
-      user: { name: "User", email: "user@test.fr", phone: "0600" },
-    });
+    mockedFindUnique
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "PENDING",
+        driverId: "d1",
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        user: { name: "User", email: "user@test.fr", phone: "0600" },
+      })
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "CONFIRMED",
+        driverId: "d1",
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        user: { name: "User", email: "user@test.fr", phone: "0600" },
+        bookingNotes: [],
+      });
     mockedUpdate.mockResolvedValue({
       ...bookingStub,
       status: "CONFIRMED",
@@ -225,6 +245,8 @@ describe("api/admin/bookings", () => {
       }),
     });
     const res = await mod.PATCH(req);
+    await Promise.resolve();
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
 
     expect(res.status).toBe(200);
     expect(prisma.bookingNote.create).toHaveBeenCalledWith({
@@ -232,6 +254,43 @@ describe("api/admin/bookings", () => {
     });
     expect(mockedBuildBookingEmail).toHaveBeenCalled();
     expect(mockedSendMail).toHaveBeenCalled();
+    expect(recipients).toEqual(
+      expect.arrayContaining(["driver@test.fr", "user@test.fr", "contact@test.fr"])
+    );
+  });
+
+  it("confirme sans chauffeur assigné: notifie client + site uniquement", async () => {
+    mockedAuth.mockResolvedValue({ user: { isAdmin: true, id: "admin" } });
+    mockedFindUnique.mockResolvedValue({
+      ...bookingStub,
+      status: "PENDING",
+      driverId: null,
+      driver: null,
+      user: { name: "User", email: "user@test.fr", phone: "0600" },
+    });
+    mockedUpdate.mockResolvedValue({
+      ...bookingStub,
+      status: "CONFIRMED",
+      driverId: null,
+      driver: null,
+      bookingNotes: [],
+    });
+
+    const mod = await import("@/app/api/admin/bookings/route");
+    const req = new Request("http://localhost/api/admin/bookings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        id: bookingStub.id,
+        status: "CONFIRMED",
+      }),
+    });
+    const res = await mod.PATCH(req);
+    await Promise.resolve();
+
+    expect(res.status).toBe(200);
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(expect.arrayContaining(["user@test.fr", "contact@test.fr"]));
+    expect(recipients).not.toContain("driver@test.fr");
   });
 
   it("refuse de modifier une réservation terminée ou facturée", async () => {
@@ -275,13 +334,24 @@ describe("api/admin/bookings", () => {
 
   it("termine avec note, crée un bookingNote et envoie un mail", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: true, id: "admin" } });
-    mockedFindUnique.mockResolvedValue({
-      ...bookingStub,
-      status: "CONFIRMED",
-      invoice: null,
-      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
-      user: { name: "User", email: "user@test.fr", phone: "0600" },
-    });
+    mockedFindUnique
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "CONFIRMED",
+        invoice: null,
+        driverId: "d1",
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        user: { name: "User", email: "user@test.fr", phone: "0600" },
+      })
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "COMPLETED",
+        driverId: "d1",
+        invoice: null,
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        user: { name: "User", email: "user@test.fr", phone: "0600" },
+        bookingNotes: [],
+      });
     mockedUpdate.mockResolvedValue({ ...bookingStub, status: "COMPLETED", bookingNotes: [] });
     const mod = await import("@/app/api/admin/bookings/route");
     const req = new Request("http://localhost/api/admin/bookings", {
@@ -294,24 +364,38 @@ describe("api/admin/bookings", () => {
       }),
     });
     const res = await mod.PATCH(req);
+    await Promise.resolve();
     expect(res.status).toBe(200);
     expect(prisma.bookingNote.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ content: "cloture" }) })
     );
     expect(mockedSendMail).toHaveBeenCalled();
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(
+      expect.arrayContaining(["user@test.fr", "driver@test.fr", "contact@test.fr"])
+    );
   });
 
-  it("envoie les mails client/admin lors d'une modification (PATCH sans changement de statut)", async () => {
-    const prevAdmin = process.env.ADMIN_EMAILS;
-    process.env.ADMIN_EMAILS = "admin@test.fr";
+  it("envoie les mails client/site/chauffeur lors d'une modification (PATCH sans changement de statut)", async () => {
     mockedAuth.mockResolvedValue({ user: { isAdmin: true, id: "admin", email: "admin@test.fr" } });
-    mockedFindUnique.mockResolvedValue({
-      ...bookingStub,
-      status: "PENDING",
-      user: { email: "client@test.fr", name: "Client", phone: "0600" },
-      bookingNotes: [],
-    });
-    mockedUpdate.mockResolvedValue({ ...bookingStub });
+    mockedFindUnique
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "PENDING",
+        driverId: "d1",
+        user: { email: "client@test.fr", name: "Client", phone: "0600" },
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        bookingNotes: [],
+      })
+      .mockResolvedValueOnce({
+        ...bookingStub,
+        status: "PENDING",
+        driverId: "d1",
+        user: { email: "client@test.fr", name: "Client", phone: "0600" },
+        driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+        bookingNotes: [],
+      });
+    mockedUpdate.mockResolvedValue({ ...bookingStub, driverId: "d1" });
     (prisma as unknown as { bookingNote: typeof prisma.bookingNote }).bookingNote.create = jest
       .fn()
       .mockResolvedValue({});
@@ -326,8 +410,8 @@ describe("api/admin/bookings", () => {
     expect(mockedSendMail).toHaveBeenCalled();
     const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
     expect(recipients).toContain("client@test.fr");
-    expect(recipients).toContain("admin@test.fr");
-    process.env.ADMIN_EMAILS = prevAdmin;
+    expect(recipients).toContain("contact@test.fr");
+    expect(recipients).toContain("driver@test.fr");
   });
 
   it("permet à un driver de prendre une course (driverId + status)", async () => {

@@ -75,6 +75,8 @@ describe("City pages", () => {
       const html = await streamToString(await renderToReadableStream(element));
       expect(html).toContain(city?.heroTitle ?? city?.name ?? city.slug);
       expect(html).toContain('href="/reserver"');
+      expect(html).toContain("Notre flotte");
+      expect(html).toContain('data-src="/images/three-cars-mini.png"');
     }
   });
 });

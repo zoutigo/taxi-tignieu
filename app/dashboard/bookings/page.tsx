@@ -35,7 +35,7 @@ export default async function DashboardBookingsPage() {
     return parts.join(" ") || "—";
   };
   const drivers = await prisma.user.findMany({
-    where: { isDriver: true },
+    where: { isDriver: true, isActive: true },
     select: { id: true, name: true, email: true, phone: true },
   });
 

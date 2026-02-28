@@ -53,13 +53,27 @@ async function createAddress(label) {
   });
 }
 
-async function ensureDrivers() {
-  const existing = await prisma.user.count({ where: { email: { in: DRIVER_EMAILS } } });
-  if (existing > 0) {
-    console.log("Skip drivers seed (already populated)");
-    return prisma.user.findMany({ where: { email: { in: DRIVER_EMAILS } } });
+async function ensureUserIsActiveColumn() {
+  const hasColumn = await prisma.$queryRawUnsafe("SHOW COLUMNS FROM `User` LIKE 'isActive'");
+  if (Array.isArray(hasColumn) && hasColumn.length > 0) return;
+  await prisma.$executeRawUnsafe(
+    "ALTER TABLE `User` ADD COLUMN `isActive` BOOLEAN NOT NULL DEFAULT true"
+  );
+  console.log("Patched schema: added User.isActive");
+}
+
+async function ensureUsers() {
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    console.log("Skip users seed (table User already populated)");
+    const [drivers, customers] = await Promise.all([
+      prisma.user.findMany({ where: { isDriver: true } }),
+      prisma.user.findMany({ where: { isDriver: false } }),
+    ]);
+    return { drivers, customers };
   }
-  const created = await Promise.all(
+
+  const createdDrivers = await Promise.all(
     DRIVER_EMAILS.map((email, idx) =>
       prisma.user.create({
         data: {
@@ -73,17 +87,8 @@ async function ensureDrivers() {
       })
     )
   );
-  console.log(`Seeded ${created.length} drivers`);
-  return created;
-}
 
-async function ensureCustomers() {
-  const existing = await prisma.user.count({ where: { email: { in: CUSTOMER_EMAILS } } });
-  if (existing > 0) {
-    console.log("Skip customers seed (already populated)");
-    return prisma.user.findMany({ where: { email: { in: CUSTOMER_EMAILS } } });
-  }
-  const created = await Promise.all(
+  const createdCustomers = await Promise.all(
     CUSTOMER_EMAILS.map((email, idx) =>
       prisma.user.create({
         data: {
@@ -97,11 +102,17 @@ async function ensureCustomers() {
       })
     )
   );
-  console.log(`Seeded ${created.length} customers`);
-  return created;
+
+  console.log(`Seeded ${createdDrivers.length} drivers`);
+  console.log(`Seeded ${createdCustomers.length} customers`);
+  return { drivers: createdDrivers, customers: createdCustomers };
 }
 
 async function seedBookings(drivers, customers) {
+  if (!Array.isArray(customers) || customers.length === 0) {
+    console.log("Skip bookings seed (no customers available)");
+    return;
+  }
   const existingCount = await prisma.booking.count();
   if (existingCount > 0) {
     console.log("Skip bookings seed (already populated)");
@@ -141,6 +152,10 @@ async function seedBookings(drivers, customers) {
 }
 
 async function seedReviews(customers, bookings) {
+  if (!Array.isArray(customers) || customers.length === 0) {
+    console.log("Skip reviews seed (no customers available)");
+    return;
+  }
   const existingCount = await prisma.review.count();
   if (existingCount > 0) {
     console.log("Skip reviews seed (already populated)");
@@ -320,8 +335,8 @@ async function seedFeaturedTrips() {
 
 async function main() {
   // démarrage seed
-  const drivers = await ensureDrivers();
-  const customers = await ensureCustomers();
+  await ensureUserIsActiveColumn();
+  const { drivers, customers } = await ensureUsers();
   await seedBookings(drivers, customers);
   const allBookings = await prisma.booking.findMany({ select: { id: true } });
   await seedReviews(customers, allBookings);

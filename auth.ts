@@ -34,10 +34,27 @@ const authResult = NextAuth({
   },
   trustHost: true,
   callbacks: {
+    async signIn({ user }) {
+      const userId = (user as { id?: string | null } | null)?.id ?? null;
+      const userEmail = user?.email ?? null;
+      if (!userId && !userEmail) return true;
+
+      const existing = await prisma.user.findFirst({
+        where: userId
+          ? { id: userId }
+          : {
+              email: userEmail ?? undefined,
+            },
+        select: { isActive: true },
+      });
+      if (!existing) return true;
+      return Boolean(existing.isActive);
+    },
     async jwt({ token, user, trigger, session, account, profile }) {
       if (user) {
-        token.id = user.id;
+        token.id = typeof user.id === "string" ? user.id : null;
         token.phone = user.phone ?? null;
+        token.isActive = (user as { isActive?: boolean } | null)?.isActive ?? true;
         token.picture =
           (account as { picture?: string } | null)?.picture ??
           (profile as { picture?: string } | null)?.picture ??
@@ -52,13 +69,15 @@ const authResult = NextAuth({
 
         if (user.email) {
           const lower = user.email.toLowerCase();
-          token.isAdmin = Boolean(user.isAdmin || adminList.includes(lower));
-          token.isManager = Boolean(user.isManager || managerList.includes(lower));
-          token.isDriver = Boolean(user.isDriver || driverList.includes(lower));
+          const active = (user as { isActive?: boolean } | null)?.isActive ?? true;
+          token.isAdmin = Boolean(active && (user.isAdmin || adminList.includes(lower)));
+          token.isManager = Boolean(active && (user.isManager || managerList.includes(lower)));
+          token.isDriver = Boolean(active && (user.isDriver || driverList.includes(lower)));
         } else {
-          token.isAdmin = Boolean(user.isAdmin);
-          token.isManager = Boolean(user.isManager);
-          token.isDriver = Boolean(user.isDriver);
+          const active = (user as { isActive?: boolean } | null)?.isActive ?? true;
+          token.isAdmin = Boolean(active && user.isAdmin);
+          token.isManager = Boolean(active && user.isManager);
+          token.isDriver = Boolean(active && user.isDriver);
         }
       }
       if (trigger === "update" && session?.phone !== undefined) {
@@ -67,7 +86,13 @@ const authResult = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      const userId = (token.id as string) ?? token.sub ?? session.user?.id;
+      const tokenId =
+        typeof (token as { id?: unknown }).id === "string"
+          ? ((token as { id?: string }).id ?? null)
+          : null;
+      const tokenSub = typeof token.sub === "string" ? token.sub : null;
+      const sessionUserId = typeof session.user?.id === "string" ? session.user.id : null;
+      const userId = tokenId ?? tokenSub ?? sessionUserId;
       if (!session.user || !userId) {
         return session;
       }
@@ -81,21 +106,50 @@ const authResult = NextAuth({
         return session;
       }
 
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          phone: true,
-          image: true,
-          isAdmin: true,
-          isManager: true,
-          isDriver: true,
-        },
-      });
+      let user: {
+        id: string;
+        email: string | null;
+        name: string | null;
+        phone: string | null;
+        image: string | null;
+        isAdmin: boolean;
+        isManager: boolean;
+        isDriver: boolean;
+        isActive: boolean;
+      } | null = null;
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            image: true,
+            isAdmin: true,
+            isManager: true,
+            isDriver: true,
+            isActive: true,
+          },
+        });
+      } catch (error) {
+        console.warn("AUTH_SESSION_LOOKUP_FAILED", { userId, error });
+        return session;
+      }
 
       if (!user) {
+        return session;
+      }
+
+      if (!user.isActive) {
+        session.user.id = user.id;
+        session.user.email = user.email ?? session.user.email;
+        session.user.name = user.name ?? session.user.name;
+        session.user.phone = null;
+        session.user.isActive = false;
+        session.user.isAdmin = false;
+        session.user.isManager = false;
+        session.user.isDriver = false;
         return session;
       }
 
@@ -119,6 +173,9 @@ const authResult = NextAuth({
       );
       session.user.isDriver = Boolean(
         (token as unknown as { isDriver?: boolean }).isDriver ?? user.isDriver
+      );
+      session.user.isActive = Boolean(
+        (token as unknown as { isActive?: boolean }).isActive ?? user.isActive
       );
 
       return session;

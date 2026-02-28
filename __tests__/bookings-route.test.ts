@@ -34,8 +34,8 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 jest.mock("@/lib/mailer", () => ({
-  buildBookingEmail: jest.fn(() => ({
-    to: "user@test.fr",
+  buildBookingEmail: jest.fn((opts: { to: string }) => ({
+    to: opts.to,
     subject: "Email test",
     html: "<p>t</p>",
     text: "t",
@@ -95,12 +95,12 @@ const makeRequest = (body: unknown) =>
 describe("POST /api/bookings", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedBuildBookingEmail.mockReturnValue({
-      to: "user@test.fr",
+    mockedBuildBookingEmail.mockImplementation((opts: { to: string }) => ({
+      to: opts.to,
       subject: "Email test",
       html: "<p>test</p>",
       text: "test",
-    });
+    }));
     mockedGetSiteContact.mockClear();
   });
 
@@ -170,8 +170,11 @@ describe("POST /api/bookings", () => {
         authorId: "u1",
       },
     });
-    expect(mockedBuildBookingEmail).toHaveBeenCalledTimes(1);
-    expect(mockedSendMail).toHaveBeenCalledTimes(1);
+    expect(mockedBuildBookingEmail).toHaveBeenCalledTimes(2);
+    expect(mockedSendMail).toHaveBeenCalledTimes(2);
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toContain("user@test.fr");
+    expect(recipients).toContain("contact@taxitignieucharvieur.fr");
   });
 
   it("calcule dateTime et priceCents, même sans notes", async () => {
@@ -441,6 +444,11 @@ describe("PATCH /api/bookings", () => {
       status: "PENDING",
       updatedAt: oldDate,
       customerId: null,
+      bookingNotes: [],
+      invoice: null,
+      user: { name: "User", email: "user@test.fr", phone: "0601010101" },
+      customer: null,
+      driver: null,
     });
     mockedUpdate.mockResolvedValue({
       id: "b1",
@@ -457,6 +465,11 @@ describe("PATCH /api/bookings", () => {
       status: "PENDING",
       updatedAt: newDate,
       customerId: null,
+      bookingNotes: [],
+      user: { name: "User", email: "user@test.fr", phone: "0601010101" },
+      customer: null,
+      driver: null,
+      driverId: null,
     });
 
     await (
@@ -477,6 +490,82 @@ describe("PATCH /api/bookings", () => {
 
     expect(mockedBuildBookingEmail).toHaveBeenCalled();
     expect(mockedSendMail).toHaveBeenCalledTimes(2);
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(
+      expect.arrayContaining(["user@test.fr", "contact@taxitignieucharvieur.fr"])
+    );
+  });
+
+  it("envoie client + site + chauffeur si la réservation modifiée est assignée", async () => {
+    mockedAuth.mockResolvedValue({
+      user: { id: "u1", email: "user@test.fr", name: "User", phone: "0601010101" },
+    } as { user: { id: string; email: string; name: string; phone: string } });
+
+    const oldDate = new Date("2025-01-01T10:00:00Z");
+    const newDate = new Date("2025-01-02T11:00:00Z");
+    mockedFindUnique.mockResolvedValue({
+      id: "b2",
+      createdAt: oldDate,
+      userId: "u1",
+      pickup: { name: "Ancien dep", street: "Rue A", postalCode: "11111", city: "Old" },
+      dropoff: { name: "Ancienne arr", street: "Rue B", postalCode: "22222", city: "OldCity" },
+      dateTime: oldDate,
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: 1000,
+      status: "PENDING",
+      updatedAt: oldDate,
+      customerId: null,
+      bookingNotes: [],
+      invoice: null,
+      user: { name: "User", email: "user@test.fr", phone: "0601010101" },
+      customer: null,
+      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+      driverId: "d1",
+    });
+    mockedUpdate.mockResolvedValue({
+      id: "b2",
+      createdAt: newDate,
+      userId: "u1",
+      pickup: { name: "Nouveau dep", street: "Rue C", postalCode: "33333", city: "New" },
+      dropoff: { name: "Nouvelle arr", street: "Rue D", postalCode: "44444", city: "NewCity" },
+      dateTime: newDate,
+      pax: 2,
+      luggage: 1,
+      babySeat: false,
+      priceCents: 2000,
+      status: "PENDING",
+      updatedAt: newDate,
+      customerId: null,
+      bookingNotes: [],
+      user: { name: "User", email: "user@test.fr", phone: "0601010101" },
+      customer: null,
+      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+      driverId: "d1",
+    });
+
+    await (
+      await import("@/app/api/bookings/route")
+    ).PATCH(
+      makeRequest({
+        id: "b2",
+        pickup: { label: "Nouveau dep", lat: 1, lng: 1 },
+        dropoff: { label: "Nouvelle arr", lat: 2, lng: 2 },
+        date: "2025-01-02",
+        time: "11:00",
+        passengers: 2,
+        luggage: 1,
+        notes: "New",
+        estimatedPrice: 20,
+      })
+    );
+
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(
+      expect.arrayContaining(["user@test.fr", "contact@taxitignieucharvieur.fr", "driver@test.fr"])
+    );
+    expect(recipients).toHaveLength(3);
   });
 });
 
@@ -502,6 +591,10 @@ describe("DELETE /api/bookings", () => {
       customerId: null,
       bookingNotes: [],
       invoice: null,
+      user: { name: "Client", email: "client@test.fr", phone: "0600" },
+      customer: null,
+      driver: null,
+      driverId: null,
     });
     const cancelledAt = new Date();
     mockedUpdate.mockResolvedValue({
@@ -535,6 +628,10 @@ describe("DELETE /api/bookings", () => {
       priceCents: null,
       customerId: null,
       bookingNotes: [],
+      user: { name: "Client", email: "client@test.fr", phone: "0600" },
+      customer: null,
+      driver: null,
+      driverId: null,
       invoice: null,
     });
 
@@ -550,6 +647,91 @@ describe("DELETE /api/bookings", () => {
         changes: expect.arrayContaining([expect.stringContaining("Motif")]),
       })
     );
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(
+      expect.arrayContaining(["client@test.fr", "contact@taxitignieucharvieur.fr"])
+    );
+    expect(recipients).toHaveLength(2);
+  });
+
+  it("notifie aussi le chauffeur lors d'une annulation si la réservation est assignée", async () => {
+    process.env.ADMIN_EMAILS = "admin@test.com";
+    mockedAuth.mockResolvedValue({ user: { id: "uX", email: "admin@test.com" } } as {
+      user: { id: string; email: string };
+    });
+    mockedFindUnique.mockResolvedValue({
+      id: "bDel2",
+      createdAt: new Date(),
+      userId: "other",
+      pickupId: "a1",
+      dropoffId: "a2",
+      dateTime: new Date(),
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: null,
+      status: "PENDING",
+      updatedAt: new Date(),
+      customerId: null,
+      bookingNotes: [],
+      invoice: null,
+      user: { name: "Client", email: "client@test.fr", phone: "0600" },
+      customer: null,
+      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+      driverId: "d1",
+    });
+    mockedUpdate.mockResolvedValue({
+      id: "bDel2",
+      status: "CANCELLED",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: "u1",
+      pickupId: "a1",
+      dropoffId: "a2",
+      pickup: {
+        street: "Rue A",
+        streetNumber: "1",
+        postalCode: "11111",
+        city: "Ville A",
+        country: "France",
+        name: "Dep",
+      },
+      dropoff: {
+        street: "Rue B",
+        streetNumber: "2",
+        postalCode: "22222",
+        city: "Ville B",
+        country: "France",
+        name: "Arr",
+      },
+      dateTime: new Date(),
+      pax: 1,
+      luggage: 0,
+      babySeat: false,
+      priceCents: null,
+      customerId: null,
+      bookingNotes: [],
+      user: { name: "Client", email: "client@test.fr", phone: "0600" },
+      customer: null,
+      driver: { id: "d1", name: "Driver", email: "driver@test.fr", phone: "0600" },
+      driverId: "d1",
+      invoice: null,
+    });
+
+    const res = await (
+      await import("@/app/api/bookings/route")
+    ).DELETE(makeRequest({ id: "bDel2", note: "annulation assignée" }));
+
+    expect(res.status).toBe(200);
+    const recipients = mockedSendMail.mock.calls.map((c) => c[0].to);
+    expect(recipients).toEqual(
+      expect.arrayContaining([
+        "client@test.fr",
+        "contact@taxitignieucharvieur.fr",
+        "driver@test.fr",
+      ])
+    );
+    expect(recipients).toHaveLength(3);
   });
 
   it("refuse la suppression si la réservation est terminée ou facturée", async () => {

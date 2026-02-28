@@ -312,6 +312,30 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="relative overflow-hidden rounded-[28px] border border-border/70 bg-card p-4 shadow-[0_30px_55px_rgba(5,15,35,0.1)] sm:p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,hsl(var(--primary)/0.22),transparent_46%),radial-gradient(circle_at_85%_85%,hsl(var(--sidebar)/0.24),transparent_50%)]" />
+        <div className="relative overflow-hidden rounded-[22px] border border-white/20 bg-sidebar/95 shadow-[0_32px_64px_rgba(5,15,35,0.35)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/25 to-transparent" />
+          <div className="pointer-events-none absolute -bottom-16 left-1/2 h-40 w-[80%] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative h-[230px] sm:h-[290px] lg:h-[360px]">
+            <Image
+              src="/images/three-cars-mini.png"
+              alt="Flotte Taxi Tignieu Charvieu disponible 24h/24"
+              fill
+              className="object-cover object-center"
+              sizes="(max-width: 640px) 100vw, (max-width: 1200px) 90vw, 1100px"
+            />
+          </div>
+          <div className="relative border-t border-white/15 bg-gradient-to-r from-sidebar via-sidebar/95 to-sidebar/90 px-4 py-4 text-white sm:px-6">
+            <p className="text-xs uppercase tracking-[0.32em] text-primary/95">Notre flotte</p>
+            <p className="mt-1 text-sm text-white/85 sm:text-base">
+              Berlines confort et vans spacieux pour vos transferts aéroport, gares et trajets
+              longue distance.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-[32px] border border-border/70 bg-gradient-to-r from-sidebar via-sidebar/95 to-[#0d1a32] px-6 py-10 text-sidebar-foreground shadow-[0_35px_55px_rgba(2,8,32,0.35)] sm:px-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl space-y-3">
