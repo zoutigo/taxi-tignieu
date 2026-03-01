@@ -244,6 +244,11 @@ export async function PATCH(req: Request) {
   };
 
   const sendEmailsIfNeeded = async () => {
+    const emailTasks: Array<Promise<void>> = [];
+    const queueMail = (mail: Parameters<typeof sendMail>[0], errorMessage: string) => {
+      emailTasks.push(sendMail(mail).catch((err) => console.error(errorMessage, err)));
+    };
+
     const hasEmail = (email?: string | null) => Boolean(email && email.trim().length > 0);
     const statusChangedToConfirmed =
       parsed.data.status === "CONFIRMED" && existing.status !== "CONFIRMED";
@@ -317,9 +322,7 @@ export async function PATCH(req: Request) {
           legalUrl,
           changes: parsed.data.notes ? [`Note : ${parsed.data.notes}`] : [],
         });
-        sendMail(mailToDriver).catch((err) =>
-          console.error("Erreur mail assignation chauffeur", err)
-        );
+        queueMail(mailToDriver, "Erreur mail assignation chauffeur");
       }
 
       // User confirmation email (always send if we have an email)
@@ -355,7 +358,7 @@ export async function PATCH(req: Request) {
           legalUrl,
           changes: parsed.data.notes ? [`Note : ${parsed.data.notes}`] : [],
         });
-        sendMail(mailToUser).catch((err) => console.error("Erreur mail confirmation client", err));
+        queueMail(mailToUser, "Erreur mail confirmation client");
       }
 
       const siteRecipients = resolveBookingNotificationRecipients({
@@ -395,7 +398,7 @@ export async function PATCH(req: Request) {
           legalUrl,
           changes: parsed.data.notes ? [`Note : ${parsed.data.notes}`] : [],
         });
-        sendMail(mailToSite).catch((err) => console.error("Erreur mail confirmation site", err));
+        queueMail(mailToSite, "Erreur mail confirmation site");
       }
     }
 
@@ -456,7 +459,7 @@ export async function PATCH(req: Request) {
             `Laisser un avis : ${reviewUrl}`,
           ],
         });
-        sendMail(mailCompleted).catch((err) => console.error("Erreur mail clôture", err));
+        queueMail(mailCompleted, "Erreur mail clôture");
       }
     }
 
@@ -528,12 +531,18 @@ export async function PATCH(req: Request) {
           manageUrl:
             isSiteRecipient || isDriverRecipient ? `${siteUrl}/dashboard/bookings` : manageUrl,
         });
-        sendMail(mail).catch((err) => console.error("Erreur mail modif booking", err));
+        queueMail(mail, "Erreur mail modif booking");
       }
+    }
+
+    if (emailTasks.length > 0) {
+      await Promise.allSettled(emailTasks);
     }
   };
 
-  sendEmailsIfNeeded().catch((err) => console.error("Erreur envoi mails admin bookings", err));
+  await sendEmailsIfNeeded().catch((err) =>
+    console.error("Erreur envoi mails admin bookings", err)
+  );
 
   return NextResponse.json({ booking }, { status: 200 });
 }

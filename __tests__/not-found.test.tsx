@@ -1,5 +1,4 @@
 /** @jest-environment jsdom */
-import React from "react";
 import { TextDecoder, TextEncoder } from "util";
 
 jest.mock("@/lib/site-config", () => ({
