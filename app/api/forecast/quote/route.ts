@@ -1,17 +1,29 @@
 import { NextResponse } from "next/server";
 import { computePriceEuros, type TariffCode } from "@/lib/tarifs";
 import { getTariffConfig } from "@/lib/tariff-config";
+import { getOrsDrivingDistance } from "@/lib/ors-distance";
 
 type Coord = { lat: number; lng: number };
 
-const haversineKm = (a: Coord, b: Coord) => {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+const inferDayNightTariff = (date?: string, time?: string): TariffCode => {
+  let hour: number | null = null;
+  if (date && time) {
+    const dt = new Date(`${date}T${time}`);
+    if (!Number.isNaN(dt.getTime())) {
+      hour = dt.getHours();
+    }
+  }
+  if (hour == null && time) {
+    const match = time.match(/^(\d{1,2}):/);
+    if (match) {
+      const parsed = Number(match[1]);
+      if (Number.isFinite(parsed)) {
+        hour = parsed;
+      }
+    }
+  }
+  if (hour == null) return "C";
+  return hour < 7 || hour >= 19 ? "D" : "C";
 };
 
 export async function POST(request: Request) {
@@ -33,18 +45,14 @@ export async function POST(request: Request) {
 
     const from = body.pickup;
     const to = body.dropoff;
-    const tariff = (body.tariff ?? "A") as TariffCode;
+    const tariff = inferDayNightTariff(body.date, body.time);
     const passengers = Math.max(0, Number(body.passengers ?? 1));
-    const baggageCount = Math.max(
-      0,
-      Number(
-        (body as { baggageCount?: number; luggage?: number }).baggageCount ?? body["luggage"] ?? 0
-      )
+    const parsedBaggage = Number(
+      (body as { baggageCount?: number; luggage?: number }).baggageCount ?? body["luggage"] ?? 1
     );
+    const baggageCount = Number.isFinite(parsedBaggage) ? Math.max(1, parsedBaggage) : 1;
     const fifthPassenger = Boolean(body.fifthPassenger ?? passengers > 4);
     const waitMinutes = Math.max(0, Number(body.waitMinutes ?? 0));
-    const providedDistance = Number(body.distanceKm);
-    const providedDuration = Number(body.durationMinutes);
 
     if (!from || !to) {
       return NextResponse.json(
@@ -61,13 +69,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Coordonnées invalides." }, { status: 400 });
     }
 
-    const distanceKmRaw = Number.isFinite(providedDistance)
-      ? Number(providedDistance)
-      : haversineKm(from, to);
-    const distanceKm = Math.max(0, distanceKmRaw);
-    const durationMinutes = Number.isFinite(providedDuration)
-      ? Math.max(0, providedDuration)
-      : Math.round((distanceKm / 40) * 60); // approx 40 km/h if non fourni
+    let distanceKm = 0;
+    let durationMinutes = 0;
+    try {
+      const result = await getOrsDrivingDistance(
+        { lat: Number(from.lat), lng: Number(from.lng) },
+        { lat: Number(to.lat), lng: Number(to.lng) }
+      );
+      distanceKm = result.distanceKm;
+      durationMinutes = result.durationMinutes;
+    } catch (error) {
+      const msg = String(error);
+      const status = msg.includes("manquante côté serveur") ? 500 : 502;
+      return NextResponse.json(
+        {
+          error:
+            status === 500
+              ? "OPENROUTESERVICE_API_KEY manquante côté serveur."
+              : "Échec OpenRouteService.",
+          details: msg,
+        },
+        { status }
+      );
+    }
+
     const cfg = await getTariffConfig();
     const price = computePriceEuros(
       distanceKm,
@@ -80,7 +105,12 @@ export async function POST(request: Request) {
       cfg
     );
 
-    return NextResponse.json({ distanceKm, durationMinutes, price });
+    return NextResponse.json({
+      distanceKm,
+      durationMinutes,
+      price,
+      source: "ors",
+    });
   } catch (error) {
     return NextResponse.json({ error: "Erreur interne", details: String(error) }, { status: 500 });
   }

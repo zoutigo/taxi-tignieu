@@ -256,4 +256,82 @@ describe("ReservationWizard end-to-end UI flow", () => {
       ).toBe(true)
     );
   });
+
+  it("affiche 'Distance ORS indisponible' quand le calcul ORS échoue", async () => {
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.startsWith("/api/tarifs/config")) {
+        return Promise.resolve({ ok: true, json: async () => ({}) });
+      }
+      if (url.startsWith("/api/forecast/geocode")) {
+        const body = opts?.body ? JSON.parse(opts.body.toString()) : { address: "" };
+        const addr = (body.address as string).toLowerCase();
+        const result =
+          addr.includes("114") || addr.includes("crémieu")
+            ? {
+                lat: 45.75,
+                lng: 4.85,
+                street: "route de Crémieu",
+                streetNumber: "114",
+                postcode: "38230",
+                city: "Tignieu-Jameyzieu",
+                country: "France",
+                formatted_address: "114 route de Crémieu, 38230 Tignieu-Jameyzieu, France",
+              }
+            : {
+                lat: 49.01,
+                lng: 2.55,
+                street: "Rue interne Aéroport CDG",
+                streetNumber: "",
+                postcode: "95700",
+                city: "Roissy-en-France",
+                country: "France",
+                formatted_address: "Aéroport Paris CDG, 95700 Roissy-en-France, France",
+              };
+        return Promise.resolve({ ok: true, json: async () => ({ results: [result] }) });
+      }
+      if (url.startsWith("/api/forecast/quote")) {
+        return Promise.resolve({
+          ok: false,
+          status: 502,
+          json: async () => ({ error: "Échec OpenRouteService." }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    const { getByText, getByPlaceholderText, getByLabelText, getByRole, findByText } = render(
+      <ReservationWizard
+        mode="create"
+        useStore={false}
+        savedAddresses={[]}
+        initialValues={{ policiesAccepted: true }}
+      />
+    );
+
+    fireEvent.click(getByText("Commencer la réservation"));
+    fireEvent.change(getByPlaceholderText("Ex: 114B route de Crémieu, Tignieu"), {
+      target: { value: "114 route de Crémieu" },
+    });
+    fireEvent.click(getByRole("button", { name: /Rechercher/i }));
+    const pickupSuggestion = await waitFor(() =>
+      getByRole("button", { name: /114 route de crémieu/i })
+    );
+    fireEvent.click(pickupSuggestion);
+    fireEvent.click(getByText("Continuer"));
+
+    await waitFor(() => getByPlaceholderText("Ex: Aéroport de Lyon"));
+    fireEvent.change(getByPlaceholderText("Ex: Aéroport de Lyon"), {
+      target: { value: "Paris CDG" },
+    });
+    fireEvent.click(getByRole("button", { name: /Rechercher/i }));
+    const dropSuggestion = await waitFor(() => getByRole("button", { name: /aéroport cdg/i }));
+    fireEvent.click(dropSuggestion);
+    fireEvent.click(getByText("Continuer"));
+
+    await waitFor(() => getByText(/Estimation du tarif/));
+    fireEvent.change(getByLabelText("Date"), { target: { value: "2025-12-12" } });
+    fireEvent.change(getByLabelText("Heure"), { target: { value: "10:00" } });
+
+    expect(await findByText("Distance ORS indisponible")).toBeTruthy();
+  });
 });
