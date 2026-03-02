@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { getOrsDrivingDistance } from "@/lib/ors-distance";
 
 type Coord = { lat: number; lng: number };
 
-const ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car";
 const cache = new Map<string, { expires: number; distanceKm: number; durationMinutes: number }>();
 const TTL_MS = 10 * 60 * 1000;
 
@@ -40,81 +40,35 @@ export async function POST(request: Request) {
       return NextResponse.json({
         distanceKm: cached.distanceKm,
         durationMinutes: cached.durationMinutes,
+        source: "cache",
       });
     }
-
-    const haversineKm = () => {
-      const R = 6371;
-      const dLat = ((toLat - fromLat) * Math.PI) / 180;
-      const dLng = ((toLng - fromLng) * Math.PI) / 180;
-      const la1 = (fromLat * Math.PI) / 180;
-      const la2 = (toLat * Math.PI) / 180;
-      const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-    };
-
-    const apiKey = process.env.OPENROUTESERVICE_API_KEY;
-    if (!apiKey) {
-      const fallbackDistance = Math.round(haversineKm() * 100) / 100;
-      const fallbackDuration = Math.round((fallbackDistance / 40) * 60);
-      return NextResponse.json(
-        { distanceKm: fallbackDistance, durationMinutes: fallbackDuration, fallback: true },
-        { status: 200 }
-      );
-    }
-
-    let distanceKm: number | null = null;
-    let durationMinutes: number | null = null;
 
     try {
-      const orsRes = await fetch(ORS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: apiKey,
-        },
-        body: JSON.stringify({
-          coordinates: [
-            [fromLng, fromLat],
-            [toLng, toLat],
-          ],
-        }),
+      const result = await getOrsDrivingDistance(
+        { lat: fromLat, lng: fromLng },
+        { lat: toLat, lng: toLng }
+      );
+      cache.set(key, {
+        distanceKm: result.distanceKm,
+        durationMinutes: result.durationMinutes,
+        expires: Date.now() + TTL_MS,
       });
-
-      if (orsRes.ok) {
-        const raw = await orsRes.text();
-        const parsed = JSON.parse(raw) as {
-          features?: Array<{ properties?: { summary?: { distance?: number; duration?: number } } }>;
-          routes?: Array<{ summary?: { distance?: number; duration?: number } }>;
-        };
-        const summary =
-          parsed.features?.[0]?.properties?.summary ?? parsed.routes?.[0]?.summary ?? undefined;
-        const dKm = summary?.distance ? summary.distance / 1000 : NaN;
-        const dMin = summary?.duration ? summary.duration / 60 : NaN;
-        if (Number.isFinite(dKm) && Number.isFinite(dMin)) {
-          distanceKm = dKm;
-          durationMinutes = dMin;
-        }
-      }
-    } catch {
-      // ignore and fallback
+      return NextResponse.json({ ...result, source: "ors" });
+    } catch (error) {
+      const msg = String(error);
+      const status = msg.includes("manquante côté serveur") ? 500 : 502;
+      return NextResponse.json(
+        {
+          error:
+            status === 500
+              ? "OPENROUTESERVICE_API_KEY manquante côté serveur."
+              : "Échec OpenRouteService.",
+          details: msg,
+        },
+        { status }
+      );
     }
-
-    if (distanceKm == null) {
-      distanceKm = Math.round(haversineKm() * 100) / 100;
-      durationMinutes = Math.round((distanceKm / 40) * 60);
-    } else {
-      distanceKm = Math.round(distanceKm * 100) / 100;
-      durationMinutes = durationMinutes != null ? Math.round(durationMinutes) : null;
-    }
-
-    const result = {
-      distanceKm,
-      durationMinutes: durationMinutes ?? Math.round((distanceKm / 40) * 60),
-    };
-    cache.set(key, { ...result, expires: Date.now() + TTL_MS });
-
-    return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({ error: "Erreur interne", details: String(error) }, { status: 500 });
   }

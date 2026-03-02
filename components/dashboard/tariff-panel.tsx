@@ -61,7 +61,14 @@ export function TariffPanel({ initialTariff }: Props) {
       setSaving(false);
       return;
     }
-    setMessage("Tarifs mis à jour.");
+    const payload = (await res.json().catch(() => ({}))) as {
+      recompute?: { mode?: "queued" | "sync_fallback"; jobId?: string };
+    };
+    if (payload?.recompute?.mode === "queued") {
+      setMessage(`Tarifs mis à jour. Recalcul planifié (job ${payload.recompute.jobId ?? "n/a"}).`);
+    } else {
+      setMessage("Tarifs mis à jour. Recalcul lancé.");
+    }
     setSaving(false);
     setTimeout(() => setMessage(null), 2500);
   };

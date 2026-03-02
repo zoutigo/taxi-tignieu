@@ -52,6 +52,50 @@ const sampleAddressB = {
 };
 
 describe("ReservationWizard recapitulatif", () => {
+  beforeEach(() => {
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = jest
+      .fn()
+      .mockImplementation((input) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : String(input ?? "");
+
+        if (url.includes("/api/tarifs/config")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              baseChargeCents: 300,
+              kmCentsA: 122,
+              kmCentsB: 183,
+              kmCentsC: 244,
+              kmCentsD: 366,
+              waitPerHourCents: 3220,
+              baggageFeeCents: 200,
+              fifthPassengerCents: 400,
+            }),
+          });
+        }
+        if (url.includes("/api/forecast/quote")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              distanceKm: 14.25,
+              durationMinutes: 24,
+              price: 20.39,
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, json: async () => ({}) });
+      });
+  });
+
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
   it("affiche toutes les infos saisies dans le récap", async () => {
     const { getByText, getByRole } = render(
       <ReservationWizard
@@ -75,7 +119,6 @@ describe("ReservationWizard recapitulatif", () => {
 
     fireEvent.click(getByRole("button", { name: /Continuer/i })); // étape 2 -> 3
     await screen.findAllByText(/Estimation du tarif/i);
-
     fireEvent.click(getByRole("button", { name: /Continuer/i })); // étape 3 -> 4
     await screen.findAllByText(/Connexion|Confirmation/i);
 
@@ -86,6 +129,8 @@ describe("ReservationWizard recapitulatif", () => {
     const departLine = screen.getByText(/Départ :/).closest("li");
     const arriveeLine = screen.getByText(/Arrivée :/).closest("li");
     const dateLine = screen.getByText(/Date \/ heure/).closest("li");
+    const distanceLine = screen.getByText(/Distance estimée/).closest("li");
+    const priceLine = screen.getByText(/Prix estimé/).closest("li");
     const passagersLine = screen.getByText(/Passagers/).closest("li");
     const bagagesLine = screen.getByText(/Bagages/).closest("li");
     const notesLine = screen.getByText(/Notes/).closest("li");
@@ -93,6 +138,8 @@ describe("ReservationWizard recapitulatif", () => {
     expect(departLine?.textContent).toContain(sampleAddress.label);
     expect(arriveeLine?.textContent).toContain(sampleAddressB.label);
     expect(dateLine?.textContent).toContain("2026-02-05 03:47");
+    expect(distanceLine?.textContent).toMatch(/Distance estimée :\s*[\d.,]+\s*km/i);
+    expect(priceLine?.textContent).toMatch(/Prix estimé :\s*[\d.,]+\s*€/i);
     expect(passagersLine?.textContent).toContain("3");
     expect(bagagesLine?.textContent).toContain("3");
     expect(notesLine?.textContent).toContain("erreur corrigée");

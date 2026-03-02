@@ -116,7 +116,7 @@ export default async function Home() {
 
   const fallbackFeatured = {
     title: "Tignieu → Aéroport",
-    subtitle: "Lyon Saint-Exupéry ou Lyon Part-Dieu",
+    subtitle: "Lyon Saint-Exupéry",
     priceEuro: 35,
     note: "Tarif indicatif journée, 1 à 4 passagers",
   };
@@ -130,10 +130,13 @@ export default async function Home() {
   const featuredCard = featuredType
     ? {
         title: featuredType.title ?? fallbackFeatured.title,
-        subtitle:
-          computedSubtitle && computedSubtitle.length
-            ? computedSubtitle
-            : fallbackFeatured.subtitle,
+        subtitle: (() => {
+          const raw =
+            computedSubtitle && computedSubtitle.length
+              ? computedSubtitle
+              : fallbackFeatured.subtitle;
+          return /part-?dieu/i.test(raw) ? "Lyon Saint-Exupéry" : raw;
+        })(),
         priceEuro:
           featuredType.basePriceCents != null
             ? Number(featuredType.basePriceCents) / 100

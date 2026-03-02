@@ -342,8 +342,6 @@ export function ReservationWizard({
 
   useEffect(() => {
     form.reset(defaultValues);
-    setQuoteDistance("");
-    setQuoteDuration("");
   }, [defaultValues, form, useStore]);
 
   useEffect(() => {
@@ -643,7 +641,14 @@ export function ReservationWizard({
       setQuoteDuration(durationMinutes > 0 ? String(durationMinutes) : "");
       persistEstimate(finalPrice);
     } catch (e) {
-      setError("Erreur lors du calcul du tarif : " + String(e));
+      const details = e instanceof Error ? e.message : String(e);
+      const orsUnavailable =
+        /openrouteservice|openrouteservice_api_key|distance\/durée|échec ors|échec openrouteservice/i.test(
+          details
+        );
+      setError(
+        orsUnavailable ? "Distance ORS indisponible" : `Erreur lors du calcul du tarif : ${details}`
+      );
     } finally {
       setQuoteLoading(false);
     }
@@ -655,6 +660,22 @@ export function ReservationWizard({
   const watchedLuggage = form.watch("luggage");
   const watchedPickup = form.watch("pickup");
   const watchedDropoff = form.watch("dropoff");
+  const displayedDistance = useMemo(() => {
+    if (quoteDistance) return quoteDistance;
+    const p = watchedPickup as AddressData | undefined;
+    const d = watchedDropoff as AddressData | undefined;
+    if (
+      p &&
+      d &&
+      Number.isFinite(p.lat) &&
+      Number.isFinite(p.lng) &&
+      Number.isFinite(d.lat) &&
+      Number.isFinite(d.lng)
+    ) {
+      return haversineKm({ lat: p.lat, lng: p.lng }, { lat: d.lat, lng: d.lng }).toFixed(2);
+    }
+    return "";
+  }, [quoteDistance, watchedPickup, watchedDropoff]);
   const scheduleReady = useMemo(() => {
     const passengersNum = Number(watchedPassengers);
     const luggageNum = Number(watchedLuggage);
@@ -816,6 +837,10 @@ export function ReservationWizard({
 
   const steps = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
   const priceDisplay = quotePrice ?? (isHydrated ? storePrice : null) ?? initialPrice ?? "—";
+  const recapPriceLabel =
+    typeof priceDisplay === "number" && Number.isFinite(priceDisplay)
+      ? `${priceDisplay.toFixed(2)} €`
+      : "—";
 
   const updateStep = (target: WizardStep) => {
     setStep(target);
@@ -1321,7 +1346,7 @@ export function ReservationWizard({
                         {priceDisplay} €
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {quoteDistance ? `${quoteDistance} km` : ""}
+                        {displayedDistance ? `${displayedDistance} km` : ""}
                         {quoteDuration ? ` • ${quoteDuration} min` : ""}
                       </span>
                     </div>
@@ -1375,6 +1400,14 @@ export function ReservationWizard({
                       <li>
                         <span className="font-semibold text-foreground">Date / heure : </span>
                         {(form.watch("date") || "—") + " " + (form.watch("time") || "")}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Distance estimée : </span>
+                        {displayedDistance ? `${displayedDistance} km` : "—"}
+                      </li>
+                      <li>
+                        <span className="font-semibold text-foreground">Prix estimé : </span>
+                        {recapPriceLabel}
                       </li>
                       <li>
                         <span className="font-semibold text-foreground">Passagers : </span>
@@ -1485,17 +1518,6 @@ export function ReservationWizard({
           </div>
         </section>
       ) : null}
-
-      <section className="rounded-3xl border border-border/60 bg-card p-5 text-sm text-foreground shadow-sm">
-        <h2 className="text-lg font-semibold">Résumé tarifaire (extrait panneau 2020)</h2>
-        <ul className="mt-3 space-y-2 text-muted-foreground">
-          <li>Prise en charge : 2,80 €</li>
-          <li>Tarif A : 0,98 €/km (jour semaine 7h-19h) • Tarif B : 1,23 €/km (nuit/dim/fériés)</li>
-          <li>Tarif C : 1,96 €/km (gare jour) • Tarif D : 2,46 €/km (gare nuit)</li>
-          <li>Attente : 29,40 €/h (marche lente ou arrêt demandé)</li>
-          <li>Suppléments : 5ᵉ passager 2,50 € • Bagage 2 €</li>
-        </ul>
-      </section>
     </div>
   );
 }

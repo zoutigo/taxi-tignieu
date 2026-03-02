@@ -15,9 +15,27 @@ jest.mock("@/lib/tariff-config", () => ({
 const mockComputePrice = jest.mocked(computePriceEuros);
 
 describe("api/forecast/quote", () => {
+  const fetchMock = jest.fn();
+  const envBackup = process.env.OPENROUTESERVICE_API_KEY;
+
   beforeEach(() => {
     jest.resetAllMocks();
+    process.env.OPENROUTESERVICE_API_KEY = "test-key";
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          features: [{ properties: { summary: { distance: 12340, duration: 1500 } } }],
+        }),
+    });
+    (globalThis as unknown as { fetch: jest.Mock }).fetch = fetchMock;
     mockComputePrice.mockReturnValue(10);
+  });
+
+  afterAll(() => {
+    if (envBackup === undefined) delete process.env.OPENROUTESERVICE_API_KEY;
+    else process.env.OPENROUTESERVICE_API_KEY = envBackup;
   });
 
   const run = (body: unknown) =>
@@ -43,16 +61,13 @@ describe("api/forecast/quote", () => {
     expect(res.status).toBe(400);
   });
 
-  it("utilise la distance fournie et appelle computePriceEuros avec les bons paramètres", async () => {
+  it("utilise strictement ORS et appelle computePriceEuros avec les bons paramètres", async () => {
     const res = await run({
       pickup: { lat: 45, lng: 5 },
       dropoff: { lat: 46, lng: 6 },
-      distanceKm: 12.34,
-      durationMinutes: 25,
       passengers: 3,
       baggageCount: 2,
       waitMinutes: 4,
-      tariff: "B",
       date: "2026-02-13",
       time: "12:00",
     });
@@ -62,9 +77,10 @@ describe("api/forecast/quote", () => {
     expect(json.distanceKm).toBeCloseTo(12.34);
     expect(json.durationMinutes).toBe(25);
     expect(json.price).toBe(10); // valeur mockée
+    expect(json.source).toBe("ors");
     expect(mockComputePrice).toHaveBeenCalledWith(
       12.34,
-      "B",
+      "C",
       expect.objectContaining({
         baggageCount: 2,
         fifthPassenger: false,
@@ -74,28 +90,26 @@ describe("api/forecast/quote", () => {
     );
   });
 
-  it("clamp négatifs, calcule haversine si distance absente et marque fifthPassenger quand >4", async () => {
-    // ~157 km entre ces deux points => on s'assure que la distance est calculée
+  it("clamp négatifs et marque fifthPassenger selon passengers", async () => {
     const res = await run({
       pickup: { lat: 45, lng: 5 },
       dropoff: { lat: 46, lng: 7 },
       passengers: -2,
       baggageCount: -3,
       waitMinutes: -1,
-      tariff: "A",
       date: "2026-02-13",
       time: "01:16",
     });
 
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.distanceKm).toBeGreaterThan(100);
+    expect(json.distanceKm).toBeCloseTo(12.34);
     expect(json.durationMinutes).toBeGreaterThan(0);
     expect(mockComputePrice).toHaveBeenCalledWith(
-      expect.any(Number),
-      "A",
+      12.34,
+      "D",
       expect.objectContaining({
-        baggageCount: 0,
+        baggageCount: 1,
         fifthPassenger: false,
         waitMinutes: 0,
       }),
@@ -103,23 +117,46 @@ describe("api/forecast/quote", () => {
     );
   });
 
-  it("déclenche fifthPassenger quand passengers > 4", async () => {
+  it("déclenche fifthPassenger quand passengers > 4 et applique tarif nuit D", async () => {
     await run({
       pickup: { lat: 45, lng: 5 },
       dropoff: { lat: 45.5, lng: 5.5 },
-      distanceKm: 5,
       passengers: 5,
       baggageCount: 1,
-      tariff: "C",
       date: "2026-02-13",
       time: "23:00",
     });
 
     expect(mockComputePrice).toHaveBeenCalledWith(
-      5,
-      "C",
+      12.34,
+      "D",
       expect.objectContaining({ fifthPassenger: true }),
       undefined
     );
+  });
+
+  it("force au moins 1 bagage même si bagage/luggage absent", async () => {
+    await run({
+      pickup: { lat: 45, lng: 5 },
+      dropoff: { lat: 45.5, lng: 5.5 },
+      date: "2026-02-13",
+      time: "12:00",
+    });
+
+    expect(mockComputePrice).toHaveBeenCalledWith(
+      12.34,
+      "C",
+      expect.objectContaining({ baggageCount: 1 }),
+      undefined
+    );
+  });
+
+  it("500 si clé ORS manquante", async () => {
+    delete process.env.OPENROUTESERVICE_API_KEY;
+    const res = await run({
+      pickup: { lat: 45, lng: 5 },
+      dropoff: { lat: 46, lng: 6 },
+    });
+    expect(res.status).toBe(500);
   });
 });

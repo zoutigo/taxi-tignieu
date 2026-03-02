@@ -5,6 +5,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
 import { getTariffConfig } from "@/lib/tariff-config";
+import { getOrsDrivingDistance } from "@/lib/ors-distance";
+import { enqueueTariffRecomputeJob } from "@/lib/tariff-recompute-queue";
 
 const payloadSchema = z.object({
   baseCharge: z.number().nonnegative(),
@@ -92,27 +94,33 @@ export async function PATCH(req: Request) {
   safeRevalidate("tariff-config");
   safeRevalidate("featured-trips");
 
-  // Recalcule tous les featured trips/POI pour refléter les nouveaux tarifs.
+  // Recalcul asynchrone via file SQL+cron; fallback sync uniquement si file indisponible.
+  let queuedJobId: string | null = null;
   try {
-    await refreshFeaturedTripsWithTariff();
+    const queued = await enqueueTariffRecomputeJob();
+    queuedJobId = queued?.jobId ?? null;
   } catch (err) {
-    console.error("Failed to refresh featured trips after tariff update:", err);
+    console.error("Failed to enqueue tariff recompute job:", err);
   }
 
-  return NextResponse.json(updated, { status: 200 });
+  if (!queuedJobId) {
+    try {
+      await refreshFeaturedTripsWithTariff();
+    } catch (err) {
+      console.error("Failed to refresh featured trips after tariff update:", err);
+    }
+  }
+
+  return NextResponse.json(
+    {
+      ...updated,
+      recompute: queuedJobId ? { mode: "queued", jobId: queuedJobId } : { mode: "sync_fallback" },
+    },
+    { status: 200 }
+  );
 }
 
 type Coords = { lat: number; lng: number };
-
-const haversineKm = (a: Coords, b: Coords) => {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const la1 = (a.lat * Math.PI) / 180;
-  const la2 = (b.lat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-};
 
 const ensureCoords = async (address: {
   id?: string | null;
@@ -183,12 +191,11 @@ const ensureCoords = async (address: {
 
 const quotePoi = async (from: Coords, to: Coords) => {
   const cfg = await getTariffConfig();
-  const distanceKm = haversineKm(from, to);
-  const durationMinutes = Math.round((distanceKm / 40) * 60); // approx 40 km/h si non fourni
+  const { distanceKm, durationMinutes } = await getOrsDrivingDistance(from, to);
   const price = computePriceEuros(
     distanceKm,
-    "A",
-    { baggageCount: 0, fifthPassenger: false, waitMinutes: 0 },
+    "C",
+    { baggageCount: 1, fifthPassenger: false, waitMinutes: 0 },
     cfg
   );
   return { distanceKm, durationMinutes, price };
@@ -203,6 +210,7 @@ async function refreshFeaturedTripsWithTariff() {
   const trips = await prisma.featuredTrip.findMany({
     include: {
       pickupAddress: true,
+      dropoffAddress: true,
       poiDestinations: { include: { dropoffAddress: true } },
     },
   });
@@ -217,6 +225,7 @@ async function refreshFeaturedTripsWithTariff() {
         longitude: trip.pickupAddress?.longitude,
       });
 
+      let firstPoiPriceCents: number | null = null;
       const updatedPois = [];
       for (const poi of trip.poiDestinations) {
         const label = poi.label;
@@ -228,6 +237,10 @@ async function refreshFeaturedTripsWithTariff() {
         });
 
         const quote = await quotePoi(pickupCoords, dropoffCoords);
+        const poiPriceCents = Math.round(quote.price * 100);
+        if (poi.order === 0 && firstPoiPriceCents == null) {
+          firstPoiPriceCents = poiPriceCents;
+        }
 
         updatedPois.push(
           prisma.featuredPoi.update({
@@ -236,7 +249,7 @@ async function refreshFeaturedTripsWithTariff() {
               dropoffAddressId,
               distanceKm: quote.distanceKm,
               durationMinutes: quote.durationMinutes,
-              priceCents: Math.round(quote.price * 100),
+              priceCents: poiPriceCents,
             },
           })
         );
@@ -244,18 +257,35 @@ async function refreshFeaturedTripsWithTariff() {
 
       await Promise.all(updatedPois);
 
-      const firstPoi = trip.poiDestinations[0];
+      let tripDropoffAddressId = trip.dropoffAddressId ?? null;
+      let typeQuote: { distanceKm: number; durationMinutes: number; price: number } | null = null;
+
+      // For TYPE trips (or trips without POIs), keep trip-level metrics/pricing in sync.
+      if (trip.dropoffLabel) {
+        const { addressId: resolvedDropoffId, coords: dropoffCoords } = await ensureCoords({
+          id: trip.dropoffAddressId,
+          label: trip.dropoffLabel,
+          latitude: trip.dropoffAddress?.latitude,
+          longitude: trip.dropoffAddress?.longitude,
+        });
+        tripDropoffAddressId = resolvedDropoffId;
+        typeQuote = await quotePoi(pickupCoords, dropoffCoords);
+      }
+
       const basePrice =
-        firstPoi && typeof firstPoi.priceCents === "number"
-          ? firstPoi.priceCents
-          : updatedPois.length
-            ? undefined
+        firstPoiPriceCents != null
+          ? firstPoiPriceCents
+          : typeQuote
+            ? Math.round(typeQuote.price * 100)
             : trip.basePriceCents;
 
       await prisma.featuredTrip.update({
         where: { id: trip.id },
         data: {
           pickupAddressId,
+          dropoffAddressId: tripDropoffAddressId,
+          distanceKm: typeQuote?.distanceKm ?? trip.distanceKm,
+          durationMinutes: typeQuote?.durationMinutes ?? trip.durationMinutes,
           basePriceCents: basePrice,
         },
       });

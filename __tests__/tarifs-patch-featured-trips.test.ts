@@ -49,6 +49,7 @@ describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.GOOGLE_MAPS_API_KEY = "test-key";
+    process.env.OPENROUTESERVICE_API_KEY = "test-key";
   });
 
   it("géocode pickup/POI et met à jour distances, durées et prix", async () => {
@@ -100,9 +101,12 @@ describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
       )
       // quote
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ distanceKm: 12.34, durationMinutes: 20, price: 56.78 }), {
-          status: 200,
-        })
+        new Response(
+          JSON.stringify({
+            features: [{ properties: { summary: { distance: 12340, duration: 1200 } } }],
+          }),
+          { status: 200 }
+        )
       );
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -130,8 +134,8 @@ describe("PATCH /api/settings/tarifs - recalcul des featured trips", () => {
     const res = (await PATCH(req)) as Response;
     expect(res.status).toBe(200);
 
-    // 2 appels geocode (pickup + poi) – plus de fetch pour le quote (calcul local)
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // 2 appels geocode (pickup + poi) + 1 appel ORS distance routière
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
     // Adresse pickup créée et mise à jour des coords
     expect(mockAddrCreate).toHaveBeenCalledWith(
