@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { computePriceEuros, defaultTariffConfig } from "@/lib/tarifs";
 import { getTariffConfig } from "@/lib/tariff-config";
 import { getOrsDrivingDistance } from "@/lib/ors-distance";
-import { enqueueTariffRecomputeJob } from "@/lib/tariff-recompute-queue";
+import {
+  enqueueTariffRecomputeJob,
+  processTariffRecomputeBatch,
+} from "@/lib/tariff-recompute-queue";
 
 const payloadSchema = z.object({
   baseCharge: z.number().nonnegative(),
@@ -94,7 +97,7 @@ export async function PATCH(req: Request) {
   safeRevalidate("tariff-config");
   safeRevalidate("featured-trips");
 
-  // Recalcul asynchrone via file SQL+cron; fallback sync uniquement si file indisponible.
+  // Enqueue le job de recompute.
   let queuedJobId: string | null = null;
   try {
     const queued = await enqueueTariffRecomputeJob();
@@ -103,7 +106,23 @@ export async function PATCH(req: Request) {
     console.error("Failed to enqueue tariff recompute job:", err);
   }
 
-  if (!queuedJobId) {
+  if (queuedJobId) {
+    // Drain la queue en arrière-plan après l'envoi de la réponse HTTP.
+    // after() maintient le process Node.js en vie jusqu'à la fin du callback,
+    // sans bloquer le client qui reçoit sa réponse immédiatement.
+    after(async () => {
+      let idle = false;
+      while (!idle) {
+        const result = await processTariffRecomputeBatch(5);
+        // On s'arrête quand il n'y a plus rien à traiter maintenant
+        // (items RETRY avec nextAttemptAt dans le futur seront repris par le cron).
+        if (!result.ok || result.processed === 0) {
+          idle = true;
+        }
+      }
+    });
+  } else {
+    // Fallback sync si la queue SQL est indisponible.
     try {
       await refreshFeaturedTripsWithTariff();
     } catch (err) {
@@ -114,7 +133,9 @@ export async function PATCH(req: Request) {
   return NextResponse.json(
     {
       ...updated,
-      recompute: queuedJobId ? { mode: "queued", jobId: queuedJobId } : { mode: "sync_fallback" },
+      recompute: queuedJobId
+        ? { mode: "background", jobId: queuedJobId }
+        : { mode: "sync_fallback" },
     },
     { status: 200 }
   );
