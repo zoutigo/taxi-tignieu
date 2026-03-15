@@ -3,6 +3,8 @@ import { getTariffConfig } from "@/lib/tariff-config";
 import { computePriceEuros } from "@/lib/tarifs";
 import { getOrsDrivingDistance } from "@/lib/ors-distance";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 type Coords = { lat: number; lng: number };
 
 const quotePoi = async (from: Coords, to: Coords) => {
@@ -104,7 +106,10 @@ export async function recomputeFeaturedTripById(tripId: string): Promise<void> {
   });
 
   let firstPoiPriceCents: number | null = null;
-  for (const poi of trip.poiDestinations) {
+  for (let poiIdx = 0; poiIdx < trip.poiDestinations.length; poiIdx++) {
+    const poi = trip.poiDestinations[poiIdx];
+    // Throttle entre chaque appel ORS pour rester sous la limite du plan gratuit (40 req/min).
+    if (poiIdx > 0) await sleep(1800);
     const { addressId: dropoffAddressId, coords: dropoffCoords } = await ensureCoords({
       id: poi.dropoffAddressId,
       label: poi.label,

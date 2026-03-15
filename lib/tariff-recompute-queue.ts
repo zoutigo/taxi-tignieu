@@ -260,19 +260,20 @@ export async function processTariffRecomputeBatch(limit = 5) {
     await sleep(1700);
   }
 
+  // Aliases en snake_case pour éviter la perte de casse MySQL (doneCount → donecount → undefined).
   const counts = await raw.$queryRawUnsafe<
-    Array<{ total: number; doneCount: number; failedCount: number; pendingCount: number }>
+    Array<{ total: number; done_count: number; failed_count: number; pending_count: number }>
   >(
     `SELECT
       COUNT(*) as total,
-      SUM(CASE WHEN status='DONE' THEN 1 ELSE 0 END) as doneCount,
-      SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END) as failedCount,
-      SUM(CASE WHEN status IN ('PENDING','RUNNING','RETRY') THEN 1 ELSE 0 END) as pendingCount
+      SUM(CASE WHEN status='DONE' THEN 1 ELSE 0 END) as done_count,
+      SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END) as failed_count,
+      SUM(CASE WHEN status IN ('PENDING','RUNNING','RETRY') THEN 1 ELSE 0 END) as pending_count
      FROM tariff_recompute_items
      WHERE jobId=?`,
     job.id
   );
-  const rawCounts = counts[0] ?? { total: 0, doneCount: 0, failedCount: 0, pendingCount: 0 };
+  const rawCounts = counts[0] ?? { total: 0, done_count: 0, failed_count: 0, pending_count: 0 };
   const toInt = (v: unknown) => {
     if (typeof v === "number") return v;
     if (typeof v === "bigint") return Number(v);
@@ -281,9 +282,9 @@ export async function processTariffRecomputeBatch(limit = 5) {
   };
   const c = {
     total: toInt(rawCounts.total),
-    doneCount: toInt(rawCounts.doneCount),
-    failedCount: toInt(rawCounts.failedCount),
-    pendingCount: toInt(rawCounts.pendingCount),
+    doneCount: toInt(rawCounts.done_count),
+    failedCount: toInt(rawCounts.failed_count),
+    pendingCount: toInt(rawCounts.pending_count),
   };
 
   let status: JobRow["status"] = "RUNNING";
